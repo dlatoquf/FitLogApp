@@ -1,0 +1,98 @@
+/**
+ * FitLog API 공통 훅
+ */
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_URL } from "../constants/api";
+
+/**
+ * JWT를 포함한 fetch 헬퍼
+ */
+export async function apiFetch(
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const jwt = await AsyncStorage.getItem("jwt");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (jwt) {
+    headers["Authorization"] = `Bearer ${jwt}`;
+  }
+  return fetch(`${API_URL}${path}`, { ...options, headers });
+}
+
+/**
+ * GET 요청 헬퍼
+ */
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await apiFetch(path);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `오류: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * POST 요청 헬퍼
+ */
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "POST",
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `오류: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * PUT 요청 헬퍼
+ */
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "PUT",
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `오류: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * DELETE 요청 헬퍼
+ */
+export async function apiDelete(path: string): Promise<void> {
+  const res = await apiFetch(path, { method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `오류: ${res.status}`);
+  }
+}
+
+/**
+ * 날짜를 YYYY-MM-DD 형식으로 변환
+ */
+export function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * 주간 날짜 배열 반환 (월~일)
+ */
+export function getWeekDates(offset = 0): Date[] {
+  const today = new Date();
+  const day = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}

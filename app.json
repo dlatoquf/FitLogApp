@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "FitLogApp",
+    "slug": "FitLogApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "fitlogapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.FitLogApp",
+      "infoPlist": {
+        "KAKAO_APP_KEY": "e889ccffb6096521a6b49b9774f4d9ab",
+        "KAKAO_APP_SCHEME": "kakaoe889ccffb6096521a6b49b9774f4d9ab",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["fitlogapp"]
+          },
+          {
+            "CFBundleURLSchemes": ["kakaoe889ccffb6096521a6b49b9774f4d9ab"]
+          }
+        ],
+        "LSApplicationQueriesSchemes": [
+          "kakaokompassauth",
+          "kakaolink",
+          "storykompassauth"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.anonymous.FitLogApp",
+      "adaptiveIcon": {
+        "backgroundColor": "#2e8b57",
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "@react-native-seoul/kakao-login",
+        {
+          "kakaoAppKey": "e889ccffb6096521a6b49b9774f4d9ab"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
