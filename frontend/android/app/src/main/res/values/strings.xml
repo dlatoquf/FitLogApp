@@ -1,0 +1,5 @@
+<resources>
+  <string name="app_name">FitLogApp</string>
+  <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
+  <string name="kakao_app_key">e889ccffb6096521a6b49b9774f4d9ab</string>
+</resources>

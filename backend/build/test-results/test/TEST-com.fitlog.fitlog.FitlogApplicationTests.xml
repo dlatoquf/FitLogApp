@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.fitlog.fitlog.FitlogApplicationTests" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-30T05:09:12.394Z" hostname="imsaebyeol-ui-MacBookAir.local" time="21.668">
+  <properties/>
+  <testcase name="contextLoads()" classname="com.fitlog.fitlog.FitlogApplicationTests" time="0.298"/>
+  <system-out><![CDATA[14:09:12.479 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.fitlog.fitlog.FitlogApplicationTests]: FitlogApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:09:12.529 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.fitlog.fitlog.FitlogApplication for test class com.fitlog.fitlog.FitlogApplicationTests
+14:09:12.567 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.fitlog.fitlog.FitlogApplicationTests]: FitlogApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:09:12.568 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.fitlog.fitlog.FitlogApplication for test class com.fitlog.fitlog.FitlogApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.6)
+
+2026-04-30T14:09:12.720+09:00  INFO 42005 --- [    Test worker] c.fitlog.fitlog.FitlogApplicationTests   : Starting FitlogApplicationTests using Java 17 with PID 42005 (started by imsaebyeol in /Users/imsaebyeol/Desktop/fitlog)
+2026-04-30T14:09:12.721+09:00  INFO 42005 --- [    Test worker] c.fitlog.fitlog.FitlogApplicationTests   : No active profile set, falling back to 1 default profile: "default"
+2026-04-30T14:09:13.051+09:00  INFO 42005 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-30T14:09:13.129+09:00  INFO 42005 --- [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 73 ms. Found 5 JPA repository interfaces.
+2026-04-30T14:09:13.300+09:00  INFO 42005 --- [    Test worker] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-04-30T14:09:13.337+09:00  INFO 42005 --- [    Test worker] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.12.Final
+2026-04-30T14:09:13.547+09:00  INFO 42005 --- [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-04-30T14:09:13.566+09:00  INFO 42005 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-04-30T14:09:17.710+09:00  INFO 42005 --- [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@7efba9b9
+2026-04-30T14:09:17.714+09:00  INFO 42005 --- [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-04-30T14:09:18.449+09:00  WARN 42005 --- [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-04-30T14:09:18.783+09:00  INFO 42005 --- [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:mysql://switchyard.proxy.rlwy.net:48785/railway?serverTimezone=Asia/Seoul&characterEncoding=UTF-8]
+	Database driver: MySQL Connector/J
+	Database dialect: MySQLDialect
+	Database version: 9.4
+	Default catalog/schema: railway/undefined
+	Autocommit mode: undefined/unknown
+	Isolation level: REPEATABLE_READ [default REPEATABLE_READ]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-04-30T14:09:19.296+09:00  INFO 42005 --- [    Test worker] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+Hibernate: 
+    create table members (
+        id bigint not null auto_increment,
+        body_fat float(53),
+        height float(53),
+        muscle_mass float(53),
+        phone varchar(255),
+        pt_remaining integer,
+        weight float(53),
+        trainer_id bigint,
+        user_id bigint not null,
+        primary key (id)
+    ) engine=InnoDB
+Hibernate: 
+    create table schedule_requests (
+        id bigint not null auto_increment,
+        status enum ('CONFIRMED','PENDING','REJECTED'),
+        member_id bigint not null,
+        schedule_id bigint not null,
+        primary key (id)
+    ) engine=InnoDB
+Hibernate: 
+    create table schedules (
+        id bigint not null auto_increment,
+        date date,
+        end_time time(0),
+        start_time time(0),
+        status enum ('CONFIRMED','OPEN','REQUESTED'),
+        trainer_id bigint not null,
+        primary key (id)
+    ) engine=InnoDB
+Hibernate: 
+    create table trainers (
+        id bigint not null auto_increment,
+        end_time varchar(255),
+        gym_name varchar(255),
+        start_time varchar(255),
+        trainer_code varchar(255),
+        work_days varchar(255),
+        user_id bigint not null,
+        primary key (id)
+    ) engine=InnoDB
+Hibernate: 
+    alter table users 
+       add column email varchar(255)
+Hibernate: 
+    alter table users 
+       modify column kakao_id bigint not null
+Hibernate: 
+    alter table users 
+       modify column name varchar(255)
+Hibernate: 
+    alter table members 
+       drop index UKda61ga2jecphdliwvkqyt6sw2
+Hibernate: 
+    alter table members 
+       add constraint UKda61ga2jecphdliwvkqyt6sw2 unique (user_id)
+Hibernate: 
+    alter table trainers 
+       drop index UKse8qmhomor3guutjui5wfmrk3
+Hibernate: 
+    alter table trainers 
+       add constraint UKse8qmhomor3guutjui5wfmrk3 unique (user_id)
+Hibernate: 
+    alter table members 
+       add constraint FKpuumgrbmt270og5275pwltnq 
+       foreign key (trainer_id) 
+       references trainers (id)
+Hibernate: 
+    alter table members 
+       add constraint FKpj3n6wh5muoeakc485whgs3x5 
+       foreign key (user_id) 
+       references users (id)
+Hibernate: 
+    alter table schedule_requests 
+       add constraint FKre9mggf7oq9r8ccoac542u0w6 
+       foreign key (member_id) 
+       references members (id)
+Hibernate: 
+    alter table schedule_requests 
+       add constraint FKji828mcairk2icl9i2th6vqcx 
+       foreign key (schedule_id) 
+       references schedules (id)
+Hibernate: 
+    alter table schedules 
+       add constraint FK8k8sargvsxu3pbed0a0q0bspi 
+       foreign key (trainer_id) 
+       references trainers (id)
+Hibernate: 
+    alter table trainers 
+       add constraint FKmkxcvfr0uu3pwv772aurye5w7 
+       foreign key (user_id) 
+       references users (id)
+2026-04-30T14:09:33.234+09:00  INFO 42005 --- [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-04-30T14:09:33.389+09:00  INFO 42005 --- [    Test worker] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-04-30T14:09:33.568+09:00  WARN 42005 --- [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-04-30T14:09:33.755+09:00  INFO 42005 --- [    Test worker] c.fitlog.fitlog.FitlogApplicationTests   : Started FitlogApplicationTests in 21.148 seconds (process running for 21.772)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
