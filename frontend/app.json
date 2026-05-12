@@ -51,6 +51,12 @@
         {
           "kakaoAppKey": "e889ccffb6096521a6b49b9774f4d9ab"
         }
+      ],
+      [
+        "@react-native-kakao/core",
+        {
+          "nativeAppKey": "e889ccffb6096521a6b49b9774f4d9ab"
+        }
       ]
     ],
     "experiments": {

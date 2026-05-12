@@ -1,0 +1,116 @@
+package com.fitlog.fitlog.schedule.controller;
+
+import com.fitlog.fitlog.schedule.dto.ScheduleRequest;
+import com.fitlog.fitlog.schedule.entity.Schedule;
+import com.fitlog.fitlog.schedule.service.ScheduleService;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/schedule")
+public class ScheduleController {
+
+    private final ScheduleService scheduleService;
+
+    public ScheduleController(ScheduleService scheduleService) {
+        this.scheduleService = scheduleService;
+    }
+
+    @GetMapping("/slots")
+    public List<Schedule> getSlots(@RequestHeader("Authorization") String auth) {
+        return scheduleService.getSlotsForMember(auth);
+    }
+
+    @GetMapping("/my-this-week")
+    public ResponseEntity<List<Map<String, Object>>> getMyThisWeek(
+            @RequestHeader("Authorization") String auth) {
+        return ResponseEntity.ok(scheduleService.getMyThisWeekSchedules(auth));
+    }
+
+    @GetMapping("/next-week-slots")
+    public ResponseEntity<List<Map<String, Object>>> getNextWeekSlots(
+            @RequestHeader("Authorization") String auth) {
+        return ResponseEntity.ok(scheduleService.getNextWeekSlotsForMember(auth));
+    }
+
+    @PostMapping("/request/{scheduleId}")
+    public ResponseEntity<Void> requestSlot(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId) {
+        scheduleService.requestSlot(auth, scheduleId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/request/{scheduleId}")
+    public ResponseEntity<Void> cancelRequest(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId) {
+        scheduleService.cancelRequest(auth, scheduleId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/requests/{scheduleId}")
+    public List<Map<String, Object>> getRequests(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId) {
+        return scheduleService.getRequestsBySlot(auth, scheduleId);
+    }
+
+    @PostMapping("/confirm/{scheduleId}")
+    public ResponseEntity<Void> confirmRequest(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId,
+            @RequestBody Map<String, Long> body) {
+        scheduleService.confirmRequest(auth, scheduleId, body.get("memberId"));
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/calendar")
+    public List<Map<String, Object>> getCalendar(
+            @RequestHeader("Authorization") String auth,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
+        return scheduleService.getWeeklyCalendar(auth, weekStart);
+    }
+
+    @PostMapping("/generate")
+    public ResponseEntity<Map<String, Object>> generateSlots(
+            @RequestHeader("Authorization") String auth) {
+        try {
+            scheduleService.generateSlotsForTrainer(auth);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "다음 주 슬롯이 오픈됐어요."
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/create-and-confirm")
+    public ResponseEntity<Void> createAndConfirm(
+            @RequestHeader("Authorization") String auth,
+            @RequestBody Map<String, Object> body) {
+        String date      = (String) body.get("date");
+        String startTime = (String) body.get("startTime");
+        Long memberId    = ((Number) body.get("memberId")).longValue();
+        scheduleService.createAndConfirm(auth, date, startTime, memberId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/confirm/{scheduleId}")
+    public ResponseEntity<Void> cancelConfirmed(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId) {
+        scheduleService.cancelConfirmed(auth, scheduleId);
+        return ResponseEntity.ok().build();
+    }
+}

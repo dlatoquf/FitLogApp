@@ -38,12 +38,11 @@ export default function SignupMemberScreen() {
       return;
     }
     setVerifying(true);
-    // 실제로는 서버에 코드 검증 요청을 보내야 합니다.
-    // 현재는 6자리 코드를 입력하면 검증 성공으로 처리합니다.
+    // 실제 연결 가능 여부는 가입 완료 시 서버에서 최종 확인합니다.
     setTimeout(() => {
       setVerifying(false);
       setCodeVerified(true);
-    }, 800);
+    }, 300);
   };
 
   const handleSubmit = async () => {
@@ -60,7 +59,6 @@ export default function SignupMemberScreen() {
       const body: Record<string, any> = {
         name,
         phone: phone.replace(/-/g, ""),
-        trainerCode: trainerCode.trim() || undefined,
       };
       if (height) body.height = parseFloat(height);
       if (weight) body.weight = parseFloat(weight);
@@ -77,8 +75,66 @@ export default function SignupMemberScreen() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "프로필 저장 실패");
+        const raw = await res.text();
+        let message = raw || "프로필 저장 실패";
+
+        try {
+          const data = raw ? JSON.parse(raw) : {};
+          message = data.message ?? message;
+        } catch {}
+
+        if (message.includes("무료 플랜") || message.includes("회원 3명")) {
+          // TODO: 실제 배포 시 문구 그대로 유지 (회원 3명 초과)
+          // 현재는 테스트용으로 1명 초과 시 동일 메시지 표시
+          Alert.alert(
+            "연결 불가",
+            "트레이너의 무료 플랜은 회원 3명까지 연결할 수 있어요.\n트레이너에게 PRO 업그레이드를 요청해주세요."
+          );
+          return;
+        }
+
+        throw new Error(message);
+      }
+
+      const code = trainerCode.trim().toUpperCase();
+
+      if (code) {
+        const connectRes = await fetch(`${API_URL}/api/member/connect-trainer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({ trainerCode: code }),
+        });
+
+        const raw = await connectRes.text();
+        let message = raw || "트레이너 연결 실패";
+
+        try {
+          const data = raw ? JSON.parse(raw) : {};
+          message = data.message ?? message;
+        } catch {}
+
+        if (!connectRes.ok) {
+          await AsyncStorage.removeItem("pendingName");
+
+          if (message.includes("무료 플랜") || message.includes("회원 3명")) {
+            Alert.alert(
+              "가입 완료 · 트레이너 연결 불가",
+              "프로필 가입은 완료됐지만, 트레이너의 무료 플랜은 회원 3명까지라 연결할 수 없어요.\n트레이너에게 PRO 업그레이드를 요청해주세요.",
+              [{ text: "확인", onPress: () => router.replace("/(tabs)/member/home") }]
+            );
+            return;
+          }
+
+          Alert.alert(
+            "가입 완료 · 트레이너 연결 실패",
+            message,
+            [{ text: "확인", onPress: () => router.replace("/(tabs)/member/home") }]
+          );
+          return;
+        }
       }
 
       await AsyncStorage.removeItem("pendingName");

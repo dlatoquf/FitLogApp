@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context"; // ✅ deprecated 교체
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { API_URL } from "../../constants/api";
 
@@ -22,7 +22,77 @@ try {
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
+  // 앱 진입 시 JWT 자동검증 중에는 스플래시처럼 로딩 표시
+  const [checkingToken, setCheckingToken] = useState(true);
 
+  // ─────────────────────────────────────────────
+  // 앱 최초 진입 시: 저장된 JWT로 자동 로그인 시도
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    const tryAutoLogin = async () => {
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+
+        if (!jwt) {
+          // JWT 없음 → 로그인 화면 표시
+          setCheckingToken(false);
+          return;
+        }
+
+        // JWT 있음 → 서버에서 유효성 검증
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
+
+        if (!res.ok) {
+          // 토큰 만료 또는 유효하지 않음 → 삭제 후 로그인 화면
+          await AsyncStorage.multiRemove(["jwt", "role"]);
+          setCheckingToken(false);
+          return;
+        }
+
+        const data: { jwt: string; isNewUser: boolean; role: string | null } =
+          await res.json();
+
+        // role 최신화
+        if (data.role) {
+          await AsyncStorage.setItem("role", data.role);
+        }
+
+        // 자동 로그인 성공 → 홈으로 이동
+        navigateByRole(data.role);
+      } catch {
+        // 네트워크 오류 등 → 캐시된 role로 오프라인 진입 시도
+        const cachedRole = await AsyncStorage.getItem("role");
+        if (cachedRole) {
+          navigateByRole(cachedRole);
+        } else {
+          setCheckingToken(false);
+        }
+      }
+    };
+
+    tryAutoLogin();
+  }, []);
+
+  // role에 따라 화면 이동
+  const navigateByRole = (role: string | null) => {
+    if (!role) {
+      router.replace("/auth/signup");
+    } else if (role === "TRAINER") {
+      router.replace("/(tabs)/trainer/home");
+    } else if (role === "MEMBER") {
+      router.replace("/(tabs)/member/home");
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // 카카오 로그인 버튼 핸들러
+  // ─────────────────────────────────────────────
   const handleKakaoLogin = async () => {
     if (!loginWithKakaoAccount) {
       Alert.alert("개발 모드", "카카오 로그인 라이브러리가 없습니다.\n테스트용으로 이동합니다.", [
@@ -35,10 +105,9 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // 1. 카카오 로그인
+      // 1. 카카오 SDK 로그인
       const kakaoResult = await loginWithKakaoAccount();
 
-      // ✅ 카카오 SDK 응답에서 accessToken 안전하게 추출 (키 이름 대응)
       const accessToken =
         kakaoResult?.accessToken ??
         kakaoResult?.access_token ??
@@ -66,17 +135,16 @@ export default function LoginScreen() {
       if (!res.ok) throw new Error((data as any)?.message || `오류: ${res.status}`);
 
       const { jwt, isNewUser, role } = data;
+
+      // JWT & role 저장 (자동 로그인에 사용)
       await AsyncStorage.setItem("jwt", jwt);
-      // ✅ role도 저장해두면 네트워크 오류 시 index.tsx에서 활용 가능
       if (role) await AsyncStorage.setItem("role", role);
 
       // 3. 라우팅
       if (isNewUser || !role) {
         router.replace("/auth/signup");
-      } else if (role === "TRAINER") {
-        router.replace("/(tabs)/trainer/home");
-      } else if (role === "MEMBER") {
-        router.replace("/(tabs)/member/home");
+      } else {
+        navigateByRole(role);
       }
     } catch (e: any) {
       Alert.alert("로그인 실패", e?.message ?? "알 수 없는 오류가 발생했어요.");
@@ -85,6 +153,20 @@ export default function LoginScreen() {
     }
   };
 
+  // ─────────────────────────────────────────────
+  // JWT 자동검증 중 → 로딩 스피너만 표시
+  // ─────────────────────────────────────────────
+  if (checkingToken) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={Colors.green} />
+      </SafeAreaView>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // 로그인 화면 UI
+  // ─────────────────────────────────────────────
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <View

@@ -1,7 +1,9 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -10,61 +12,63 @@ import {
   View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
-import { ENDPOINTS } from "../../../constants/api";
-import { apiGet } from "../../../hooks/useApi";
-import { Member } from "../../../types";
+import { API_URL } from "../../../constants/api";
+
+interface MemberUser {
+  id: number;
+  name: string;
+}
+
+interface Member {
+  id: number;
+  user: MemberUser;
+  ptRemaining: number | null;
+  ptTotal: number | null;
+  goal: string | null;
+}
 
 export default function TrainerMembersScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | "active" | "inactive">("all");
 
   const fetchMembers = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+  
     try {
-      const data = await apiGet<Member[]>(ENDPOINTS.trainer.members);
+      const jwt = await AsyncStorage.getItem("jwt");
+  
+      if (!jwt) {
+        throw new Error("로그인 정보가 없어요. 다시 로그인해주세요.");
+      }
+  
+      const res = await fetch(`${API_URL}/api/trainer/members`, {
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+      });
+  
+      const text = await res.text();
+  
+      console.log("회원관리 status:", res.status);
+      console.log("회원관리 raw 응답:", text);
+  
+      if (!res.ok) {
+        throw new Error(`회원 목록 조회 실패 (${res.status}): ${text}`);
+      }
+  
+      let data: Member[];
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`서버 응답이 JSON이 아니에요: ${text}`);
+      }
+  
       setMembers(data);
-    } catch {
-      // 더미 데이터
-      setMembers([
-        {
-          id: 1,
-          user: { id: 1, name: "김지수" },
-          ptRemaining: 12,
-          ptTotal: 20,
-          ptStartDate: "2025-03-01",
-          ptExpDate: "2025-06-30",
-          goal: "체지방 감량",
-          status: "ACTIVE",
-        },
-        {
-          id: 2,
-          user: { id: 2, name: "이준호" },
-          ptRemaining: 18,
-          ptTotal: 30,
-          goal: "근육 증가",
-          status: "ACTIVE",
-        },
-        {
-          id: 3,
-          user: { id: 3, name: "박민지" },
-          ptRemaining: 3,
-          ptTotal: 10,
-          goal: "체력 향상",
-          status: "ACTIVE",
-        },
-        {
-          id: 4,
-          user: { id: 4, name: "최영호" },
-          ptRemaining: 0,
-          ptTotal: 0,
-          goal: "다이어트",
-          status: "INACTIVE",
-        },
-      ]);
+    } catch (e: any) {
+      Alert.alert("오류", e?.message ?? "회원 목록을 불러오지 못했어요.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,14 +79,9 @@ export default function TrainerMembersScreen() {
     fetchMembers();
   }, [fetchMembers]);
 
-  const filtered = members.filter((m) => {
-    const matchSearch = m.user.name.includes(search);
-    const matchTab =
-      tab === "all" ||
-      (tab === "active" && m.status === "ACTIVE") ||
-      (tab === "inactive" && m.status === "INACTIVE");
-    return matchSearch && matchTab;
-  });
+  const filtered = members.filter((m) =>
+    m.user.name.includes(search)
+  );
 
   if (loading) {
     return (
@@ -105,44 +104,24 @@ export default function TrainerMembersScreen() {
         }
       >
         {/* 헤더 */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
-            회원 관리
-          </Text>
-          <View
-            style={{
-              backgroundColor: Colors.green,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-              borderRadius: 99,
-            }}
-          >
-            <Text style={{ fontSize: 13, color: "#fff", fontWeight: "700" }}>
-              {members.length}명
-            </Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>회원 관리</Text>
+          <View style={{ backgroundColor: Colors.green, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99 }}>
+            <Text style={{ fontSize: 13, color: "#fff", fontWeight: "700" }}>{members.length}명</Text>
           </View>
         </View>
 
         {/* 검색 */}
-        <View
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderWidth: 1.5,
-            borderColor: Colors.border,
-            borderRadius: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 14,
-            marginBottom: 14,
-          }}
-        >
+        <View style={{
+          backgroundColor: Colors.bgSub,
+          borderWidth: 1.5,
+          borderColor: Colors.border,
+          borderRadius: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 14,
+          marginBottom: 16,
+        }}>
           <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
           <TextInput
             placeholder="회원 이름 검색"
@@ -151,35 +130,6 @@ export default function TrainerMembersScreen() {
             onChangeText={setSearch}
             style={{ flex: 1, fontSize: 14, color: Colors.text, paddingVertical: 12 }}
           />
-        </View>
-
-        {/* 탭 */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-          {(["all", "active", "inactive"] as const).map((t) => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t)}
-              style={{
-                flex: 1,
-                paddingVertical: 9,
-                borderRadius: 10,
-                alignItems: "center",
-                backgroundColor: tab === t ? Colors.green : Colors.bgSub,
-                borderWidth: 1,
-                borderColor: tab === t ? Colors.green : Colors.border,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "700",
-                  color: tab === t ? "#fff" : Colors.textMuted,
-                }}
-              >
-                {t === "all" ? "전체" : t === "active" ? "활성" : "비활성"}
-              </Text>
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* 회원 목록 */}
@@ -194,9 +144,7 @@ export default function TrainerMembersScreen() {
           filtered.map((m) => (
             <TouchableOpacity
               key={m.id}
-              onPress={() =>
-                router.push(`/(tabs)/trainer/member-detail?id=${m.id}`)
-              }
+              onPress={() => router.push(`/(tabs)/trainer/member-detail?id=${m.id}`)}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -209,33 +157,23 @@ export default function TrainerMembersScreen() {
               }}
             >
               {/* 아바타 */}
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  backgroundColor:
-                    m.status === "ACTIVE" ? Colors.green : Colors.border,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: 12,
-                }}
-              >
+              <View style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                backgroundColor: Colors.green,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 12,
+              }}>
                 <Text style={{ fontSize: 18, fontWeight: "800", color: "#fff" }}>
                   {m.user.name[0]}
                 </Text>
               </View>
 
-              {/* 정보 */}
+              {/* 이름 + 목표 */}
               <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "700",
-                    color: Colors.text,
-                    marginBottom: 2,
-                  }}
-                >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text, marginBottom: 2 }}>
                   {m.user.name}
                 </Text>
                 <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -245,42 +183,27 @@ export default function TrainerMembersScreen() {
 
               {/* PT 잔여 */}
               <View style={{ alignItems: "flex-end" }}>
-                {m.ptTotal > 0 ? (
+                {m.ptTotal && m.ptTotal > 0 ? (
                   <>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        fontWeight: "900",
-                        color:
-                          m.ptRemaining <= 3 ? Colors.red : Colors.blue,
-                      }}
-                    >
-                      {m.ptRemaining}회
+                    <Text style={{
+                      fontSize: 18,
+                      fontWeight: "900",
+                      color: (m.ptRemaining ?? 0) <= 3 ? Colors.red : Colors.blue,
+                    }}>
+                      {m.ptRemaining ?? 0}
                     </Text>
-                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                      / {m.ptTotal}회
-                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>/ {m.ptTotal}회</Text>
                   </>
                 ) : (
-                  <View
-                    style={{
-                      backgroundColor: Colors.goldBg,
-                      borderWidth: 1,
-                      borderColor: Colors.gold + "44",
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: Colors.gold,
-                        fontWeight: "700",
-                      }}
-                    >
-                      PT 미등록
-                    </Text>
+                  <View style={{
+                    backgroundColor: Colors.goldBg,
+                    borderWidth: 1,
+                    borderColor: Colors.gold + "44",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                  }}>
+                    <Text style={{ fontSize: 11, color: Colors.gold, fontWeight: "700" }}>PT 미등록</Text>
                   </View>
                 )}
               </View>

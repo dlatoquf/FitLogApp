@@ -107,6 +107,7 @@ export interface FoodSearchResult {
   carbs: number;
   protein: number;
   fat: number;
+  source?: "internal" | "kfood" | "fatsecret"; // 검색 출처
 }
 
 export interface DietFeedback {
