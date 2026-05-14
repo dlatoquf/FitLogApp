@@ -42,3 +42,6 @@ app-example
 /ios
 /android
 backend/src/main/resources/application.properties
+
+backend/src/main/resources/firebase-service-account.json
+backend/build/resources/main/firebase-service-account.json
