@@ -5,10 +5,18 @@ import com.fitlog.fitlog.diet.repository.FoodRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import io.netty.resolver.DefaultAddressResolverGroup;
 
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class FoodSearchService {
@@ -20,7 +28,13 @@ public class FoodSearchService {
     @Value("${kfood.api-key:}")
     private String kfoodApiKey;
 
-    private final WebClient kfoodClient = WebClient.create("https://apis.data.go.kr");
+    private final WebClient kfoodClient = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(
+                    HttpClient.create()
+                            .resolver(DefaultAddressResolverGroup.INSTANCE)
+                            .responseTimeout(Duration.ofSeconds(2))
+            ))
+            .build();
 
     public FoodSearchService(FoodRepository foodRepository, FatSecretService fatSecretService, DeepLService deepLService) {
         this.foodRepository = foodRepository;
@@ -28,100 +42,137 @@ public class FoodSearchService {
         this.deepLService = deepLService;
     }
 
-    // ── 통합 검색 결과 DTO ────────────────────────────────────────────────────
     public record FoodSearchResult(
-            String foodId,       // foods.food_id (내부) 또는 fatsecret food_id (외부)
-            String foodName,     // 한글 이름
+            String foodId,
+            String foodName,
             double calories,
             double carbs,
             double protein,
             double fat,
-            String source        // "internal" | "kfood" | "fatsecret"
+            String source
     ) {}
 
-    // ── 메인 통합 검색 ─────────────────────────────────────────────────────────
     public List<FoodSearchResult> search(String query) {
 
         // Step 1: 내부 DB 조회
-        List<Food> internalResults = foodRepository.findByFoodNameContaining(query);
-        if (!internalResults.isEmpty()) {
-            return internalResults.stream()
-                    .limit(10)
-                    .map(f -> new FoodSearchResult(
-                            "internal:" + f.getFoodId(),
-                            f.getFoodName(),
-                            f.getCalories() != null ? f.getCalories() : 0,
-                            f.getCarbohydrate() != null ? f.getCarbohydrate() : 0,
-                            f.getProtein() != null ? f.getProtein() : 0,
-                            f.getFat() != null ? f.getFat() : 0,
-                            "internal"
-                    ))
-                    .toList();
-        }
+        List<FoodSearchResult> internalResults = foodRepository.findByFoodNameContaining(query)
+                .stream()
+                .map(f -> new FoodSearchResult(
+                        "internal:" + f.getFoodId(),
+                        f.getFoodName(),
+                        f.getCalories() != null ? f.getCalories() : 0,
+                        f.getCarbohydrate() != null ? f.getCarbohydrate() : 0,
+                        f.getProtein() != null ? f.getProtein() : 0,
+                        f.getFat() != null ? f.getFat() : 0,
+                        "internal"
+                ))
+                .toList();
 
-        // Step 2: 식약처 공공 API 조회 (API 키가 있을 때만)
-        if (kfoodApiKey != null && !kfoodApiKey.isBlank()) {
-            List<FoodSearchResult> kfoodResults = searchKfood(query);
-            if (!kfoodResults.isEmpty()) {
-                return kfoodResults;
+        // Step 2: 식약처 + FatSecret 병렬 호출
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        Future<List<FoodSearchResult>> kfoodFuture = executor.submit(() -> {
+            if (kfoodApiKey != null && !kfoodApiKey.isBlank()) {
+                return searchKfood(query);
             }
-        }
-
-        // Step 3: DeepL로 한글 → 영어 번역 후 FatSecret fallback
-        try {
-            String englishQuery = deepLService.translateToEnglish(query);
-            System.out.println("DeepL 번역: " + query + " → " + englishQuery);
-
-            List<FatSecretService.FoodSearchResult> fsResults = fatSecretService.searchFood(englishQuery);
-            return fsResults.stream()
-                    .map(f -> new FoodSearchResult(
-                            "fatsecret:" + f.foodId(),
-                            f.foodName() + " (" + englishQuery + ")",  // 영어 이름 + 번역어 표시
-                            f.calories(),
-                            f.carbs(),
-                            f.protein(),
-                            f.fat(),
-                            "fatsecret"
-                    ))
-                    .toList();
-        } catch (Exception e) {
             return List.of();
+        });
+
+        Future<List<FoodSearchResult>> fatSecretFuture = executor.submit(() -> {
+            try {
+                String englishQuery = deepLService.translateToEnglish(query);
+                System.out.println("DeepL 번역: " + query + " → " + englishQuery);
+                List<FatSecretService.FoodSearchResult> fsResults = fatSecretService.searchFood(englishQuery);
+                return fsResults.stream()
+                        .map(f -> new FoodSearchResult(
+                                "fatsecret:" + f.foodId(),
+                                query,
+                                f.calories(),
+                                f.carbs(),
+                                f.protein(),
+                                f.fat(),
+                                "fatsecret"
+                        ))
+                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                return List.of();
+            }
+        });
+
+        List<FoodSearchResult> kfoodResults = new ArrayList<>();
+        List<FoodSearchResult> fatSecretResults = new ArrayList<>();
+
+        try {
+            kfoodResults = kfoodFuture.get(3, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            System.out.println("식약처 타임아웃 또는 오류");
         }
+
+        try {
+            fatSecretResults = fatSecretFuture.get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            System.out.println("FatSecret 타임아웃 또는 오류");
+        }
+
+        executor.shutdown();
+
+        // 합치기: FatSecret(정확한 식품) 먼저, 내부DB, 식약처 순
+        List<FoodSearchResult> combined = Stream.concat(
+                fatSecretResults.stream(),
+                Stream.concat(internalResults.stream(), kfoodResults.stream())
+        ).limit(10).collect(Collectors.toList());
+
+        if (!combined.isEmpty()) {
+            return sortResults(combined, query);
+        }
+
+        return List.of();
     }
 
-    // ── 식약처 공공 API 호출 ─────────────────────────────────────────────────
+    private List<FoodSearchResult> sortResults(List<FoodSearchResult> results, String query) {
+        return results.stream()
+                .sorted(Comparator.comparingInt(r -> {
+                    String name = r.foodName();
+                    if (name.equals(query)) return 0;
+                    if (name.startsWith(query)) return 1;
+                    if (name.contains(query)) return 2;
+                    return 3;
+                }))
+                .toList();
+    }
+
     @SuppressWarnings("unchecked")
     private List<FoodSearchResult> searchKfood(String query) {
         try {
+            String encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
+            String rawUrl = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
+                    + "?serviceKey=" + kfoodApiKey
+                    + "&FOOD_NM_KR=" + encodedQuery
+                    + "&pageNo=1&numOfRows=10&type=json";
+
             Map<?, ?> response = kfoodClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/1471000/FoodNtrIrdntInfoService1/getFoodNtrItdntList1")
-                            .queryParam("serviceKey", kfoodApiKey)
-                            .queryParam("desc_kor", query)
-                            .queryParam("pageNo", "1")
-                            .queryParam("numOfRows", "10")
-                            .queryParam("type", "json")
-                            .build())
+                    .uri(java.net.URI.create(rawUrl))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(Duration.ofSeconds(2));
 
             if (response == null) return List.of();
 
-            // 식약처 응답 파싱: response.body.items[].item
-            Map<?, ?> body = (Map<?, ?>) ((Map<?, ?>) response.get("response")).get("body");
+            Map<?, ?> body = (Map<?, ?>) response.get("body");
             if (body == null) return List.of();
 
             Object itemsObj = body.get("items");
             if (itemsObj == null) return List.of();
 
             List<?> items;
-            if (itemsObj instanceof Map) {
+            if (itemsObj instanceof List) {
+                items = (List<?>) itemsObj;
+            } else if (itemsObj instanceof Map) {
                 Object itemObj = ((Map<?, ?>) itemsObj).get("item");
                 if (itemObj instanceof List) {
                     items = (List<?>) itemObj;
                 } else if (itemObj instanceof Map) {
-                    items = List.of(itemObj); // 단건
+                    items = List.of(itemObj);
                 } else {
                     return List.of();
                 }
@@ -134,16 +185,22 @@ public class FoodSearchService {
                 if (!(i instanceof Map)) continue;
                 Map<Object, Object> item = (Map<Object, Object>) i;
 
-                String foodName = getString(item, "DESC_KOR");
+                String foodName = getString(item, "FOOD_NM_KR");
                 if (foodName == null || foodName.isBlank()) continue;
+
+                double carbs = parseDouble(item, "AMT_NUM6");
+                if (carbs == 0.0) carbs = parseDouble(item, "AMT_NUM7");
+
+                double fat = parseDouble(item, "AMT_NUM4");
+                if (fat == 0.0) fat = parseDouble(item, "AMT_NUM24");
 
                 results.add(new FoodSearchResult(
                         "kfood:" + getString(item, "FOOD_CD"),
                         foodName,
-                        parseDouble(item, "NUTR_CONT1"),  // 칼로리
-                        parseDouble(item, "NUTR_CONT3"),  // 탄수화물
-                        parseDouble(item, "NUTR_CONT2"),  // 단백질 (실제 순서: 단백질=2, 지방=4, 탄수=3)
-                        parseDouble(item, "NUTR_CONT4"),  // 지방
+                        parseDouble(item, "AMT_NUM1"),
+                        carbs,
+                        parseDouble(item, "AMT_NUM3"),
+                        fat,
                         "kfood"
                 ));
             }
@@ -155,7 +212,6 @@ public class FoodSearchService {
         }
     }
 
-    // ── 식약처 결과를 foods 테이블에 캐싱 ───────────────────────────────────
     public Food cacheKfoodResult(FoodSearchResult result) {
         Food food = new Food();
         food.setFoodName(result.foodName());
@@ -163,7 +219,7 @@ public class FoodSearchService {
         food.setCarbohydrate((float) result.carbs());
         food.setProtein((float) result.protein());
         food.setFat((float) result.fat());
-        food.setSourceType(result.source()); // "kfood" or "fatsecret"
+        food.setSourceType(result.source());
         food.setBaseAmount("100g");
         return foodRepository.save(food);
     }
@@ -176,7 +232,7 @@ public class FoodSearchService {
     private double parseDouble(Map<Object, Object> map, String key) {
         try {
             Object val = map.get(key);
-            if (val == null) return 0.0;
+            if (val == null || String.valueOf(val).isBlank()) return 0.0;
             return Double.parseDouble(String.valueOf(val));
         } catch (Exception e) {
             return 0.0;

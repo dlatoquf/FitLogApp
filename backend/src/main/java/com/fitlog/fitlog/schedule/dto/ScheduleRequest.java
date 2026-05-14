@@ -23,17 +23,14 @@ public class ScheduleRequest {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private String status = "PENDING";
+    private Status status = Status.PENDING;
 
     public enum Status { PENDING, CONFIRMED, REJECTED }
 
-    public Status getStatus() {
-        if (status == null) return Status.PENDING;
-        try { return Status.valueOf(status); }
-        catch (Exception e) { return Status.PENDING; }
-    }
-    public void setStatus(Status s) { this.status = s.name(); }
+    public Status getStatus() { return status; }
+    public void setStatus(Status s) { this.status = s; }
 
     public Long getId() { return id; }
     public Schedule getSchedule() { return schedule; }

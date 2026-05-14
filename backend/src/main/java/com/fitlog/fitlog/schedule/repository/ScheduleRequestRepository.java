@@ -60,10 +60,35 @@ public interface ScheduleRequestRepository extends JpaRepository<ScheduleRequest
           AND s.date BETWEEN :from AND :to
         ORDER BY s.date, s.startTime
     """)
-        List<ScheduleRequest> findThisWeekConfirmedByMemberId(
-                @Param("memberId") Long memberId,
-                @Param("status") ScheduleRequest.Status status,
-                @Param("from") LocalDate from,
-                @Param("to") LocalDate to
-        );
+    List<ScheduleRequest> findThisWeekConfirmedByMemberId(
+            @Param("memberId") Long memberId,
+            @Param("status") ScheduleRequest.Status status,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to
+    );
+
+    // 스케줄 ID 목록으로 벌크 삭제
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM ScheduleRequest sr WHERE sr.schedule.id IN :scheduleIds")
+    int deleteByScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
+
+    // 스케줄 삭제 전 schedule_id를 null로 업데이트
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE ScheduleRequest sr SET sr.schedule = null WHERE sr.schedule.id IN :scheduleIds")
+    int detachScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
+
+    // 특정 schedule_id 목록에 연결된 requests 조회
+    @Query("SELECT sr.schedule.id FROM ScheduleRequest sr WHERE sr.schedule.id IN :scheduleIds")
+    List<Long> findScheduleIdsByScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
+
+    @Query("""
+        SELECT sr
+        FROM ScheduleRequest sr
+        JOIN FETCH sr.member m
+        JOIN FETCH m.user
+        WHERE sr.schedule.id IN :scheduleIds
+    """)
+        List<ScheduleRequest> findByScheduleIds(
+                @Param("scheduleIds") List<Long> scheduleIds
+    );
 }

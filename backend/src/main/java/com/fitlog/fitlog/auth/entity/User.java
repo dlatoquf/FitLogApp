@@ -23,6 +23,10 @@ public class User {
     @Column(name = "role")
     private Role role;
 
+    // FCM 푸시 알림 토큰 (앱 실행 시 저장됨)
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     public enum Role {
         TRAINER, MEMBER
     }
@@ -32,9 +36,11 @@ public class User {
     public String getEmail() { return email; }
     public String getName() { return name; }
     public Role getRole() { return role; }
+    public String getFcmToken() { return fcmToken; }
 
     public void setKakaoId(Long kakaoId) { this.kakaoId = kakaoId; }
     public void setEmail(String email) { this.email = email; }
     public void setName(String name) { this.name = name; }
     public void setRole(Role role) { this.role = role; }
+    public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
 }

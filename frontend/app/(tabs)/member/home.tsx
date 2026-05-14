@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -60,6 +60,8 @@ const NOTI_ICON: Record<string, string> = {
 };
 
 export default function MemberHomeScreen() {
+  const params = useLocalSearchParams<{ openSchedule?: string }>();
+  const didOpenScheduleFromNoti = useRef(false);
   const [data, setData]                         = useState<MemberHomeData | null>(null);
   const [loading, setLoading]                   = useState(true);
   const [refreshing, setRefreshing]             = useState(false);
@@ -168,6 +170,17 @@ export default function MemberHomeScreen() {
     didFetch.current = true;
     fetchHome();
   }, []);
+
+  // 알림에서 "다음 주 수업 오픈"을 눌러 들어온 경우,
+  // 홈 화면의 다음 주 수업 신청 모달을 바로 열어준다.
+  useEffect(() => {
+    if (params.openSchedule !== "true") return;
+    if (didOpenScheduleFromNoti.current) return;
+
+    didOpenScheduleFromNoti.current = true;
+    setShowSchedule(true);
+    fetchNextWeekSlots();
+  }, [params.openSchedule]);
 
   if (loading) {
     return (

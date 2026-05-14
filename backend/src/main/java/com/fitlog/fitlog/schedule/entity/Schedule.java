@@ -6,6 +6,7 @@ import com.fitlog.fitlog.schedule.dto.ScheduleRequest;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -43,6 +44,10 @@ public class Schedule {
     @OneToMany(mappedBy = "schedule", fetch = FetchType.LAZY)
     private List<ScheduleRequest> requests;
 
+    //스케줄 오픈 시간
+    @Column(name = "opened_at")
+    private LocalDateTime openedAt;
+
     public enum Status { OPEN, REQUESTED, CONFIRMED ,COMPLETED, CANCELED} // 스케줄 상태 5가지로 수정
 
     public String getStatusStr() { return status; }
@@ -63,10 +68,14 @@ public class Schedule {
     public LocalTime getStartTime() { return startTime; }
     public LocalTime getEndTime() { return endTime; }
     public List<ScheduleRequest> getRequests() { return requests; }
+    public LocalDateTime getOpenedAt() { return openedAt; }
+
 
     public void setTrainer(Trainer trainer) { this.trainer = trainer; }
     public void setMember(Member member) { this.member = member; }
     public void setDate(LocalDate date) { this.date = date; }
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+    public void setOpenedAt(LocalDateTime openedAt) { this.openedAt = openedAt; }
+
 }

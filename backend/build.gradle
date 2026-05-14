@@ -44,8 +44,10 @@ dependencies {
 
 	// 스케줄러 (Spring 기본 포함, 활성화만 하면 됨)
 	implementation 'org.springframework.boot:spring-boot-starter'
-}
 
+	// Firebase Admin SDK (FCM 푸시 알림)
+	implementation 'com.google.firebase:firebase-admin:9.2.0'
+}
 tasks.named('test') {
 	useJUnitPlatform()
 }

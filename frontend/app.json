@@ -11,16 +11,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.FitLogApp",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "KAKAO_APP_KEY": "e889ccffb6096521a6b49b9774f4d9ab",
         "KAKAO_APP_SCHEME": "kakaoe889ccffb6096521a6b49b9774f4d9ab",
         "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": ["fitlogapp"]
-          },
-          {
-            "CFBundleURLSchemes": ["kakaoe889ccffb6096521a6b49b9774f4d9ab"]
-          }
+          { "CFBundleURLSchemes": ["fitlogapp"] },
+          { "CFBundleURLSchemes": ["kakaoe889ccffb6096521a6b49b9774f4d9ab"] }
         ],
         "LSApplicationQueriesSchemes": [
           "kakaokompassauth",
@@ -31,6 +28,7 @@
     },
     "android": {
       "package": "com.anonymous.FitLogApp",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#2e8b57",
         "foregroundImage": "./assets/images/logo.png",
@@ -48,16 +46,14 @@
       "expo-router",
       [
         "@react-native-seoul/kakao-login",
-        {
-          "kakaoAppKey": "e889ccffb6096521a6b49b9774f4d9ab"
-        }
+        { "kakaoAppKey": "e889ccffb6096521a6b49b9774f4d9ab" }
       ],
       [
         "@react-native-kakao/core",
-        {
-          "nativeAppKey": "e889ccffb6096521a6b49b9774f4d9ab"
-        }
-      ]
+        { "nativeAppKey": "e889ccffb6096521a6b49b9774f4d9ab" }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true,

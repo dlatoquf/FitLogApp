@@ -79,13 +79,18 @@ public class ScheduleController {
 
     @PostMapping("/generate")
     public ResponseEntity<Map<String, Object>> generateSlots(
-            @RequestHeader("Authorization") String auth) {
+            @RequestHeader("Authorization") String auth,
+            @RequestBody(required = false) Map<String, Object> body) {
         try {
-            scheduleService.generateSlotsForTrainer(auth);
+            List<Map<String, String>> dayTimes = null;
+            if (body != null && body.get("dayTimes") instanceof List) {
+                dayTimes = (List<Map<String, String>>) body.get("dayTimes");
+            }
+            scheduleService.generateSlotsForTrainer(auth, dayTimes);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "다음 주 슬롯이 오픈됐어요."
+                    "message", "다음 주 일정이 오픈됐어요."
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of(

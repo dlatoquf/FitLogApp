@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Purchases from "react-native-purchases";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -16,370 +17,202 @@ import {
 import { Colors } from "../../../constants/Colors";
 import { API_URL, ENDPOINTS } from "../../../constants/api";
 import { apiGet, apiPut } from "../../../hooks/useApi";
-import { MemberProfile } from "../../../types";
+import { TrainerProfile } from "../../../types";
 
-interface MemberProfileWithTrainerCode extends MemberProfile {
-  trainerCode?: string;
-  gymName?: string;
+const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
+
+
+// 30분 단위 시간 옵션 (05:00 ~ 24:00)
+const TIME_OPTIONS: string[] = [];
+for (let h = 5; h <= 24; h++) {
+  TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:00`);
+  if (h < 24) TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:30`);
 }
 
-interface BodyLog {
-  date?: string;
-  logDate?: string;
-  weight?: number;
-  bodyFat?: number;
-  bodyFatMass?: number;
-  muscleMass?: number;
-}
-
-export default function MemberMoreScreen() {
-  const [profile, setProfile] = useState<MemberProfileWithTrainerCode | null>(null);
+export default function TrainerMoreScreen() {
+  const [profile, setProfile] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    phone: "",
-    height: "",
-  });
+  const [editForm, setEditForm] = useState({ gymName: "", workDays: [] as number[], startTime: "09:00", endTime: "22:00" });
   const [saving, setSaving] = useState(false);
-  const [showTrainerCodeModal, setShowTrainerCodeModal] = useState(false);
-  const [trainerCodeForm, setTrainerCodeForm] = useState("");
-  const [connectingTrainer, setConnectingTrainer] = useState(false);
   const [notifPush, setNotifPush] = useState(true);
-  const [notifFeedback, setNotifFeedback] = useState(true);
+  const [notifSchedule, setNotifSchedule] = useState(true);
+  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const pairs = await AsyncStorage.multiGet(["notif_push_member", "notif_feedback"]);
+      // ✅ 알림 설정 불러오기
+      const pairs = await AsyncStorage.multiGet(["notif_push", "notif_schedule"]);
       if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
-      if (pairs[1][1] !== null) setNotifFeedback(pairs[1][1] === "true");
+      if (pairs[1][1] !== null) setNotifSchedule(pairs[1][1] === "true");
+
+      // RevenueCat 구독 상태 확인
+      try {
+        if (Purchases && typeof Purchases.getCustomerInfo === "function") {
+          const info = await Purchases.getCustomerInfo();
+          const isPro = typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
+          setPlan(isPro ? "PRO" : "FREE");
+        }
+      } catch (e) {
+        console.log("RevenueCat 상태 확인 실패:", e);
+      }
 
       try {
-        const data = await apiGet<MemberProfile>(ENDPOINTS.member.me);
-
-        // 최신 바디로그가 있으면 더보기 카드에는 최신 체중/체지방/근육 값을 우선 표시
-        let latestBodyLog: BodyLog | null = null;
-
-        try {
-          const bodyLogs = await apiGet<BodyLog[]>(ENDPOINTS.bodylog.me);
-
-          latestBodyLog = [...bodyLogs]
-            .filter((log) => log.logDate || log.date)
-            .sort((a, b) =>
-              String(b.logDate ?? b.date).localeCompare(String(a.logDate ?? a.date))
-            )[0] ?? null;
-        } catch (e) {
-          console.log("최신 바디로그 조회 실패:", e);
-        }
-
-        const latestProfile: MemberProfileWithTrainerCode = {
-          ...data,
-          weight: latestBodyLog?.weight ?? data.weight,
-          bodyFat:
-            latestBodyLog?.bodyFat ??
-            (latestBodyLog?.bodyFatMass && latestBodyLog?.weight
-              ? Math.round((latestBodyLog.bodyFatMass / latestBodyLog.weight) * 1000) / 10
-              : data.bodyFat),
-          muscleMass: latestBodyLog?.muscleMass ?? data.muscleMass,
-        };
-
-        setProfile(latestProfile);
-        setEditForm({
-          name: latestProfile.name ?? "",
-          phone: latestProfile.phone ?? "",
-          height: String(latestProfile.height ?? ""),
-        });
+        const data = await apiGet<TrainerProfile>(ENDPOINTS.profile.trainer);
+        setProfile(data);
+        const workDayIndices = (data.workDays || "").split(",").map((d) => DAYS.indexOf(d.trim())).filter((i) => i >= 0);
+        setEditForm({ gymName: data.gymName, workDays: workDayIndices, startTime: data.startTime, endTime: data.endTime });
       } catch {
-        const dummy: MemberProfileWithTrainerCode = {
-          id: 1,
-          name: "김지수",
-          phone: "010-1234-5678",
-          height: 165,
-          weight: 60,
-          bodyFat: 22,
-          muscleMass: 28,
-          ptRemaining: 12,
-          ptTotal: 20,
-          ptStartDate: "2025-03-01",
-          ptExpDate: "2025-06-30",
-          goal: "체지방 감량",
-          trainerName: "김트레이너",
-        };
-        setProfile(dummy);
-        setEditForm({
-          name: dummy.name ?? "",
-          phone: dummy.phone ?? "",
-          height: String(dummy.height ?? ""),
-        });
+        setProfile({ id: 1, name: "트레이너", gymName: "", workDays: "월,화,수,목,금", startTime: "09:00", endTime: "22:00", trainerCode: "---" });
+        setEditForm({ gymName: "", workDays: [0, 1, 2, 3, 4], startTime: "09:00", endTime: "22:00" });
       } finally {
         setLoading(false);
       }
     };
-
     fetchProfile();
   }, []);
 
+  // ✅ 알림 설정 저장
+  const handleNotifPush = (v: boolean) => { setNotifPush(v); AsyncStorage.setItem("notif_push", String(v)); };
+  const handleNotifSchedule = (v: boolean) => { setNotifSchedule(v); AsyncStorage.setItem("notif_schedule", String(v)); };
+
   const handleSaveProfile = async () => {
     setSaving(true);
-
+  
     try {
-      await apiPut("/api/member/me", {
-        name: editForm.name || undefined,
-        phone: editForm.phone || undefined,
-        height: editForm.height ? parseFloat(editForm.height) : undefined,
+      const jwt = await AsyncStorage.getItem("jwt");
+  
+      const res = await fetch(`${API_URL}${ENDPOINTS.profile.trainer}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          gymName: editForm.gymName,
+          workDays: editForm.workDays.map((i) => DAYS[i]).join(","),
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+        }),
       });
-
+  
+      if (!res.ok) throw new Error("프로필 수정 실패");
+  
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              name: editForm.name || prev.name,
-              phone: editForm.phone || prev.phone,
-              height: editForm.height ? parseFloat(editForm.height) : prev.height,
+              gymName: editForm.gymName,
+              workDays: editForm.workDays.map((i) => DAYS[i]).join(","),
+              startTime: editForm.startTime,
+              endTime: editForm.endTime,
             }
           : prev
       );
-
+  
       setShowEditModal(false);
       Alert.alert("완료", "프로필이 수정됐어요.");
     } catch (e: any) {
-      Alert.alert("오류", e.message ?? "프로필 수정 중 오류가 발생했어요.");
+      Alert.alert("오류", e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleConnectTrainer = async () => {
-    const code = trainerCodeForm.trim().toUpperCase();
-
-    if (!code) {
-      Alert.alert("입력 오류", "트레이너 코드를 입력해주세요.");
-      return;
-    }
-
-    setConnectingTrainer(true);
-
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/member/connect-trainer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({ trainerCode: code }),
-      });
-
-      const raw = await res.text();
-      let data: any = {};
-
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch {
-        data = { message: raw };
-      }
-
-      if (!res.ok) {
-        const message = data.message ?? "트레이너 연결에 실패했어요.";
-
-        if (message.includes("무료 플랜") || message.includes("회원 3명")) {
-          // TODO: 실제 배포 시 문구 그대로 유지 (회원 3명 초과)
-          // 현재는 테스트용으로 1명 초과 시 동일 메시지 표시
-          Alert.alert(
-            "연결 불가",
-            "트레이너의 무료 플랜은 회원 3명까지 연결할 수 있어요.\n트레이너에게 PRO 업그레이드를 요청해주세요."
-          );
-          return;
-        }
-
-        Alert.alert("오류", message);
-        return;
-      }
-
-      const trainerName = data.trainerName ? `${data.trainerName} 트레이너` : "트레이너";
-
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              trainerName: data.trainerName ?? prev.trainerName,
-              trainerCode: code,
-            }
-          : prev
-      );
-      setTrainerCodeForm("");
-      setShowTrainerCodeModal(false);
-
-      Alert.alert("연결 완료", `${trainerName}와 연결됐어요.`);
-    } catch (e: any) {
-      Alert.alert("오류", e?.message ?? "트레이너 연결 중 오류가 발생했어요.");
-    } finally {
-      setConnectingTrainer(false);
-    }
-  };
-
-  const handlePushToggle = async (value: boolean) => {
-    setNotifPush(value);
-    await AsyncStorage.setItem("notif_push_member", String(value));
-  };
-
-  const handleFeedbackToggle = async (value: boolean) => {
-    setNotifFeedback(value);
-    await AsyncStorage.setItem("notif_feedback", String(value));
-  };
-
   const handleLogout = () => {
     Alert.alert("로그아웃", "로그아웃 하시겠어요?", [
       { text: "취소", style: "cancel" },
-      {
-        text: "로그아웃",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.multiRemove(["jwt", "pendingName"]);
-          router.replace("/auth/login");
-        },
-      },
+      { text: "로그아웃", style: "destructive", onPress: async () => { await AsyncStorage.multiRemove(["jwt", "pendingName"]); router.replace("/auth/login"); } },
     ]);
   };
 
-  const ptPct = profile && profile.ptTotal ? (profile.ptRemaining! / profile.ptTotal) * 100 : 0;
-  const currentTrainerCode = profile?.trainerCode ?? "";
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-        <Text style={{ fontSize: 14, color: Colors.textMuted }}>불러오는 중...</Text>
-      </View>
-    );
-  }
+  const copyCode = () => Alert.alert("복사 완료", `트레이너 코드 ${profile?.trainerCode}가 복사됐어요.`);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: "#fff" }}
-      contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 40 }}
-    >
+    <ScrollView style={{ flex: 1, backgroundColor: "#fff" }} contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 40 }}>
       <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text, marginBottom: 20 }}>더보기</Text>
 
       {/* 프로필 카드 */}
-      <View style={{ backgroundColor: Colors.bgSub, borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: Colors.border }}>
+      <View style={{ backgroundColor: Colors.bgSub, borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: Colors.border }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 }}>
-          <View style={{ width: 60, height: 60, borderRadius: 16, backgroundColor: Colors.blue, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 24, fontWeight: "900", color: "#fff" }}>{profile?.name?.[0] ?? "M"}</Text>
+          <View style={{ width: 60, height: 60, borderRadius: 16, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 24, fontWeight: "900", color: "#fff" }}>{profile?.name?.[0] ?? "T"}</Text>
           </View>
-
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text }}>{profile?.name ?? "-"}</Text>
-            {profile?.phone && (
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>{profile.phone}</Text>
-            )}
-            {profile?.trainerName && (
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>담당: {profile.trainerName} 트레이너</Text>
-            )}
-            {currentTrainerCode && (
-              <Text style={{ fontSize: 12, color: Colors.green, marginTop: 2, fontWeight: "700" }}>트레이너 코드: {currentTrainerCode}</Text>
-            )}
-            {profile?.goal && (
-              <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 6, alignSelf: "flex-start" }}>
-                <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>{profile.goal}</Text>
-              </View>
-            )}
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>{profile?.gymName ?? "-"}</Text>
           </View>
-
-          <TouchableOpacity
-            onPress={() => {
-              setEditForm({
-                name: profile?.name ?? "",
-                phone: profile?.phone ?? "",
-                height: String(profile?.height ?? ""),
-              });
-              setShowEditModal(true);
-            }}
-            style={{ backgroundColor: Colors.blue, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-          >
+          <TouchableOpacity onPress={() => setShowEditModal(true)} style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}>
             <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>수정</Text>
           </TouchableOpacity>
         </View>
-
-        {/* 신체 정보 */}
-        <View style={{ flexDirection: "row", justifyContent: "space-around", paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border }}>
-          {[
-            { label: "키", val: profile?.height, unit: "cm" },
-            { label: "체중", val: profile?.weight, unit: "kg" },
-            { label: "체지방", val: profile?.bodyFat, unit: "%" },
-            { label: "근육", val: profile?.muscleMass, unit: "kg" },
-          ].map(({ label, val, unit }) => (
-            <View key={label} style={{ alignItems: "center" }}>
-              <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text }}>
-                {val ?? "-"}
-                <Text style={{ fontSize: 11 }}>{val ? unit : ""}</Text>
-              </Text>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>{label}</Text>
+        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {(profile?.workDays || "").split(",").map((d) => (
+            <View key={d} style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+              <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>{d.trim()}</Text>
             </View>
           ))}
         </View>
+        <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.startTime} ~ {profile?.endTime}</Text>
       </View>
 
-      {/* PT 현황 */}
-      {profile?.ptTotal && profile.ptTotal > 0 && (
-        <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.border }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, color: Colors.textSub }}>PT 현황</Text>
-            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
-              <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.blue }}>{profile.ptRemaining}</Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 2 }}>/ {profile.ptTotal}회</Text>
-            </View>
-          </View>
-          <View style={{ backgroundColor: Colors.border, borderRadius: 99, height: 8, marginBottom: 8 }}>
-            <View style={{ width: `${Math.min(ptPct, 100)}%` as any, height: 8, borderRadius: 99, backgroundColor: Colors.blue }} />
-          </View>
-          {profile.ptStartDate && (
-            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-              {profile.ptStartDate} 시작{profile.ptExpDate ? ` · ${profile.ptExpDate} 만료` : ""}
+      {/* 플랜 상태 */}
+      <View style={{ backgroundColor: plan === "PRO" ? Colors.greenLight : Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: plan === "PRO" ? Colors.green + "44" : Colors.border, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Text style={{ fontSize: 13, fontWeight: "800", color: plan === "PRO" ? Colors.green : Colors.textMuted }}>
+              {plan === "PRO" ? "✅ PRO 플랜" : "🔒 FREE 플랜"}
             </Text>
-          )}
+          </View>
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+            {plan === "PRO" ? "회원 무제한 · 모든 기능 이용 중" : "무료 플랜은 회원 3명까지 가능해요"}
+          </Text>
         </View>
-      )}
+        {plan === "FREE" && (
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                if (!Purchases || typeof Purchases.getOfferings !== "function") {
+                  Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                  return;
+                }
+                const offerings = await Purchases.getOfferings();
+                const pkg = offerings.current?.availablePackages.find(
+                  (p: any) => p.packageType === "MONTHLY"
+                ) ?? offerings.current?.availablePackages[0];
+                if (!pkg) { Alert.alert("오류", "구독 상품을 불러오지 못했어요."); return; }
+                await Purchases.purchasePackage(pkg);
+                setPlan("PRO");
+                Alert.alert("구독 완료! 🎉", "PRO 플랜이 활성화됐어요.");
+              } catch (e: any) {
+                if (!e.userCancelled) Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
+              }
+            }}
+            style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>업그레이드</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* 트레이너 연결 */}
-      <SectionHeader title="트레이너 연결" />
-      <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, overflow: "hidden", marginBottom: 20, borderWidth: 1, borderColor: Colors.border }}>
-        <TouchableOpacity
-          onPress={() => {
-            setTrainerCodeForm(currentTrainerCode);
-            setShowTrainerCodeModal(true);
-          }}
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, gap: 12 }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, color: Colors.text, fontWeight: "700" }}>
-              {profile?.trainerName ? "담당 트레이너 변경/재연결" : "트레이너 코드 연결"}
-            </Text>
-            <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 3, lineHeight: 16 }}>
-              {profile?.trainerName
-                ? `현재 ${profile.trainerName} 트레이너와 연결되어 있어요.${currentTrainerCode ? ` 코드: ${currentTrainerCode}` : ""}`
-                : "트레이너에게 받은 코드를 입력하면 연결할 수 있어요."}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
-        </TouchableOpacity>
+      {/* 트레이너 코드 */}
+      <View style={{ backgroundColor: Colors.greenLight, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.green + "44" }}>
+        <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green, marginBottom: 8 }}>🔑 내 트레이너 코드</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 24, fontWeight: "900", color: Colors.text, letterSpacing: 3 }}>{profile?.trainerCode ?? "---"}</Text>
+          <TouchableOpacity onPress={copyCode} style={{ backgroundColor: Colors.green, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}>
+            <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>복사</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 8 }}>회원에게 이 코드를 공유하면 자동으로 연결돼요</Text>
       </View>
 
       {/* 알림 설정 */}
       <SectionHeader title="알림 설정" />
       <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, overflow: "hidden", marginBottom: 20, borderWidth: 1, borderColor: Colors.border }}>
-        <SwitchRow
-          label="푸시 알림"
-          description="휴대폰 푸시 알림 수신 여부"
-          value={notifPush}
-          onValueChange={handlePushToggle}
-        />
+        <SwitchRow label="푸시 알림" value={notifPush} onValueChange={handleNotifPush} color={Colors.green} />
         <View style={{ height: 1, backgroundColor: Colors.border }} />
-        <SwitchRow
-          label="피드백 알림"
-          description="트레이너 피드백 알림 표시 여부"
-          value={notifFeedback}
-          onValueChange={handleFeedbackToggle}
-        />
+        <SwitchRow label="일정 알림" value={notifSchedule} onValueChange={handleNotifSchedule} color={Colors.green} />
       </View>
 
       {/* 앱 정보 */}
@@ -393,112 +226,67 @@ export default function MemberMoreScreen() {
       </View>
 
       {/* 로그아웃 */}
-      <TouchableOpacity
-        onPress={handleLogout}
-        style={{ backgroundColor: Colors.redBg, borderRadius: 14, padding: 16, alignItems: "center", borderWidth: 1, borderColor: Colors.red + "44" }}
-      >
+      <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: Colors.redBg, borderRadius: 14, padding: 16, alignItems: "center", borderWidth: 1, borderColor: Colors.red + "44" }}>
         <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>로그아웃</Text>
       </TouchableOpacity>
 
       {/* 프로필 수정 모달 */}
       <Modal visible={showEditModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "80%" }}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 16 }} />
-              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>프로필 수정</Text>
-              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 16 }}>
-                이름, 전화번호, 키만 수정할 수 있어요. 체중/체지방/근육량은 바디로그 최신값으로 표시돼요.
-              </Text>
-
-              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>이름</Text>
-              <TextInput
-                value={editForm.name}
-                onChangeText={(v) => setEditForm((f) => ({ ...f, name: v }))}
-                placeholder="이름"
-                placeholderTextColor={Colors.textPlaceholder}
-                style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: editForm.name ? Colors.green : Colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: Colors.text, marginBottom: 12 }}
-              />
-
-              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>전화번호</Text>
-              <TextInput
-                value={editForm.phone}
-                onChangeText={(v) => setEditForm((f) => ({ ...f, phone: v }))}
-                placeholder="010-0000-0000"
-                placeholderTextColor={Colors.textPlaceholder}
-                keyboardType="phone-pad"
-                style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: editForm.phone ? Colors.green : Colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: Colors.text, marginBottom: 12 }}
-              />
-
-              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>키 (cm)</Text>
-              <TextInput
-                value={editForm.height}
-                onChangeText={(v) => setEditForm((f) => ({ ...f, height: v }))}
-                placeholder="170"
-                placeholderTextColor={Colors.textPlaceholder}
-                keyboardType="decimal-pad"
-                style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: editForm.height ? Colors.green : Colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: Colors.text, marginBottom: 20 }}
-              />
-
+              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 16 }}>프로필 수정</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>헬스장명</Text>
+              <TextInput value={editForm.gymName} onChangeText={(v) => setEditForm((f) => ({ ...f, gymName: v }))}
+                style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: Colors.text, marginBottom: 14 }} />
+              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 8 }}>근무 요일</Text>
+              <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
+                {DAYS.map((d, i) => (
+                  <TouchableOpacity key={d} onPress={() => setEditForm((f) => ({ ...f, workDays: f.workDays.includes(i) ? f.workDays.filter((x) => x !== i) : [...f.workDays, i] }))}
+                    style={{ flex: 1, height: 36, borderRadius: 8, backgroundColor: editForm.workDays.includes(i) ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: editForm.workDays.includes(i) ? Colors.green : Colors.border, justifyContent: "center", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: editForm.workDays.includes(i) ? "#fff" : Colors.textMuted }}>{d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
+                {(["startTime", "endTime"] as const).map((key) => (
+                  <View key={key} style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>{key === "startTime" ? "출근" : "퇴근"}</Text>
+                    <ScrollView
+                      style={{ height: 120, backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 10 }}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                    >
+                      {TIME_OPTIONS.map((t) => (
+                        <TouchableOpacity
+                          key={t}
+                          onPress={() => setEditForm((f) => ({ ...f, [key]: t }))}
+                          style={{
+                            padding: 10,
+                            backgroundColor: editForm[key] === t ? Colors.green : "transparent",
+                            borderRadius: 8,
+                            marginHorizontal: 4,
+                            marginVertical: 2,
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: editForm[key] === t ? "700" : "400", color: editForm[key] === t ? "#fff" : Colors.text }}>{t}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ))}
+              </View>
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity onPress={() => setShowEditModal(false)} style={{ flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14, alignItems: "center" }}>
                   <Text style={{ fontSize: 14, color: Colors.textSub }}>취소</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSaveProfile} disabled={saving} style={{ flex: 2, backgroundColor: Colors.blue, borderRadius: 12, padding: 14, alignItems: "center", opacity: saving ? 0.7 : 1 }}>
+                <TouchableOpacity onPress={handleSaveProfile} disabled={saving} style={{ flex: 2, backgroundColor: Colors.green, borderRadius: 12, padding: 14, alignItems: "center" }}>
                   <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>{saving ? "저장 중..." : "저장"}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* 트레이너 코드 연결 모달 */}
-      <Modal visible={showTrainerCodeModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
-            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 16 }} />
-            <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>트레이너 코드 연결</Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 16, lineHeight: 18 }}>
-              {currentTrainerCode
-                ? `현재 연결된 코드: ${currentTrainerCode}\n새 코드로 변경하려면 아래에 입력해주세요.`
-                : "트레이너에게 받은 코드를 입력해주세요. 트레이너의 무료 플랜 회원 수가 초과된 경우 연결이 제한될 수 있어요."}
-            </Text>
-
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}>트레이너 코드</Text>
-            <TextInput
-              value={trainerCodeForm}
-              onChangeText={(v) => setTrainerCodeForm(v.toUpperCase())}
-              placeholder="예: ABC123"
-              placeholderTextColor={Colors.textPlaceholder}
-              autoCapitalize="characters"
-              style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: trainerCodeForm ? Colors.green : Colors.border, borderRadius: 10, padding: 12, fontSize: 14, color: Colors.text, marginBottom: 20 }}
-            />
-
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => setShowTrainerCodeModal(false)}
-                disabled={connectingTrainer}
-                style={{ flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14, alignItems: "center" }}
-              >
-                <Text style={{ fontSize: 14, color: Colors.textSub }}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleConnectTrainer}
-                disabled={connectingTrainer || !trainerCodeForm.trim()}
-                style={{ flex: 2, backgroundColor: trainerCodeForm.trim() ? Colors.green : Colors.border, borderRadius: 12, padding: 14, alignItems: "center", opacity: connectingTrainer ? 0.7 : 1 }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "700", color: trainerCodeForm.trim() ? "#fff" : Colors.textMuted }}>
-                  {connectingTrainer ? "연결 중..." : "연결하기"}
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -507,68 +295,23 @@ export default function MemberMoreScreen() {
 }
 
 function SectionHeader({ title }: { title: string }) {
-  return (
-    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 4 }}>
-      {title.toUpperCase()}
-    </Text>
-  );
+  return <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 4 }}>{title.toUpperCase()}</Text>;
 }
 
-function SwitchRow({
-  label,
-  description,
-  value,
-  onValueChange,
-}: {
-  label: string;
-  description?: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-}) {
+function SwitchRow({ label, value, onValueChange, color }: { label: string; value: boolean; onValueChange: (v: boolean) => void; color: string }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, gap: 12 }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, color: Colors.text, fontWeight: "600" }}>{label}</Text>
-        {description && (
-          <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 3 }}>{description}</Text>
-        )}
-      </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: Colors.blue }} thumbColor="#fff" />
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16 }}>
+      <Text style={{ fontSize: 14, color: Colors.text }}>{label}</Text>
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ true: color }} thumbColor="#fff" />
     </View>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value?: string;
-  onPress?: () => void;
-}) {
+function InfoRow({ label, value }: { label: string; value?: string }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={!onPress}
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-      }}
-    >
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16 }}>
       <Text style={{ fontSize: 14, color: Colors.text }}>{label}</Text>
-
-      {value && (
-        <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-          {value}
-        </Text>
-      )}
-
-      {!value && (
-        <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
-      )}
-    </TouchableOpacity>
+      {value ? <Text style={{ fontSize: 13, color: Colors.textMuted }}>{value}</Text> : <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>}
+    </View>
   );
 }

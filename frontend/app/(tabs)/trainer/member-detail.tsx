@@ -763,12 +763,10 @@ useEffect(() => {
     let minV = Math.min(...values);
     let maxV = Math.max(...values);
 
-    if (metric === "bodyFat") {
-      const center = (minV + maxV) / 2;
-      minV = Math.max(0, center - 1.5);
-      maxV = center + 1.5;
-    }
-
+    const diff = maxV - minV;
+    const padding = diff === 0 ? 1 : diff * 0.3;
+    minV = minV - padding;
+    maxV = maxV + padding;
     const range = maxV - minV || 1;
 
     const graphColor = color;

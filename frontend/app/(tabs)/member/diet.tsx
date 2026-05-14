@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -1372,11 +1371,10 @@ export default function MemberDietScreen() {
               </View>
 
               {searchResults.length > 0 && (
-                <FlatList
-                  data={searchResults}
-                  keyExtractor={(item) => item.foodId}
-                  renderItem={({ item }) => (
+                <View>
+                  {searchResults.map((item) => (
                     <TouchableOpacity
+                      key={item.foodId}
                       onPress={() => selectSearchFood(item)}
                       style={{
                         backgroundColor: Colors.bgSub,
@@ -1419,9 +1417,8 @@ export default function MemberDietScreen() {
                         {item.calories}kcal
                       </Text>
                     </TouchableOpacity>
-                  )}
-                  style={{ maxHeight: 160, marginBottom: 12 }}
-                />
+                  ))}
+                </View>
               )}
 
               <Text

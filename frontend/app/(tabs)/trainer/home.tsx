@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Purchases from "react-native-purchases";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -31,6 +32,7 @@ interface HomeData {
   todaySchedules: number;
   todayPtList: TodayPt[];
   trainerCode: string;
+  plan: string;
 }
 
 interface Noti {
@@ -77,7 +79,23 @@ export default function TrainerHomeScreen() {
         fetch(`${API_URL}/api/notifications`, { headers }),
       ]);
       if (!homeRes.ok) throw new Error("홈 데이터 조회 실패");
-      setData(await homeRes.json());
+      const homeData = await homeRes.json();
+      setData(homeData);
+
+      // RevenueCat 초기화 + 트레이너 userId 연결
+      try {
+        if (Purchases && typeof Purchases.configure === "function") {
+          await Purchases.configure({ apiKey: "test_XvTfkaGFYgntevQoXLZXZHUhVZy" });
+          const jwt = await AsyncStorage.getItem("jwt");
+          if (jwt) {
+            const payload = JSON.parse(atob(jwt.split(".")[1]));
+            const userId = String(payload.sub ?? payload.userId ?? payload.id);
+            await Purchases.logIn(userId);
+          }
+        }
+      } catch (e) {
+        console.log("RevenueCat 초기화 실패:", e);
+      }
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
@@ -188,10 +206,53 @@ export default function TrainerHomeScreen() {
         </TouchableOpacity>
 
         {/* 요약 카드 */}
-        <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
           <SummaryCard value={String(data?.totalMembers ?? 0)} label="총 회원" color={Colors.green} pct={Math.min((data?.totalMembers ?? 0) * 5, 100)} />
           <SummaryCard value={String(data?.todaySchedules ?? 0)} label="오늘 PT" color={Colors.blue} pct={Math.min((data?.todaySchedules ?? 0) * 20, 100)} />
         </View>
+
+        {/* 하루 출석률 카드 */}
+        {(() => {
+          const now = new Date();
+          const list = data?.todayPtList ?? [];
+          const total = list.length;
+          const completed = list.filter(item => item.completed).length;
+          const noShow = list.filter(item => {
+            if (item.completed) return false;
+            const [h, m] = item.time.split(":").map(Number);
+            const scheduleEnd = new Date();
+            scheduleEnd.setHours(h + 1, m, 0, 0);
+            return now > scheduleEnd;
+          }).length;
+          const attendancePct = total > 0 ? Math.round((completed / total) * 100) : 0;
+          if (total === 0) return null;
+          const barColor = attendancePct >= 80 ? Colors.green : "#F59E0B";
+          return (
+            <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: barColor }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "700" }}>하루 출석률</Text>
+                <Text style={{ fontSize: 22, fontWeight: "800", color: barColor }}>{attendancePct}%</Text>
+              </View>
+              <ProgressBar pct={attendancePct} color={barColor} />
+              <View style={{ flexDirection: "row", gap: 16, marginTop: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green }} />
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>출석 {completed}명</Text>
+                </View>
+                {noShow > 0 && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
+                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>노쇼 {noShow}명</Text>
+                  </View>
+                )}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue }} />
+                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>전체 {total}명</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* 오늘 PT 일정 */}
         <SectionTitle title="오늘 PT 일정" />
@@ -281,10 +342,10 @@ export default function TrainerHomeScreen() {
               <View style={{ backgroundColor: Colors.greenLight, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.green + "33" }}>
                 <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 4 }}>PRO 플랜</Text>
                 <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
-                  <Text style={{ fontSize: 30, fontWeight: "900", color: Colors.green }}>4,500</Text>
+                  <Text style={{ fontSize: 30, fontWeight: "900", color: Colors.green }}>6,900</Text>
                   <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.green, marginBottom: 4 }}>원 / 월</Text>
                 </View>
-                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>✓ 회원 무제한 · ✓ 모든 기능 이용</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>✓ 회원 무제한 · ✓ 모든 기능 이용 · ✓ 알림 기능 제공</Text>
               </View>
 
               {/* 결제 수단 3가지 */}
@@ -296,7 +357,31 @@ export default function TrainerHomeScreen() {
                   productId: "com.anonymous.FitLogApp.pro_monthly"
                   App Store Connect에서 인앱 구매 상품 등록 필요 */}
               <TouchableOpacity
-                onPress={() => Alert.alert("준비 중", "애플 인앱결제 연동 준비 중이에요.")}
+                onPress={async () => {
+                  try {
+                    if (!Purchases || typeof Purchases.getOfferings !== "function") {
+                      Alert.alert("오류", "결제 모듈을 불러오지 못했어요. 앱을 재시작해주세요.");
+                      return;
+                    }
+                    const offerings = await Purchases.getOfferings();
+                    const pkg = offerings.current?.availablePackages.find(
+                      (p: any) => p.packageType === "MONTHLY"
+                    ) ?? offerings.current?.availablePackages[0];
+
+                    if (!pkg) {
+                      Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                      return;
+                    }
+
+                    await Purchases.purchasePackage(pkg);
+                    Alert.alert("구독 완료! 🎉", "PRO 플랜이 활성화됐어요.");
+                    fetchHome(); // 홈 새로고침
+                  } catch (e: any) {
+                    if (!e.userCancelled) {
+                      Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
+                    }
+                  }
+                }}
                 style={{ backgroundColor: "#000", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10, flexDirection: "row", justifyContent: "center", gap: 8 }}
               >
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}> Apple Pay로 구독</Text>
@@ -305,22 +390,22 @@ export default function TrainerHomeScreen() {
               {/* 카카오페이 */}
               {/* TODO: @react-native-kakao/pay SDK 연동
                   또는 웹뷰로 카카오페이 결제 URL 오픈 */}
-              <TouchableOpacity
+              {/*<TouchableOpacity
                 onPress={() => Alert.alert("준비 중", "카카오페이 연동 준비 중이에요.")}
                 style={{ backgroundColor: "#FEE500", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10, flexDirection: "row", justifyContent: "center", gap: 8 }}
               >
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#3C1E1E" }}>카카오페이로 구독</Text>
-              </TouchableOpacity>
+              </TouchableOpacity>8/}
 
               {/* 토스페이먼츠 */}
               {/* TODO: @tosspayments/tosspayments-sdk 연동
                   또는 웹뷰로 토스 결제 URL 오픈 */}
-              <TouchableOpacity
+              {/*<TouchableOpacity
                 onPress={() => Alert.alert("준비 중", "토스 연동 준비 중이에요.")}
                 style={{ backgroundColor: "#0064FF", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 16, flexDirection: "row", justifyContent: "center", gap: 8 }}
               >
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>토스로 구독</Text>
-              </TouchableOpacity>
+              </TouchableOpacity>*/}
 
               {/* 닫기 */}
               <TouchableOpacity onPress={() => setPaymentVisible(false)}>

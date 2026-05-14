@@ -3,11 +3,12 @@
  * 개발 환경에 맞게 API_URL을 수정하세요.
  */
 /*자취방 */
-/*export const API_URL = "http://192.168.0.182:8080";*/
+export const API_URL = "http://192.168.0.182:8080";
 /*오ㅃㅏ집 */
 /*export const API_URL = "http://192.168.219.155:8080";*/
 /*본가*/
-export const API_URL = "http://192.168.219.114:8080";
+/*export const API_URL = "http://192.168.219.114:8080";*/
+
 
 export const ENDPOINTS = {
   // 인증

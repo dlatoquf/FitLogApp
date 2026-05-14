@@ -115,11 +115,11 @@ public class DietService {
         String foodName = request.getFoodName();
         if (request.getFatSecretFoodId() != null && request.getFatSecretFoodId().startsWith("fatsecret:")) {
             log.setFoodNameEn(foodName);
-            log.setFoodNameKo(null);
+            log.setFoodNameKo(foodName);
         } else {
             // 내부DB, 식약처, 직접입력 모두 한글 이름
             log.setFoodNameKo(foodName);
-            log.setFoodNameEn(null);
+            log.setFoodNameEn(foodName);  // NOT NULL 제약으로 같은 값 채움
         }
 
         log.setCalories(request.getCalories());

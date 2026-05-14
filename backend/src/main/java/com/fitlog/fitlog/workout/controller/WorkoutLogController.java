@@ -68,15 +68,26 @@ public class WorkoutLogController {
 
         WorkoutLog log = buildLog(body, member, trainer, "PT");
         workoutLogRepository.save(log);
-        // 운동 저장 후 COMPLETED 처리 추가
+
+        // 운동 저장 후 COMPLETED 처리
+        // scheduleId가 있으면 그걸로, 없으면 오늘 날짜 + 해당 회원의 CONFIRMED 스케줄 자동 탐색
         if (body.containsKey("scheduleId") && body.get("scheduleId") != null) {
             Long scheduleId = ((Number) body.get("scheduleId")).longValue();
-
-            Schedule schedule = scheduleRepository.findById(scheduleId)
-                    .orElseThrow(() -> new RuntimeException("스케줄을 찾을 수 없습니다."));
-
-            schedule.setStatusStr("COMPLETED");
-            scheduleRepository.save(schedule);
+            scheduleRepository.findById(scheduleId).ifPresent(schedule -> {
+                schedule.setStatusStr("COMPLETED");
+                scheduleRepository.save(schedule);
+            });
+        } else {
+            // scheduleId 없으면 오늘 날짜 + 해당 회원 CONFIRMED 스케줄 자동 완료 처리
+            LocalDate logDate = log.getLogDate();
+            scheduleRepository.findByTrainerAndDateAndStatus(trainer, logDate, "CONFIRMED")
+                    .stream()
+                    .filter(s -> s.getMember() != null && s.getMember().getId().equals(member.getId()))
+                    .findFirst()
+                    .ifPresent(schedule -> {
+                        schedule.setStatusStr("COMPLETED");
+                        scheduleRepository.save(schedule);
+                    });
         }
 
         // 알림 저장

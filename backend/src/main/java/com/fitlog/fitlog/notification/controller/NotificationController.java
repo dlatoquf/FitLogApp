@@ -3,7 +3,6 @@ package com.fitlog.fitlog.notification.controller;
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
-import com.fitlog.fitlog.notification.entity.Notification;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +35,6 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
 
         return notificationRepository
@@ -62,9 +60,7 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-
         long count = notificationRepository.countByUserAndIsReadFalse(user);
-
         return ResponseEntity.ok(Map.of("count", count));
     }
 
@@ -74,12 +70,8 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-
         notificationRepository.markAllAsRead(user);
-
-        return ResponseEntity.ok(
-                Map.of("message", "모두 읽음 처리됐어요.")
-        );
+        return ResponseEntity.ok(Map.of("message", "모두 읽음 처리됐어요."));
     }
 
     // 단건 읽음 처리
@@ -89,19 +81,33 @@ public class NotificationController {
             @PathVariable Long id
     ) {
         User user = getUserFromToken(authorization);
-
         notificationRepository.markOneAsRead(id, user);
+        return ResponseEntity.ok(Map.of("message", "읽음 처리됐어요."));
+    }
 
-        return ResponseEntity.ok(
-                Map.of("message", "읽음 처리됐어요.")
-        );
+    // FCM 토큰 저장 (앱 시작 시 프론트에서 호출)
+    @PostMapping("/fcm-token")
+    public ResponseEntity<Map<String, String>> saveFcmToken(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, String> body
+    ) {
+        User user = getUserFromToken(authorization);
+        String token = body.get("token");
+
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "토큰이 없어요."));
+        }
+
+        // User 엔티티에 FCM 토큰 저장
+        user.setFcmToken(token);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "FCM 토큰 저장 완료"));
     }
 
     private User getUserFromToken(String authorization) {
         String token = authorization.replace("Bearer ", "");
-
         Long userId = jwtService.getUserIdFromToken(token);
-
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
     }

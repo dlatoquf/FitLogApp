@@ -105,8 +105,12 @@ import { API_URL } from "../../../constants/api";
             return;
         }
         // 다음 주 스케줄 오픈 알림
-        if (n.targetType === "SCHEDULE_OPEN") {
-            router.push("/(tabs)/member/schedule");
+        // 회원용 홈 화면의 "다음 주 수업 신청" 모달을 바로 열도록 이동
+        if (n.targetType === "SCHEDULE_OPEN" || n.type === "SCHEDULE_OPEN") {
+            router.push({
+                pathname: "/(tabs)/member/home",
+                params: { openSchedule: "true" },
+            });
             return;
         }
         // 일반 알림 / 이동 대상 없는 알림
