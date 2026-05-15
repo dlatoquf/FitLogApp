@@ -14,7 +14,6 @@ import com.fitlog.fitlog.workout.entity.WorkoutSet;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/fitlog")
@@ -249,7 +249,7 @@ public class WorkoutLogController {
     }
 
     // WorkoutLogController.java 안에 추가
-// 위치: getMyWorkoutLogs 메서드 아래, buildLog 메서드 위 추천
+    // 위치: getMyWorkoutLogs 메서드 아래, buildLog 메서드 위 추천
 
     @Transactional
     @PutMapping("/{id}")
@@ -258,14 +258,27 @@ public class WorkoutLogController {
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
 
-        User trainerUser = getUserFromToken(authorization);
-        Trainer trainer = trainerRepository.findByUser(trainerUser)
-                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
+        User user = getUserFromToken(authorization);
 
         WorkoutLog log = workoutLogRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("운동 기록을 찾을 수 없습니다."));
 
-        if (log.getTrainer() == null || !log.getTrainer().getId().equals(trainer.getId())) {
+        boolean isMemberOwner =
+                log.getMember() != null &&
+                        log.getMember().getUser() != null &&
+                        log.getMember().getUser().getId().equals(user.getId());
+
+        boolean isTrainerOwner = false;
+        Optional<Trainer> trainerOpt = trainerRepository.findByUser(user);
+
+        if (trainerOpt.isPresent()) {
+            Trainer trainer = trainerOpt.get();
+            isTrainerOwner =
+                    log.getTrainer() != null &&
+                            log.getTrainer().getId().equals(trainer.getId());
+        }
+
+        if (!isMemberOwner && !isTrainerOwner) {
             throw new RuntimeException("수정 권한이 없습니다.");
         }
 
@@ -273,14 +286,16 @@ public class WorkoutLogController {
             log.setLogDate(LocalDate.parse((String) body.get("date")));
         }
 
-        // 기존 세트 전체 삭제 후 다시 저장
         log.getSets().clear();
 
-        List<Map<String, Object>> exercises = (List<Map<String, Object>>) body.get("exercises");
+        List<Map<String, Object>> exercises =
+                (List<Map<String, Object>>) body.get("exercises");
+
         if (exercises != null) {
             for (Map<String, Object> ex : exercises) {
                 String name = (String) ex.get("name");
-                List<Map<String, Object>> exSets = (List<Map<String, Object>>) ex.get("sets");
+                List<Map<String, Object>> exSets =
+                        (List<Map<String, Object>>) ex.get("sets");
 
                 if (exSets != null) {
                     for (Map<String, Object> s : exSets) {

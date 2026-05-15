@@ -951,6 +951,143 @@ useEffect(() => {
     );
   };
 
+
+  const renderFitLogCard = (
+    log: any,
+    color: string,
+    title: string,
+    onEdit?: () => void,
+  ) => {
+    const exercises = log.exercises ?? [];
+    const logDate = String(log.date ?? log.logDate ?? log.log_date ?? "").slice(0, 10);
+
+    return (
+      <View
+        key={`${log.id ?? log.workoutId ?? title}-${logDate}-${log.workoutType ?? ""}`}
+        style={{
+          borderWidth: 1,
+          borderColor: Colors.border,
+          borderRadius: 18,
+          padding: 16,
+          marginBottom: 14,
+          backgroundColor: "#fff",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginBottom: 14,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}>
+              {title}
+            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}>
+              {logDate} · {exercises.length}개 운동
+            </Text>
+          </View>
+
+          {onEdit && (
+            <TouchableOpacity
+              onPress={onEdit}
+              style={{
+                borderWidth: 1,
+                borderColor: color + "44",
+                backgroundColor: color + "12",
+                borderRadius: 999,
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "800", color }}>
+                수정
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {exercises.map((exercise: any, exIdx: number) => {
+          const sets = exercise.sets ?? [];
+
+          return (
+            <View
+              key={`${exercise.name}-${exIdx}`}
+              style={{
+                backgroundColor: Colors.bgSub,
+                borderRadius: 16,
+                padding: 13,
+                marginBottom: exIdx === exercises.length - 1 ? 0 : 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+                  {exercise.name}
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: "900", color }}>
+                  {sets.length}세트
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 7,
+                }}
+              >
+                {sets.map((set: any, setIdx: number) => (
+                  <View
+                    key={`${setIdx}-${set.weight}-${set.reps}`}
+                    style={{
+                      width: "30.7%",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#fff",
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      borderRadius: 999,
+                      paddingHorizontal: 7,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "900",
+                        color,
+                        marginRight: 5,
+                      }}
+                    >
+                      {setIdx + 1}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 12, fontWeight: "800", color: Colors.text }}
+                    >
+                      {set.weight ? `${set.weight}kg × ` : ""}
+                      {set.reps}회
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <KeyboardAwareScrollView
@@ -1637,7 +1774,7 @@ useEffect(() => {
                           <View
                             style={{
                               backgroundColor: "#fff",
-                              borderRadius: 12,
+                              borderRadius: 10,
                               borderWidth: 1,
                               borderColor: Colors.border,
                               marginBottom: 10,
@@ -1969,27 +2106,27 @@ useEffect(() => {
 
                 {/* PT 수업 */}
                 {dayPtLogs.length > 0 && (
-                  <View style={{ marginBottom: 18 }}>
+                  <View style={{ marginBottom: 14 }}>
                     <View
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 8,
                         marginBottom: 10,
                       }}
                     >
                       <View
                         style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: 3.5,
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
                           backgroundColor: Colors.green,
                         }}
                       />
                       <Text
                         style={{
-                          fontSize: 13,
-                          fontWeight: "800",
+                          fontSize: 15,
+                          fontWeight: "900",
                           color: Colors.text,
                         }}
                       >
@@ -1997,182 +2134,40 @@ useEffect(() => {
                       </Text>
                     </View>
 
-                    {dayPtLogs.map((log: any) => (
-                      <View
-                        key={log.id ?? log.workoutId}
-                        style={{
-                          backgroundColor: "#fff",
-                          borderRadius: 18,
-                          padding: 16,
-                          marginBottom: 12,
-                          borderWidth: 1,
-                          borderColor: Colors.border,
-                          shadowColor: "#000",
-                          shadowOpacity: 0.05,
-                          shadowRadius: 8,
-                          shadowOffset: { width: 0, height: 3 },
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 14,
-                          }}
-                        >
-                          <View>
-                            <Text
-                              style={{
-                                fontSize: 16,
-                                fontWeight: "900",
-                                color: Colors.text,
-                              }}
-                            >
-                              PT 수업 완료
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                color: Colors.textMuted,
-                                marginTop: 3,
-                              }}
-                            >
-                              {selectedDateKey} · {log.exercises?.length ?? 0}개 운동
-                            </Text>
-                          </View>
-
-                          {isToday && (
-                            <TouchableOpacity
-                              onPress={() => startEditFitLog(log)}
-                              style={{
-                                backgroundColor: Colors.greenLight,
-                                borderRadius: 10,
-                                paddingHorizontal: 12,
-                                paddingVertical: 7,
-                                borderWidth: 1,
-                                borderColor: Colors.green + "44",
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  color: Colors.green,
-                                  fontWeight: "800",
-                                }}
-                              >
-                                수정
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-
-                        {log.exercises?.map((ex: any, ei: number) => (
-                          <View
-                            key={ei}
-                            style={{
-                              backgroundColor: Colors.bgSub,
-                              borderRadius: 14,
-                              padding: 12,
-                              marginBottom: ei < log.exercises.length - 1 ? 10 : 0,
-                            }}
-                          >
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 10,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 15,
-                                  fontWeight: "800",
-                                  color: Colors.text,
-                                }}
-                              >
-                                {ex.name}
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: Colors.green,
-                                  fontWeight: "800",
-                                }}
-                              >
-                                {ex.sets?.length ?? 0}세트
-                              </Text>
-                            </View>
-
-                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                              {ex.sets?.map((s: any, si: number) => (
-                                <View
-                                  key={si}
-                                  style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    backgroundColor: "#fff",
-                                    borderRadius: 999,
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 6,
-                                    borderWidth: 1,
-                                    borderColor: Colors.border,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 11,
-                                      fontWeight: "900",
-                                      color: Colors.green,
-                                    }}
-                                  >
-                                    {si + 1}
-                                  </Text>
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      color: Colors.textSub,
-                                      fontWeight: "700",
-                                    }}
-                                  >
-                                    {"  "}
-                                    {s.weight ? `${s.weight}kg × ` : ""}
-                                    {s.reps}회{s.rpe ? ` · RPE ${s.rpe}` : ""}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    ))}
+                    {dayPtLogs.map((log: any) =>
+                      renderFitLogCard(
+                        log,
+                        Colors.green,
+                        "PT 수업 완료",
+                        () => startEditFitLog(log),
+                      )
+                    )}
                   </View>
                 )}
 
                 {/* 개인 운동 */}
                 {dayPersonalLogs.length > 0 && (
-                  <View style={{ marginBottom: 18 }}>
+                  <View style={{ marginBottom: 14 }}>
                     <View
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 8,
                         marginBottom: 10,
                       }}
                     >
                       <View
                         style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: 3.5,
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
                           backgroundColor: "#4A90FF",
                         }}
                       />
                       <Text
                         style={{
-                          fontSize: 13,
-                          fontWeight: "800",
+                          fontSize: 15,
+                          fontWeight: "900",
                           color: Colors.text,
                         }}
                       >
@@ -2180,131 +2175,14 @@ useEffect(() => {
                       </Text>
                     </View>
 
-                    {dayPersonalLogs.map((log: any) => (
-                      <View
-                        key={log.workoutId ?? log.id}
-                        style={{
-                          backgroundColor: "#fff",
-                          borderRadius: 16,
-                          padding: 14,
-                          marginBottom: 10,
-                          borderWidth: 1.5,
-                          borderColor: "#4A90FF66",
-                          borderLeftWidth: 3,
-                          borderLeftColor: "#4A90FF",
-                          shadowColor: "#000",
-                          shadowOpacity: 0.04,
-                          shadowRadius: 6,
-                          shadowOffset: { width: 0, height: 2 },
-                        }}
-                      >
-                        {log.exercises?.map((ex: any, ei: number) => (
-                          <View
-                            key={ei}
-                            style={{
-                              marginBottom:
-                                ei < log.exercises.length - 1 ? 14 : 0,
-                              paddingBottom:
-                                ei < log.exercises.length - 1 ? 14 : 0,
-                              borderBottomWidth:
-                                ei < log.exercises.length - 1 ? 1 : 0,
-                              borderBottomColor: Colors.border,
-                            }}
-                          >
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 10,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 15,
-                                  fontWeight: "800",
-                                  color: Colors.text,
-                                }}
-                              >
-                                {ex.name}
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor: "#4A90FF18",
-                                  borderRadius: 9,
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: "800",
-                                    color: "#4A90FF",
-                                  }}
-                                >
-                                  {ex.sets?.length}세트
-                                </Text>
-                              </View>
-                            </View>
-
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                flexWrap: "wrap",
-                                gap: 6,
-                              }}
-                            >
-                              {ex.sets?.map((s: any, si: number) => (
-                                <View
-                                  key={si}
-                                  style={{
-                                    backgroundColor: Colors.bgSub,
-                                    borderRadius: 8,
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 6,
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    gap: 5,
-                                  }}
-                                >
-                                  <View
-                                    style={{
-                                      width: 22,
-                                      height: 22,
-                                      borderRadius: 6,
-                                      backgroundColor: "#4A90FF",
-                                      justifyContent: "center",
-                                      alignItems: "center",
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: "800",
-                                        color: "#fff",
-                                      }}
-                                    >
-                                      {si + 1}
-                                    </Text>
-                                  </View>
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      color: Colors.textSub,
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    {s.weight ? `${s.weight}kg × ` : ""}
-                                    {s.reps}회{s.rpe ? ` · RPE ${s.rpe}` : ""}
-                                  </Text>
-                                </View>
-                              ))}
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    ))}
+                    {dayPersonalLogs.map((log: any) =>
+                      renderFitLogCard(
+                        log,
+                        "#4A90FF",
+                        "개인 운동 완료",
+                        undefined,
+                      )
+                    )}
                   </View>
                 )}
               </View>
