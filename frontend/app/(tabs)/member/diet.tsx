@@ -333,6 +333,19 @@ export default function MemberDietScreen() {
       setSearching(false);
     }
   };
+    useEffect(() => {
+      if (!showAddModal) return;
+
+      const timer = setTimeout(() => {
+        if (searchQuery.trim()) {
+          searchFood();
+        } else {
+          setSearchResults([]);
+        }
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }, [searchQuery]);
 
   const cacheFood = async (food: FoodSearchResult) => {
     try {
@@ -1339,10 +1352,11 @@ export default function MemberDietScreen() {
               <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
                 <TextInput
                   value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  onChangeText={(text) => {
+                    setSearchQuery(text);
+                  }}
                   placeholder="음식 이름 검색..."
                   placeholderTextColor={Colors.textPlaceholder}
-                  onSubmitEditing={searchFood}
                   style={{
                     flex: 1,
                     backgroundColor: Colors.bgSub,
@@ -1354,20 +1368,6 @@ export default function MemberDietScreen() {
                     color: Colors.text,
                   }}
                 />
-                <TouchableOpacity
-                  onPress={searchFood}
-                  disabled={searching}
-                  style={{
-                    backgroundColor: Colors.green,
-                    borderRadius: 10,
-                    paddingHorizontal: 16,
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>
-                    {searching ? "..." : "검색"}
-                  </Text>
-                </TouchableOpacity>
               </View>
 
               {searchResults.length > 0 && (

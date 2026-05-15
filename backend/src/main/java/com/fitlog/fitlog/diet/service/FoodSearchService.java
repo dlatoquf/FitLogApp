@@ -117,10 +117,19 @@ public class FoodSearchService {
         executor.shutdown();
 
         // 합치기: FatSecret(정확한 식품) 먼저, 내부DB, 식약처 순
+        // 내부DB → 식약처 → FatSecret 순
         List<FoodSearchResult> combined = Stream.concat(
-                fatSecretResults.stream(),
-                Stream.concat(internalResults.stream(), kfoodResults.stream())
-        ).limit(10).collect(Collectors.toList());
+                internalResults.stream(),
+                Stream.concat(
+                        kfoodResults.stream(),
+                        fatSecretResults.stream()
+                )
+        ).collect(Collectors.toList());
+
+        combined = sortResults(combined, query)
+                .stream()
+                .limit(10)
+                .toList();
 
         if (!combined.isEmpty()) {
             return sortResults(combined, query);
@@ -130,15 +139,36 @@ public class FoodSearchService {
     }
 
     private List<FoodSearchResult> sortResults(List<FoodSearchResult> results, String query) {
+
         return results.stream()
-                .sorted(Comparator.comparingInt(r -> {
-                    String name = r.foodName();
-                    if (name.equals(query)) return 0;
-                    if (name.startsWith(query)) return 1;
-                    if (name.contains(query)) return 2;
-                    return 3;
-                }))
+                .sorted(Comparator.comparingInt(r ->
+                        scoreFoodName(r.foodName(), query)
+                ))
                 .toList();
+    }
+
+    private int scoreFoodName(String name, String query) {
+        if (name == null) return 999;
+        String normalizedName =
+                name.replace(" ", "")
+                        .replace(",", "")
+                        .toLowerCase();
+
+        String normalizedQuery =
+                query.replace(" ", "")
+                        .replace(",", "")
+                        .toLowerCase();
+
+        // 완전 일치
+        if (normalizedName.equals(normalizedQuery)) return 0;
+        // 시작 일치
+        if (normalizedName.startsWith(normalizedQuery)) return 1;
+        // _우유 / _김치찌개
+        if (normalizedName.contains("_" + normalizedQuery)) return 2;
+        // 포함
+        if (normalizedName.contains(normalizedQuery)) return 3;
+
+        return 999;
     }
 
     @SuppressWarnings("unchecked")
@@ -148,7 +178,7 @@ public class FoodSearchService {
             String rawUrl = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
                     + "?serviceKey=" + kfoodApiKey
                     + "&FOOD_NM_KR=" + encodedQuery
-                    + "&pageNo=1&numOfRows=10&type=json";
+                    + "&pageNo=1&numOfRows=20&type=jsonㄴ";
 
             Map<?, ?> response = kfoodClient.get()
                     .uri(java.net.URI.create(rawUrl))
@@ -184,8 +214,7 @@ public class FoodSearchService {
             for (Object i : items) {
                 if (!(i instanceof Map)) continue;
                 Map<Object, Object> item = (Map<Object, Object>) i;
-                System.out.println("식약처 item 원본 = " + item);
-
+                
                 String foodName = getString(item, "FOOD_NM_KR");
                 if (foodName == null || foodName.isBlank()) continue;
 
