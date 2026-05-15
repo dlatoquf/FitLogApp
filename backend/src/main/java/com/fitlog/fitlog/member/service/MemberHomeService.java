@@ -14,6 +14,8 @@ import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.schedule.repository.ScheduleRequestRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
+import java.util.Objects;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -142,25 +144,39 @@ public class MemberHomeService {
 
     public List<Map<String, Object>> getMyThisWeek(String authorization) {
         Member member = getMember(authorization);
-        LocalDate today   = LocalDate.now();
+
+        LocalDate today = LocalDate.now();
         LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
-        return scheduleRequestRepository.findByMember(member).stream()
-                .filter(r -> r.getStatus() == ScheduleRequest.Status.CONFIRMED)
-                .filter(r -> r.getSchedule() != null && r.getSchedule().getDate() != null)
-                .filter(r -> {
-                    LocalDate d = r.getSchedule().getDate();
-                    return !d.isBefore(today) && !d.isAfter(weekEnd);
-                })
-                .sorted(Comparator.comparing(r -> r.getSchedule().getDate()))
-                .map(r -> {
+        if (member.getTrainer() == null) {
+            return Collections.emptyList();
+        }
+
+        return scheduleRepository
+                .findByTrainerAndDateBetween(member.getTrainer(), today, weekEnd)
+                .stream()
+                .filter(s -> s.getMember() != null)
+                .filter(s -> Objects.equals(s.getMember().getId(), member.getId()))
+                .filter(s ->
+                        "CONFIRMED".equals(s.getStatusStr()) ||
+                                "COMPLETED".equals(s.getStatusStr())
+                )
+                .sorted(
+                        Comparator
+                                .comparing(Schedule::getDate)
+                                .thenComparing(Schedule::getStartTime)
+                )
+                .map(s -> {
                     Map<String, Object> map = new HashMap<>();
-                    map.put("scheduleId", r.getSchedule().getId());
-                    map.put("date",       r.getSchedule().getDate().toString());
-                    map.put("startTime",  r.getSchedule().getStartTime() != null ?
-                            r.getSchedule().getStartTime().toString().substring(0, 5) : "");
-                    map.put("endTime",    r.getSchedule().getEndTime() != null ?
-                            r.getSchedule().getEndTime().toString().substring(0, 5) : "");
+                    map.put("scheduleId", s.getId());
+                    map.put("date", s.getDate().toString());
+                    map.put("startTime", s.getStartTime() != null
+                            ? s.getStartTime().toString().substring(0, 5)
+                            : "");
+                    map.put("endTime", s.getEndTime() != null
+                            ? s.getEndTime().toString().substring(0, 5)
+                            : "");
+                    map.put("status", s.getStatusStr());
                     return map;
                 })
                 .collect(Collectors.toList());
