@@ -3,6 +3,7 @@ import messaging from "@react-native-firebase/messaging";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { Alert } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { API_URL } from "../constants/api";
 
 // FCM 토큰을 백엔드에 저장
@@ -80,11 +81,13 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="auth" />
-      <Stack.Screen name="(tabs)/member" />
-      <Stack.Screen name="(tabs)/trainer" />
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="(tabs)/member" />
+        <Stack.Screen name="(tabs)/trainer" />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }

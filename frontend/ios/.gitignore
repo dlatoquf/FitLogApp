@@ -28,8 +28,3 @@ project.xcworkspace
 
 # CocoaPods
 /Pods/
-
-# Firebase 보안 파일
-GoogleService-Info.plist
-google-services.json
-firebase-service-account.json

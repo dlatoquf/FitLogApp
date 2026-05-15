@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import Purchases from "react-native-purchases";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -60,13 +61,21 @@ export default function TrainerHomeScreen() {
   // TODO: 실제 서비스에서는 totalMembers >= 3 으로 변경 (FREE 플랜 3명 초과 시)
   // 현재는 테스트용으로 totalMembers >= 1 (1명 있을 때 2번째부터 결제 유도)
   const handleInvitePress = () => {
-    const limit = 1; // TODO: 실제 배포 시 3으로 변경
+    const limit = 3; // FREE 플랜 3명 초과 시 결제 유도
     if ((data?.totalMembers ?? 0) >= limit) {
       setPaymentVisible(true); // 결제 바텀시트 오픈
     } else {
       setInviteVisible(true); // 초대 모달 오픈
     }
   };
+
+  const inviteDragGesture = Gesture.Pan()
+  .runOnJS(true)
+  .onEnd((e) => {
+    if (e.translationY > 60) {
+      setInviteVisible(false);
+    }
+  });
 
 
   const fetchHome = async (isRefresh = false) => {
@@ -212,52 +221,27 @@ export default function TrainerHomeScreen() {
         </View>
 
         {/* 하루 출석률 카드 */}
-        {(() => {
-          const now = new Date();
-          const list = data?.todayPtList ?? [];
-          const total = list.length;
-          const completed = list.filter(item => item.completed).length;
-          const noShow = list.filter(item => {
-            if (item.completed) return false;
-            const [h, m] = item.time.split(":").map(Number);
-            const scheduleEnd = new Date();
-            scheduleEnd.setHours(h + 1, m, 0, 0);
-            return now > scheduleEnd;
-          }).length;
-          const attendancePct = total > 0 ? Math.round((completed / total) * 100) : 0;
-          if (total === 0) return null;
-          const barColor = attendancePct >= 80 ? Colors.green : "#F59E0B";
-          return (
-            <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: barColor }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "700" }}>하루 출석률</Text>
-                <Text style={{ fontSize: 22, fontWeight: "800", color: barColor }}>{attendancePct}%</Text>
-              </View>
-              <ProgressBar pct={attendancePct} color={barColor} />
-              <View style={{ flexDirection: "row", gap: 16, marginTop: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green }} />
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>출석 {completed}명</Text>
-                </View>
-                {noShow > 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
-                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>노쇼 {noShow}명</Text>
-                  </View>
-                )}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue }} />
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>전체 {total}명</Text>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
+        <AttendanceCard todayPtList={data?.todayPtList ?? []} />
 
         {/* 오늘 PT 일정 */}
         <SectionTitle title="오늘 PT 일정" />
         {data?.todayPtList && data.todayPtList.length > 0 ? (
-          data.todayPtList.map((item) => (
+          [...data.todayPtList]
+            .sort((a, b) => {
+              const now = new Date();
+              const [ah, am] = a.time.split(":").map(Number);
+              const [bh, bm] = b.time.split(":").map(Number);
+              const aTime = new Date(); aTime.setHours(ah, am, 0, 0);
+              const bTime = new Date(); bTime.setHours(bh, bm, 0, 0);
+              const aPast = a.completed || now > aTime;
+              const bPast = b.completed || now > bTime;
+              // 지난 것은 뒤로
+              if (aPast && !bPast) return 1;
+              if (!aPast && bPast) return -1;
+              // 같은 그룹 내에서는 시간순
+              return aTime.getTime() - bTime.getTime();
+            })
+            .map((item) => (
             <TouchableOpacity
               key={`${item.memberId}-${item.time}`}
               onPress={() => router.push(`/(tabs)/trainer/member-detail?id=${item.memberId}`)}
@@ -293,7 +277,22 @@ export default function TrainerHomeScreen() {
         <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }} activeOpacity={1} onPress={() => setInviteVisible(false)}>
           <TouchableOpacity activeOpacity={1}>
             <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: Platform.OS === "ios" ? 40 : 28 }}>
-              <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+              <GestureDetector gesture={inviteDragGesture}>
+                <TouchableOpacity
+                  onPress={() => setInviteVisible(false)}
+                  activeOpacity={0.8}
+                  style={{ alignItems: "center", paddingBottom: 12, marginTop: -8 }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 4,
+                      backgroundColor: Colors.border,
+                      borderRadius: 99,
+                    }}
+                  />
+                </TouchableOpacity>
+              </GestureDetector>
               <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>회원 초대하기 🔗</Text>
               <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>아래 코드를 회원에게 공유하면 자동으로 연결돼요</Text>
               <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 20, alignItems: "center", borderWidth: 1, borderColor: Colors.border, marginBottom: 20 }}>
@@ -323,7 +322,7 @@ export default function TrainerHomeScreen() {
           activeOpacity={1}
           onPress={() => setPaymentVisible(false)}
         >
-          <TouchableOpacity activeOpacity={1}>
+          <GestureDetector gesture={Gesture.Pan().onEnd((e) => { if (e.translationY > 80) setPaymentVisible(false); })}>
             <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: Platform.OS === "ios" ? 44 : 28 }}>
               {/* 핸들 바 */}
               <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
@@ -395,7 +394,7 @@ export default function TrainerHomeScreen() {
                 style={{ backgroundColor: "#FEE500", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10, flexDirection: "row", justifyContent: "center", gap: 8 }}
               >
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#3C1E1E" }}>카카오페이로 구독</Text>
-              </TouchableOpacity>8/}
+              </TouchableOpacity>*/}
 
               {/* 토스페이먼츠 */}
               {/* TODO: @tosspayments/tosspayments-sdk 연동
@@ -412,7 +411,7 @@ export default function TrainerHomeScreen() {
                 <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </GestureDetector>
         </TouchableOpacity>
       </Modal>
     </>
@@ -433,6 +432,46 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
     <View style={{ backgroundColor: Colors.border, borderRadius: 99, height: 5 }}>
       <View style={{ width: `${Math.min(pct, 100)}%` as any, height: 5, backgroundColor: color, borderRadius: 99 }} />
+    </View>
+  );
+}
+
+function AttendanceCard({ todayPtList }: { todayPtList: TodayPt[] }) {
+  const now = new Date();
+  const total = todayPtList.length;
+  const completed = todayPtList.filter(item => item.completed).length;
+  const noShow = todayPtList.filter(item => {
+    if (item.completed) return false;
+    const [h, m] = item.time.split(":").map(Number);
+    const scheduleEnd = new Date();
+    scheduleEnd.setHours(h + 1, m, 0, 0);
+    return now > scheduleEnd;
+  }).length;
+  const attendancePct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  if (total === 0) return null;
+  return (
+    <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: Colors.green }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "700" }}>하루 출석률</Text>
+        <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.green }}>{attendancePct}%</Text>
+      </View>
+      <ProgressBar pct={attendancePct} color={Colors.green} />
+      <View style={{ flexDirection: "row", gap: 16, marginTop: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green }} />
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>출석 {completed}명</Text>
+        </View>
+        {noShow > 0 && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
+            <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>노쇼 {noShow}명</Text>
+          </View>
+        )}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue }} />
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>전체 {total}명</Text>
+        </View>
+      </View>
     </View>
   );
 }

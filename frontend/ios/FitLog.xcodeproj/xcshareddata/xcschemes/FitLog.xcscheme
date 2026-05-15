@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "FitLogApp.app"
-               BlueprintName = "FitLogApp"
-               ReferencedContainer = "container:FitLogApp.xcodeproj">
+               BuildableName = "FitLog.app"
+               BlueprintName = "FitLog"
+               ReferencedContainer = "container:FitLog.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "FitLogAppTests.xctest"
-               BlueprintName = "FitLogAppTests"
-               ReferencedContainer = "container:FitLogApp.xcodeproj">
+               BuildableName = "FitLogTests.xctest"
+               BlueprintName = "FitLogTests"
+               ReferencedContainer = "container:FitLog.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "FitLogApp.app"
-            BlueprintName = "FitLogApp"
-            ReferencedContainer = "container:FitLogApp.xcodeproj">
+            BuildableName = "FitLog.app"
+            BlueprintName = "FitLog"
+            ReferencedContainer = "container:FitLog.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "FitLogApp.app"
-            BlueprintName = "FitLogApp"
-            ReferencedContainer = "container:FitLogApp.xcodeproj">
+            BuildableName = "FitLog.app"
+            BlueprintName = "FitLog"
+            ReferencedContainer = "container:FitLog.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

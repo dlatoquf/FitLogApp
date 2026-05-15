@@ -247,4 +247,69 @@ public class WorkoutLogController {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
     }
+
+    // WorkoutLogController.java 안에 추가
+// 위치: getMyWorkoutLogs 메서드 아래, buildLog 메서드 위 추천
+
+    @Transactional
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateWorkoutLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+
+        User trainerUser = getUserFromToken(authorization);
+        Trainer trainer = trainerRepository.findByUser(trainerUser)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
+
+        WorkoutLog log = workoutLogRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("운동 기록을 찾을 수 없습니다."));
+
+        if (log.getTrainer() == null || !log.getTrainer().getId().equals(trainer.getId())) {
+            throw new RuntimeException("수정 권한이 없습니다.");
+        }
+
+        if (body.get("date") != null) {
+            log.setLogDate(LocalDate.parse((String) body.get("date")));
+        }
+
+        // 기존 세트 전체 삭제 후 다시 저장
+        log.getSets().clear();
+
+        List<Map<String, Object>> exercises = (List<Map<String, Object>>) body.get("exercises");
+        if (exercises != null) {
+            for (Map<String, Object> ex : exercises) {
+                String name = (String) ex.get("name");
+                List<Map<String, Object>> exSets = (List<Map<String, Object>>) ex.get("sets");
+
+                if (exSets != null) {
+                    for (Map<String, Object> s : exSets) {
+                        WorkoutSet ws = new WorkoutSet();
+                        ws.setWorkoutLog(log);
+                        ws.setExerciseName(name);
+
+                        if (s.get("weight") != null) {
+                            ws.setWeight(new BigDecimal(s.get("weight").toString()));
+                        }
+                        if (s.get("reps") != null) {
+                            ws.setReps(((Number) s.get("reps")).intValue());
+                        }
+                        if (s.get("rpe") != null) {
+                            ws.setRpe(((Number) s.get("rpe")).intValue());
+                        }
+
+                        log.getSets().add(ws);
+                    }
+                }
+            }
+        }
+
+        workoutLogRepository.save(log);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "운동 로그가 수정됐어요.",
+                "workoutId", log.getWorkoutId()
+        ));
+    }
+
 }
