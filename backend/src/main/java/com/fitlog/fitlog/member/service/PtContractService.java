@@ -10,7 +10,7 @@ import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.fitlog.fitlog.notification.service.NotificationService;
 import java.util.List;
 
 @Service
@@ -20,15 +20,18 @@ public class PtContractService {
     private final MemberRepository memberRepository;
     private final TrainerRepository trainerRepository;
     private final JwtService jwtService;
+    private final NotificationService notificationService;
 
     public PtContractService(PtContractRepository ptContractRepository,
                              MemberRepository memberRepository,
                              TrainerRepository trainerRepository,
-                             JwtService jwtService) {
+                             JwtService jwtService,
+                             NotificationService notificationService) {
         this.ptContractRepository = ptContractRepository;
         this.memberRepository = memberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
+        this.notificationService=notificationService;
     }
 
     // PT 추가 등록 (누적)
@@ -53,6 +56,14 @@ public class PtContractService {
         contract.setEndDate(request.getEndDate());
         contract.setMemo(request.getMemo());
         ptContractRepository.save(contract);
+
+        notificationService.sendNotification(
+                member.getUser(),
+                "PT_ADD",
+                "트레이너가 PT " + request.getSessions() + "회를 추가했어요. 현재 잔여 " + member.getPtRemaining() + "회",
+                "PT",
+                member.getId()
+        );
 
         // members 테이블 누적 업데이트
         int prevTotal = member.getPtTotal() != null ? member.getPtTotal() : 0;

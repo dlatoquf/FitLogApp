@@ -1,4 +1,5 @@
 import { Tabs } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "../../../constants/Colors";
 
 export default function MemberTabLayout() {
@@ -11,32 +12,98 @@ export default function MemberTabLayout() {
           backgroundColor: "#fff",
           borderTopWidth: 1,
           borderTopColor: Colors.border,
-          height: 56,
-          paddingTop: 6,
-          paddingBottom: 8,
+          height: 62,
+          paddingTop: 4,
+          paddingBottom: 4,
         },
 
-        tabBarActiveTintColor: Colors.blue,
+        tabBarActiveTintColor: Colors.green,
         tabBarInactiveTintColor: Colors.textMuted,
 
         tabBarIconStyle: {
-          display: "none",
+          marginTop: 0,
+          marginBottom: 0,
         },
 
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: "700",
+          marginTop:1,
         },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: "홈" }} />
-      <Tabs.Screen name="diet" options={{ title: "식단로그" }} />
-      <Tabs.Screen name="workout" options={{ title: "운동로그" }} />
-      <Tabs.Screen name="growth" options={{ title: "바디로그" }} />
-      <Tabs.Screen name="more" options={{ title: "내정보" }} />
-      
-      <Tabs.Screen name="schedule" options={{ href: null,}}/>
-      <Tabs.Screen name="notifications" options={{ href: null,}}/>
-      </Tabs>
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "홈",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="diet"
+        options={{
+          title: "식단",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "restaurant" : "restaurant-outline"}
+              size={23}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="workout"
+        options={{
+          title: "운동",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="dumbbell"
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="growth"
+        options={{
+          title: "바디",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "analytics" : "analytics-outline"}
+              size={23}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "내정보",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={23}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen name="schedule" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+    </Tabs>
   );
 }

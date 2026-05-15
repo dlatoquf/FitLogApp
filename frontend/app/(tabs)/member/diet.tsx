@@ -875,7 +875,7 @@ export default function MemberDietScreen() {
                       padding: 12,
                       marginBottom: 4,
                       borderLeftWidth: 3,
-                      borderLeftColor: Colors.gold,
+                      borderLeftColor: Colors.green,
                       borderWidth: 1,
                       borderColor: Colors.border,
                       flexDirection: "row",

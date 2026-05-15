@@ -61,11 +61,20 @@ export default function TrainerHomeScreen() {
   // TODO: 실제 서비스에서는 totalMembers >= 3 으로 변경 (FREE 플랜 3명 초과 시)
   // 현재는 테스트용으로 totalMembers >= 1 (1명 있을 때 2번째부터 결제 유도)
   const handleInvitePress = () => {
-    const limit = 3; // FREE 플랜 3명 초과 시 결제 유도
+    const limit = 3; // FREE 플랜 3명까지 가능
+    const plan = (data?.plan ?? "FREE").toUpperCase();
+
+    // PRO는 회원 수 제한 없이 바로 초대 가능
+    if (plan === "PRO") {
+      setInviteVisible(true);
+      return;
+    }
+
+    // FREE만 제한 도달 시 업그레이드 바텀시트 오픈
     if ((data?.totalMembers ?? 0) >= limit) {
-      setPaymentVisible(true); // 결제 바텀시트 오픈
+      setPaymentVisible(true);
     } else {
-      setInviteVisible(true); // 초대 모달 오픈
+      setInviteVisible(true);
     }
   };
 
@@ -180,7 +189,7 @@ export default function TrainerHomeScreen() {
               <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(data?.plan ?? "").toUpperCase() === "PRO" && (
+              {(data?.plan ?? "FREE").toUpperCase() === "PRO" && (
                 <View
                   style={{
                     backgroundColor: Colors.greenLight,
@@ -191,7 +200,13 @@ export default function TrainerHomeScreen() {
                     paddingVertical: 3,
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
                     PRO
                   </Text>
                 </View>

@@ -33,6 +33,7 @@ import { API_URL } from "../../../constants/api";
     FEEDBACK: "💬",
     PT_EXPIRY: "⏰",
     GENERAL: "🔔",
+    PT_ADD: "➕",
     };
 
     export default function NotificationsScreen() {
@@ -113,6 +114,12 @@ import { API_URL } from "../../../constants/api";
             });
             return;
         }
+        // PT 횟수 추가 알림
+        if (n.type === "PT_ADD" || n.targetType === "PT") {
+            router.push("/(tabs)/member/home");
+            return;
+        }
+
         // 일반 알림 / 이동 대상 없는 알림
         router.push("/(tabs)/member/home");
     };
@@ -154,12 +161,12 @@ import { API_URL } from "../../../constants/api";
         </View>
 
         <ScrollView
-            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 32 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchNotifications(true)} tintColor={Colors.green} />}
         >
             {notifications.length === 0 ? (
             <View style={{ alignItems: "center", paddingVertical: 80 }}>
-                <Text style={{ fontSize: 48, marginBottom: 16 }}>🔔</Text>
+                <Text style={{ fontSize: 36, marginBottom: 12 }}>🔔</Text>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 6 }}>알림이 없어요</Text>
                 <Text style={{ fontSize: 13, color: Colors.textMuted }}>새 알림이 오면 여기에 표시돼요</Text>
             </View>
@@ -171,37 +178,37 @@ import { API_URL } from "../../../constants/api";
                 style={{
                     flexDirection: "row",
                     alignItems: "flex-start",
-                    gap: 12,
+                    gap: 9,
                     backgroundColor: n.isRead ? Colors.bgSub : Colors.greenLight,
-                    borderRadius: 14,
-                    padding: 16,
-                    marginBottom: 10,
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 7,
                     borderWidth: 1,
                     borderColor: n.isRead ? Colors.border : Colors.green + "44",
                 }}
                 >
                 {/* 아이콘 */}
                 <View style={{
-                    width: 42, height: 42, borderRadius: 12,
+                    width: 34, height: 34, borderRadius: 10,
                     backgroundColor: n.isRead ? Colors.border : Colors.green + "22",
                     justifyContent: "center", alignItems: "center",
                 }}>
-                    <Text style={{ fontSize: 20 }}>{NOTI_ICON[n.type] ?? "🔔"}</Text>
+                    <Text style={{ fontSize: 16 }}>{NOTI_ICON[n.type] ?? "🔔"}</Text>
                 </View>
 
                 {/* 내용 */}
                 <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, color: Colors.text, fontWeight: n.isRead ? "400" : "700", lineHeight: 20 }}>
+                    <Text style={{ fontSize: 13, color: Colors.text, fontWeight: n.isRead ? "400" : "700", lineHeight: 18 }}>
                     {n.content}
                     </Text>
-                    <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 6 }}>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
                     {n.createdAt?.slice(0, 16).replace("T", " ")}
                     </Text>
                 </View>
 
                 {/* 읽지 않음 표시 */}
                 {!n.isRead && (
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green, marginTop: 6 }} />
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginTop: 6 }} />
                 )}
                 </TouchableOpacity>
             ))

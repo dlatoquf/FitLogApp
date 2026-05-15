@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Purchases from "react-native-purchases";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -36,6 +37,7 @@ export default function TrainerMoreScreen() {
   const [saving, setSaving] = useState(false);
   const [notifPush, setNotifPush] = useState(true);
   const [notifSchedule, setNotifSchedule] = useState(true);
+  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,6 +45,17 @@ export default function TrainerMoreScreen() {
       const pairs = await AsyncStorage.multiGet(["notif_push", "notif_schedule"]);
       if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
       if (pairs[1][1] !== null) setNotifSchedule(pairs[1][1] === "true");
+
+      // RevenueCat 구독 상태 확인
+      try {
+        if (Purchases && typeof Purchases.getCustomerInfo === "function") {
+          const info = await Purchases.getCustomerInfo();
+          const isPro = typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
+          setPlan(isPro ? "PRO" : "FREE");
+        }
+      } catch (e) {
+        console.log("RevenueCat 상태 확인 실패:", e);
+      }
 
       try {
         const data = await apiGet<TrainerProfile>(ENDPOINTS.profile.trainer);
@@ -141,6 +154,81 @@ export default function TrainerMoreScreen() {
           ))}
         </View>
         <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.startTime} ~ {profile?.endTime}</Text>
+      </View>
+
+      {/* 플랜 상태 */}
+      <View
+        style={{
+          backgroundColor: plan === "PRO" ? Colors.greenLight : Colors.bgSub,
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 14,
+          borderWidth: 1,
+          borderColor: plan === "PRO" ? Colors.green + "44" : Colors.border,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "900",
+              color: plan === "PRO" ? Colors.green : Colors.text,
+              marginBottom: 4,
+            }}
+          >
+            {plan === "PRO" ? "PRO 플랜" : "FREE 플랜"}
+          </Text>
+          <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>
+            {plan === "PRO"
+              ? "회원 무제한 · 모든 기능 이용 중"
+              : "무료 플랜은 회원 3명까지 가능해요"}
+          </Text>
+        </View>
+
+        {plan === "FREE" && (
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                if (!Purchases || typeof Purchases.getOfferings !== "function") {
+                  Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                  return;
+                }
+
+                const offerings = await Purchases.getOfferings();
+                const pkg =
+                  offerings.current?.availablePackages.find(
+                    (p: any) => p.packageType === "MONTHLY"
+                  ) ?? offerings.current?.availablePackages[0];
+
+                if (!pkg) {
+                  Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                  return;
+                }
+
+                await Purchases.purchasePackage(pkg);
+                setPlan("PRO");
+                Alert.alert("구독 완료", "PRO 플랜이 활성화됐어요.");
+              } catch (e: any) {
+                if (!e.userCancelled) {
+                  Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
+                }
+              }
+            }}
+            style={{
+              backgroundColor: Colors.green,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>
+              업그레이드
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
       {/* 트레이너 코드 */}
       <View style={{ backgroundColor: Colors.bgSub, borderRadius: 16, padding: 16, marginBottom: 18, borderWidth: 1, borderColor: Colors.border }}>

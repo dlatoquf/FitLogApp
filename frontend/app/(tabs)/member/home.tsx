@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -28,8 +29,12 @@ interface ThisWeekSchedule {
   status?: string;
 }
 interface NextWeekSlot {
-  id: number; date: string; startTime: string; endTime: string;
-  status: "OPEN" | "REQUESTED" | "MINE" | "FULL";
+  id: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: "OPEN" | "REQUESTED" | "MINE" | "FULL" | "CONFIRMED" | "COMPLETED";
+  myRequest?: boolean;
 }
 interface MemberHomeData {
   member: {
@@ -63,6 +68,38 @@ const NOTI_ICON: Record<string, string> = {
   WORKOUT_LOG: "💪", SCHEDULE: "📅", FEEDBACK: "💬", PT_EXPIRY: "⏰", GENERAL: "🔔",
 };
 
+const formatTime = (time?: string) => {
+  if (!time) return "";
+  return String(time).slice(0, 5);
+};
+
+const normalizeSlotStatus = (slot: any): NextWeekSlot["status"] => {
+  const status = String(slot.status ?? "OPEN").toUpperCase();
+
+  if (slot.myRequest && (status === "CONFIRMED" || status === "MINE")) {
+    return "MINE";
+  }
+
+  if (slot.myRequest && status === "REQUESTED") {
+    return "REQUESTED";
+  }
+
+  if (status === "OPEN") {
+    return "OPEN";
+  }
+
+  if (status === "REQUESTED") {
+    return "REQUESTED";
+  }
+
+  // 다른 회원이 확정했거나 수업 완료된 슬롯은 회원 입장에서 마감
+  if (status === "CONFIRMED" || status === "COMPLETED" || status === "FULL") {
+    return "FULL";
+  }
+
+  return "FULL";
+};
+
 export default function MemberHomeScreen() {
   const params = useLocalSearchParams<{ openSchedule?: string }>();
   const didOpenScheduleFromNoti = useRef(false);
@@ -88,7 +125,9 @@ export default function MemberHomeScreen() {
 
   const weekDates = getWeekDates(1);
   const dateKey   = toDateKey(selectedDate);
-  const daySlots  = nextWeekSlots.filter(s => s.date === dateKey);
+  const daySlots  = nextWeekSlots
+    .filter(s => s.date === dateKey)
+    .sort((a, b) => formatTime(a.startTime).localeCompare(formatTime(b.startTime)));
   const myDates   = new Set(nextWeekSlots.filter(s => s.status === "MINE" || s.status === "REQUESTED").map(s => s.date));
 
   const fetchHome = async (isRefresh = false) => {
@@ -116,7 +155,16 @@ export default function MemberHomeScreen() {
       const jwt = await AsyncStorage.getItem("jwt");
       const res = await fetch(`${API_URL}/api/schedule/next-week-slots`, { headers: { Authorization: `Bearer ${jwt}` } });
       if (!res.ok) throw new Error();
-      setNextWeekSlots(await res.json());
+      const rawSlots = await res.json();
+      setNextWeekSlots(
+        rawSlots.map((slot: any) => ({
+          ...slot,
+          id: slot.id ?? slot.scheduleId,
+          startTime: formatTime(slot.startTime),
+          endTime: formatTime(slot.endTime),
+          status: normalizeSlotStatus(slot),
+        }))
+      );
     } catch {
       const mk = toDateKey(weekDates[0]);
       const tk = toDateKey(weekDates[1]);
@@ -169,6 +217,14 @@ export default function MemberHomeScreen() {
       }},
     ]);
   };
+
+  const scheduleDragGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationY > 60) {
+        setShowSchedule(false);
+      }
+    });
 
   useEffect(() => { if (didFetch.current) return;
     didFetch.current = true;
@@ -406,10 +462,18 @@ export default function MemberHomeScreen() {
       </Modal>
 
       {/* 다음 주 수업 신청 모달 */}
-      <Modal visible={showSchedule} animationType="slide" transparent>
+      <Modal visible={showSchedule} animationType="slide" transparent onRequestClose={() => setShowSchedule(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, height: "75%" }}>
-            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 16 }} />
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34, height: "75%" }}>
+            <GestureDetector gesture={scheduleDragGesture}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowSchedule(false)}
+                style={{ alignItems: "center", paddingVertical: 8, marginTop: -6, marginBottom: 8 }}
+              >
+                <View style={{ width: 44, height: 5, backgroundColor: Colors.border, borderRadius: 99 }} />
+              </TouchableOpacity>
+            </GestureDetector>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>다음 주 수업 신청</Text>
               <TouchableOpacity onPress={() => setShowSchedule(false)}>
@@ -420,7 +484,7 @@ export default function MemberHomeScreen() {
               {weekDates[0].getMonth() + 1}/{weekDates[0].getDate()} ~ {weekDates[6].getMonth() + 1}/{weekDates[6].getDate()}
             </Text>
             <View style={{ backgroundColor: Colors.greenLight, borderRadius: 8, padding: 8, marginBottom: 14 }}>
-              <Text style={{ fontSize: 12, color: Colors.green }}>💡 여러 시간대에 중복 신청 가능해요. 트레이너가 한 곳을 확정해드려요!</Text>
+              <Text style={{ fontSize: 12, color: Colors.green }}>여러 시간대에 중복 신청 가능해요. 트레이너가 한 곳을 확정해드려요.</Text>
             </View>
 
             {/* 요일 선택 */}
@@ -430,17 +494,18 @@ export default function MemberHomeScreen() {
                 const isSelected = dateKey === key;
                 const isMine     = myDates.has(key);
                 return (
-                  <TouchableOpacity key={i} onPress={() => setSelectedDate(date)} style={{ alignItems: "center", gap: 4 }}>
+                  <TouchableOpacity key={key} onPress={() => setSelectedDate(date)} style={{ alignItems: "center", gap: 4 }}>
                     <Text style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600" }}>{DAYS[i]}</Text>
                     <View style={{
                       width: 34, height: 34, borderRadius: 10,
-                      backgroundColor: isSelected ? Colors.green : "transparent",
-                      borderWidth: isMine && !isSelected ? 2 : 0, borderColor: Colors.blue,
+                      backgroundColor: isSelected ? Colors.green : isMine ? Colors.greenLight : "transparent",
+                      borderWidth: isMine && !isSelected ? 1 : 0,
+                      borderColor: Colors.green + "44",
                       justifyContent: "center", alignItems: "center",
                     }}>
                       <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{date.getDate()}</Text>
                     </View>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isMine ? Colors.blue : "transparent" }} />
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: isMine ? Colors.green : "transparent" }} />
                   </TouchableOpacity>
                 );
               })}
@@ -455,36 +520,84 @@ export default function MemberHomeScreen() {
                   <Text style={{ fontSize: 14, color: Colors.textMuted }}>이날은 수업이 없어요</Text>
                 </View>
               ) : (
-                daySlots.map(slot => {
+                daySlots.map((slot) => {
                   const isMine      = slot.status === "MINE";
                   const isRequested = slot.status === "REQUESTED";
-                  const isFull      = slot.status === "FULL";
+                  const isFull      =
+                    slot.status === "FULL" ||
+                    slot.status === "CONFIRMED" ||
+                    slot.status === "COMPLETED";
                   const isOpen      = slot.status === "OPEN";
+
+                  const statusText = isMine
+                    ? "내 수업"
+                    : isRequested
+                    ? "신청 대기"
+                    : isFull
+                    ? "마감"
+                    : "신청 가능";
+
+                  const statusColor = isMine
+                    ? Colors.blue
+                    : isRequested
+                    ? Colors.gold
+                    : isFull
+                    ? Colors.textMuted
+                    : Colors.green;
+
                   return (
-                    <View key={slot.id} style={{
-                      flexDirection: "row", alignItems: "center",
-                      backgroundColor: isMine ? Colors.blueBg : isRequested ? Colors.goldBg : Colors.bgSub,
-                      borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1,
-                      borderColor: isMine ? Colors.blue + "44" : isRequested ? Colors.gold + "44" : Colors.border,
-                      opacity: isFull ? 0.4 : 1,
-                    }}>
-                      <View style={{ width: 55 }}>
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>{slot.startTime}</Text>
-                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>~{slot.endTime}</Text>
-                      </View>
-                      <View style={{ width: 1, height: 32, backgroundColor: Colors.border, marginHorizontal: 12 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: isMine ? Colors.blue : isRequested ? Colors.gold : isFull ? Colors.textMuted : Colors.green }}>
-                          {isMine ? "내 수업 확정됨 ✓" : isRequested ? "신청 완료 (대기 중)" : isFull ? "마감" : "신청 가능"}
+                    <View
+                      key={`${slot.id}-${slot.date}-${formatTime(slot.startTime)}`}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: isMine
+                          ? Colors.blueBg
+                          : isRequested
+                          ? Colors.goldBg
+                          : "#fff",
+                        borderRadius: 12,
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        marginBottom: 6,
+                        borderWidth: 1,
+                        borderColor: isMine
+                          ? Colors.blue + "44"
+                          : isRequested
+                          ? Colors.gold + "44"
+                          : Colors.border,
+                        opacity: isFull ? 0.55 : 1,
+                      }}
+                    >
+                      <View style={{ width: 54 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+                          {formatTime(slot.startTime)}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 1 }}>
+                          ~{formatTime(slot.endTime)}
                         </Text>
                       </View>
+
+                      <View style={{ width: 1, height: 28, backgroundColor: Colors.border, marginHorizontal: 10 }} />
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: statusColor }}>
+                          {statusText}
+                        </Text>
+                      </View>
+
                       {isOpen && (
                         <TouchableOpacity
                           onPress={() => requestSlot(slot.id)}
                           disabled={requesting === slot.id}
-                          style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+                          style={{
+                            backgroundColor: Colors.green,
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
+                            borderRadius: 10,
+                          }}
                         >
-                          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>
+                          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>
                             {requesting === slot.id ? "..." : "신청"}
                           </Text>
                         </TouchableOpacity>
