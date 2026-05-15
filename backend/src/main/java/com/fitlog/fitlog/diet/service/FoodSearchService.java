@@ -172,7 +172,7 @@ public class FoodSearchService {
 
         return 999;
     }
-    
+
     @SuppressWarnings("unchecked")
     private List<FoodSearchResult> searchKfood(String query) {
 
@@ -258,14 +258,17 @@ public class FoodSearchService {
                     continue;
                 }
 
-                // 우유 예외처리
+                // 우유 예외처리: "우유" 검색시 우유크림/우유맛 파생 제품 제거
                 if (normalizedQuery.equals("우유")) {
 
                     if (
                             normalizedFood.contains("도넛") ||
                                     normalizedFood.contains("빵") ||
                                     normalizedFood.contains("과자") ||
-                                    normalizedFood.contains("크림")
+                                    normalizedFood.contains("크림") ||
+                                    normalizedFood.contains("우유크림") ||
+                                    normalizedFood.contains("우유맛") ||
+                                    normalizedFood.contains("케이크")
                     ) {
                         continue;
                     }

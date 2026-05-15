@@ -367,15 +367,16 @@ export default function MemberDietScreen() {
   };
 
   const selectSearchFood = (food: FoodSearchResult) => {
+    const round1 = (n: number) => Math.round((n ?? 0) * 10) / 10;
     setAddForm({
       foodName: food.foodName,
       baseAmount: "100",
       amount: "100",
       unit: "g",
-      calories: String(food.calories ?? 0),
-      carbs: String(food.carbs ?? 0),
-      protein: String(food.protein ?? 0),
-      fat: String(food.fat ?? 0),
+      calories: String(round1(food.calories)),
+      carbs: String(round1(food.carbs)),
+      protein: String(round1(food.protein)),
+      fat: String(round1(food.fat)),
       fatSecretFoodId: food.foodId,
     });
     setSearchQuery(food.foodName);
@@ -1352,6 +1353,8 @@ export default function MemberDietScreen() {
                   onChangeText={(text) => {
                     setSearchQuery(text);
                   }}
+                  onSubmitEditing={() => searchFood(searchQuery)}
+                  returnKeyType="search"
                   placeholder="음식 이름 검색..."
                   placeholderTextColor={Colors.textPlaceholder}
                   style={{
@@ -1365,6 +1368,26 @@ export default function MemberDietScreen() {
                     color: Colors.text,
                   }}
                 />
+                <TouchableOpacity
+                  onPress={() => searchFood(searchQuery)}
+                  disabled={searching}
+                  style={{
+                    backgroundColor: Colors.green,
+                    borderRadius: 10,
+                    paddingHorizontal: 16,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    opacity: searching ? 0.6 : 1,
+                  }}
+                >
+                  {searching ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
+                      검색
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
 
               {searchResults.length > 0 && (

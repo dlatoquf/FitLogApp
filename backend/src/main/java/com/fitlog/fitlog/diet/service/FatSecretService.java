@@ -68,7 +68,10 @@ public class FatSecretService {
 
         if (response == null) return List.of();
         if (response.get("error") != null) {
-            throw new RuntimeException("FatSecret API 오류: " + response.get("error"));
+            // IP 차단 등 API 오류 → 토큰 초기화 후 빈 결과 반환 (검색 전체를 실패시키지 않음)
+            accessToken = null;
+            System.out.println("FatSecret API 오류 (토큰 초기화): " + response.get("error"));
+            return List.of();
         }
 
         try {
