@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 public class FoodSearchService {
@@ -170,15 +172,23 @@ public class FoodSearchService {
 
         return 999;
     }
-
+    
     @SuppressWarnings("unchecked")
     private List<FoodSearchResult> searchKfood(String query) {
+
         try {
-            String encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
-            String rawUrl = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
-                    + "?serviceKey=" + kfoodApiKey
-                    + "&FOOD_NM_KR=" + encodedQuery
-                    + "&pageNo=1&numOfRows=20&type=jsonㄴ";
+
+            String encodedQuery =
+                    java.net.URLEncoder.encode(
+                            query,
+                            java.nio.charset.StandardCharsets.UTF_8
+                    );
+
+            String rawUrl =
+                    "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02"
+                            + "?serviceKey=" + kfoodApiKey
+                            + "&FOOD_NM_KR=" + encodedQuery
+                            + "&pageNo=1&numOfRows=30&type=json";
 
             Map<?, ?> response = kfoodClient.get()
                     .uri(java.net.URI.create(rawUrl))
@@ -195,10 +205,11 @@ public class FoodSearchService {
             if (itemsObj == null) return List.of();
 
             List<?> items;
-            if (itemsObj instanceof List) {
-                items = (List<?>) itemsObj;
-            } else if (itemsObj instanceof Map) {
+
+            if (itemsObj instanceof Map) {
+
                 Object itemObj = ((Map<?, ?>) itemsObj).get("item");
+
                 if (itemObj instanceof List) {
                     items = (List<?>) itemObj;
                 } else if (itemObj instanceof Map) {
@@ -206,38 +217,101 @@ public class FoodSearchService {
                 } else {
                     return List.of();
                 }
+
             } else {
                 return List.of();
             }
 
             List<FoodSearchResult> results = new ArrayList<>();
+
+            Set<String> seen = new HashSet<>();
+
+            String normalizedQuery =
+                    query.replace(" ", "")
+                            .toLowerCase();
+
             for (Object i : items) {
+
                 if (!(i instanceof Map)) continue;
-                Map<Object, Object> item = (Map<Object, Object>) i;
-                
-                String foodName = getString(item, "FOOD_NM_KR");
-                if (foodName == null || foodName.isBlank()) continue;
 
-                double carbs = parseDouble(item, "AMT_NUM6");
-                if (carbs == 0.0) carbs = parseDouble(item, "AMT_NUM7");
+                Map<Object, Object> item =
+                        (Map<Object, Object>) i;
 
-                double fat = parseDouble(item, "AMT_NUM4");
-                if (fat == 0.0) fat = parseDouble(item, "AMT_NUM24");
+                String foodName =
+                        getString(item, "FOOD_NM_KR");
+
+                if (foodName == null || foodName.isBlank()) {
+                    continue;
+                }
+
+                // 이름 정리
+                foodName =
+                        foodName.replaceAll("_.*", "")
+                                .trim();
+
+                String normalizedFood =
+                        foodName.replace(" ", "")
+                                .toLowerCase();
+
+                // 검색어 포함 안되면 제거
+                if (!normalizedFood.contains(normalizedQuery)) {
+                    continue;
+                }
+
+                // 우유 예외처리
+                if (normalizedQuery.equals("우유")) {
+
+                    if (
+                            normalizedFood.contains("도넛") ||
+                                    normalizedFood.contains("빵") ||
+                                    normalizedFood.contains("과자") ||
+                                    normalizedFood.contains("크림")
+                    ) {
+                        continue;
+                    }
+                }
+
+                double calories =
+                        parseDouble(item, "AMT_NUM1");
+
+                double protein =
+                        parseDouble(item, "AMT_NUM3");
+
+                double fat =
+                        parseDouble(item, "AMT_NUM4");
+
+                double carbs =
+                        parseDouble(item, "AMT_NUM6");
+
+                // 중복 제거
+                String dedupeKey =
+                        foodName + "_" + calories;
+
+                if (seen.contains(dedupeKey)) {
+                    continue;
+                }
+
+                seen.add(dedupeKey);
 
                 results.add(new FoodSearchResult(
                         "kfood:" + getString(item, "FOOD_CD"),
                         foodName,
-                        parseDouble(item, "AMT_NUM1"),
+                        calories,
                         carbs,
-                        parseDouble(item, "AMT_NUM3"),
+                        protein,
                         fat,
                         "kfood"
                 ));
             }
+
             return results;
 
         } catch (Exception e) {
-            System.out.println("식약처 API 오류: " + e.getMessage());
+
+            System.out.println(
+                    "식약처 API 오류: " + e.getMessage()
+            );
+
             return List.of();
         }
     }

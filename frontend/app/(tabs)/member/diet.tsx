@@ -309,41 +309,38 @@ export default function MemberDietScreen() {
     }
   };
 
-  const searchFood = async () => {
-    if (!searchQuery.trim()) return;
+  const searchFood = async (keyword: string) => {
+    if (!keyword.trim()) {
+      setSearchResults([]);
+      return;
+    }
     setSearching(true);
     try {
-      //FatSecret 음식 검색 API는 사용 중
       const data = await apiGet<FoodSearchResult[]>(
-        `${ENDPOINTS.diet.search}?query=${encodeURIComponent(searchQuery)}`,
+        `${ENDPOINTS.diet.search}?query=${encodeURIComponent(keyword)}`
       );
+      console.log("검색 결과", data);
       setSearchResults(data);
     } catch {
-      //FatSecret IP 제한 등으로 실패해도 직접 입력으로 추가 가능
       setSearchResults([]);
       setAddForm((prev) => ({
         ...prev,
-        foodName: searchQuery,
+        foodName: keyword,
       }));
-      Alert.alert(
-        "직접 입력",
-        "음식 검색에 실패했어요. 음식명과 영양정보를 직접 입력해서 추가할 수 있어요.",
-      );
+
     } finally {
       setSearching(false);
     }
   };
     useEffect(() => {
       if (!showAddModal) return;
-
       const timer = setTimeout(() => {
         if (searchQuery.trim()) {
-          searchFood();
+          searchFood(searchQuery);
         } else {
           setSearchResults([]);
         }
       }, 300);
-
       return () => clearTimeout(timer);
     }, [searchQuery]);
 
@@ -1372,9 +1369,9 @@ export default function MemberDietScreen() {
 
               {searchResults.length > 0 && (
                 <View>
-                  {searchResults.map((item) => (
-                    <TouchableOpacity
-                      key={item.foodId}
+                  {searchResults.map((item, index) => (
+                      <TouchableOpacity
+                      key={`${item.foodId}-${index}`}
                       onPress={() => selectSearchFood(item)}
                       style={{
                         backgroundColor: Colors.bgSub,
