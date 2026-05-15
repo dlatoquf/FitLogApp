@@ -60,6 +60,8 @@ public class ScheduleService {
     }
 
     // 이번 주 내 확정 일정 (회원용)
+    // schedule_requests는 "회원이 신청한 예약 요청" 이력이고,
+    // 트레이너가 직접 추가한 수업은 schedules.member_id / status 기준으로 확인해야 함.
     public List<Map<String, Object>> getMyThisWeekSchedules(String auth) {
         User user = getUserFromAuth(auth);
         Member member = memberRepository.findByUser(user)
@@ -69,16 +71,26 @@ public class ScheduleService {
         LocalDate monday = today.with(DayOfWeek.MONDAY);
         LocalDate sunday = monday.plusDays(6);
 
-        return scheduleRequestRepository
-                .findThisWeekConfirmedByMemberId(member.getId(), ScheduleRequest.Status.CONFIRMED, monday, sunday)
+        Trainer trainer = member.getTrainer();
+        if (trainer == null) {
+            return Collections.emptyList();
+        }
+
+        return scheduleRepository
+                .findByTrainerAndDateBetween(trainer, monday, sunday)
                 .stream()
-                .map(sr -> {
+                .filter(s -> s.getMember() != null && Objects.equals(s.getMember().getId(), member.getId()))
+                .filter(s -> "CONFIRMED".equals(s.getStatusStr()) || "COMPLETED".equals(s.getStatusStr()))
+                .sorted(Comparator
+                        .comparing(Schedule::getDate)
+                        .thenComparing(Schedule::getStartTime))
+                .map(s -> {
                     Map<String, Object> map = new HashMap<>();
-                    map.put("scheduleId", sr.getSchedule().getId());
-                    map.put("date", sr.getSchedule().getDate());
-                    map.put("startTime", sr.getSchedule().getStartTime());
-                    map.put("endTime", sr.getSchedule().getEndTime());
-                    map.put("status", sr.getStatus().name());
+                    map.put("scheduleId", s.getId());
+                    map.put("date", s.getDate());
+                    map.put("startTime", s.getStartTime());
+                    map.put("endTime", s.getEndTime());
+                    map.put("status", s.getStatusStr());
                     return map;
                 })
                 .collect(Collectors.toList());

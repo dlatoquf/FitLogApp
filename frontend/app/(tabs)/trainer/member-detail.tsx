@@ -783,7 +783,7 @@ useEffect(() => {
 
     if (validData.length < 1) return null;
 
-    const chartH = 62;
+    const chartH = 42;
     const chartPadX = 18;
     const chartW = SCREEN_W - 36;
     const stepX = chartW / (TOTAL_SLOTS - 1);
@@ -793,7 +793,7 @@ useEffect(() => {
     let maxV = Math.max(...values);
 
     const diff = maxV - minV;
-    const padding = diff === 0 ? 1 : diff * 0.3;
+    const padding = diff === 0 ? 0.5 : diff * 0.15;
     minV = minV - padding;
     maxV = maxV + padding;
     const range = maxV - minV || 1;
@@ -885,11 +885,11 @@ useEffect(() => {
                 <View
                   style={{
                     position: "absolute",
-                    left: p.x - 5,
-                    top: p.y - 5,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
+                    left: p.x - 3.5,
+                    top: p.y - 3.5,
+                    width: 7,
+                    height: 7,
+                    borderRadius: 3.5,
                     backgroundColor: graphColor,
                     borderWidth: 2,
                     borderColor: "#fff",
@@ -900,7 +900,7 @@ useEffect(() => {
                   style={{
                     position: "absolute",
                     left: p.x - 22,
-                    top: p.y - 20,
+                    top: p.y - 16,
                     width: 44,
                     alignItems: "center",
                   }}
@@ -938,7 +938,7 @@ useEffect(() => {
                   left: p.x - 22,
                   width: 44,
                   textAlign: "center",
-                  fontSize: 8,
+                  fontSize: 7,
                   color: Colors.textMuted,
                 }}
               >
@@ -1149,7 +1149,7 @@ useEffect(() => {
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "flex-start",
-                  marginBottom: 8,
+                  marginBottom: 5,
                 }}
               >
                 <View>
@@ -1543,17 +1543,17 @@ useEffect(() => {
                   style={{
                     backgroundColor: Colors.bgSub,
                     borderRadius: 14,
-                    padding: 16,
-                    marginBottom: 16,
+                    padding: 12,
+                    marginBottom: 12,
                     borderWidth: 1,
                     borderColor: Colors.border,
                   }}
                 >
                   {/* 헤더 */}
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                       <View style={{ width: 4, height: 18, backgroundColor: Colors.green, borderRadius: 2 }} />
-                      <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.text }}>
                         {editingFitLogId ? "PT 수업 수정" : "PT 수업 등록"}
                       </Text>
                     </View>
@@ -1564,9 +1564,9 @@ useEffect(() => {
                       key={ei}
                       style={{
                         backgroundColor: "#fff",
-                        borderRadius: 16,
-                        padding: 14,
-                        marginBottom: 12,
+                        borderRadius: 10,
+                        padding: 8,
+                        marginBottom: 6,
                         borderWidth: 1,
                         borderColor: Colors.border,
                       }}
@@ -1576,8 +1576,8 @@ useEffect(() => {
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
-                          gap: 8,
-                          marginBottom: 12,
+                          gap: 6,
+                          marginBottom: 8,
                         }}
                       >
                         <View style={{ flex: 1 }}>
@@ -1599,10 +1599,11 @@ useEffect(() => {
                               backgroundColor: Colors.bgSub,
                               borderWidth: 1,
                               borderColor: Colors.border,
-                              borderRadius: 12,
-                              paddingHorizontal: 14,
-                              paddingVertical: 12,
-                              fontSize: 16,
+                              borderRadius: 9,
+                              paddingHorizontal: 9,
+                              paddingVertical: 0,
+                              height: 32,
+                              fontSize: 13,
                               fontWeight: "800",
                               color: Colors.text,
                             }}
@@ -1615,9 +1616,9 @@ useEffect(() => {
                               setExercises(exercises.filter((_, i) => i !== ei))
                             }
                             style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: 12,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 9,
                               backgroundColor: Colors.bgSub,
                               justifyContent: "center",
                               alignItems: "center",
@@ -1653,8 +1654,8 @@ useEffect(() => {
                                   setExerciseSuggest(null);
                                 }}
                                 style={{
-                                  paddingHorizontal: 14,
-                                  paddingVertical: 11,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 8,
                                   borderBottomWidth:
                                     ni < exerciseSuggest.names.length - 1 ? 1 : 0,
                                   borderBottomColor: Colors.border,
@@ -1674,169 +1675,135 @@ useEffect(() => {
                           </View>
                         )}
 
-                      {/* 세트 입력 */}
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          marginBottom: 6,
-                          paddingHorizontal: 2,
-                        }}
-                      >
-                        <Text style={{ width: 34, fontSize: 11, color: Colors.textMuted }}>
-                          세트
-                        </Text>
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 11,
-                            color: Colors.textMuted,
-                            marginLeft: 8,
-                          }}
-                        >
-                          kg
-                        </Text>
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 11,
-                            color: Colors.textMuted,
-                            marginLeft: 8,
-                          }}
-                        >
-                          회
-                        </Text>
-                        <View style={{ width: 70 }} />
-                      </View>
-
-                      {ex.sets.map((s, si) => (
-                        <View
-                          key={si}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 8,
-                            marginBottom: 8,
-                          }}
-                        >
+                      {/* 세트 입력 - 촘촘한 한 줄 구성 */}
+                      <View style={{ gap: 4 }}>
+                        {ex.sets.map((s, si) => (
                           <View
+                            key={si}
                             style={{
-                              width: 34,
-                              height: 34,
-                              borderRadius: 10,
-                              backgroundColor: Colors.green,
-                              justifyContent: "center",
+                              flexDirection: "row",
                               alignItems: "center",
+                              gap: 4,
                             }}
                           >
-                            <Text
-                              style={{ fontSize: 13, fontWeight: "900", color: "#fff" }}
-                            >
-                              {si + 1}
-                            </Text>
-                          </View>
-
-                          <TextInput
-                            value={s.weight}
-                            onChangeText={(v) => {
-                              const u = [...exercises];
-                              u[ei].sets[si].weight = v;
-                              setExercises(u);
-                            }}
-                            placeholder="0"
-                            placeholderTextColor={Colors.textPlaceholder}
-                            keyboardType="decimal-pad"
-                            style={{
-                              flex: 1,
-                              height: 42,
-                              backgroundColor: Colors.bgSub,
-                              borderRadius: 12,
-                              borderWidth: 1,
-                              borderColor: Colors.border,
-                              paddingHorizontal: 12,
-                              fontSize: 15,
-                              color: Colors.text,
-                            }}
-                          />
-
-                          <TextInput
-                            value={s.reps}
-                            onChangeText={(v) => {
-                              const u = [...exercises];
-                              u[ei].sets[si].reps = v;
-                              setExercises(u);
-                            }}
-                            placeholder="0"
-                            placeholderTextColor={Colors.textPlaceholder}
-                            keyboardType="number-pad"
-                            style={{
-                              flex: 1,
-                              height: 42,
-                              backgroundColor: Colors.bgSub,
-                              borderRadius: 12,
-                              borderWidth: 1,
-                              borderColor: Colors.border,
-                              paddingHorizontal: 12,
-                              fontSize: 15,
-                              color: Colors.text,
-                            }}
-                          />
-
-                          {ex.sets.length > 1 ? (
-                            <TouchableOpacity
-                              onPress={() => {
-                                const u = [...exercises];
-                                u[ei].sets = u[ei].sets.filter((_, i) => i !== si);
-                                setExercises(u);
-                              }}
+                            <View
                               style={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: 10,
-                                justifyContent: "center",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Text style={{ fontSize: 16, color: Colors.textMuted }}>
-                                ✕
-                              </Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={{ width: 30 }} />
-                          )}
-
-                          {si === ex.sets.length - 1 ? (
-                            <TouchableOpacity
-                              onPress={() => {
-                                const u = [...exercises];
-                                u[ei].sets.push({ weight: "", reps: "" });
-                                setExercises(u);
-                              }}
-                              style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: 12,
+                                width: 22,
+                                height: 28,
+                                borderRadius: 7,
                                 backgroundColor: Colors.green,
                                 justifyContent: "center",
                                 alignItems: "center",
                               }}
                             >
-                              <Text
+                              <Text style={{ fontSize: 11, fontWeight: "900", color: "#fff" }}>
+                                {si + 1}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={{
+                                flex: 1,
+                                height: 30,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: Colors.bgSub,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: Colors.border,
+                                paddingHorizontal: 8,
+                              }}
+                            >
+                              <TextInput
+                                value={s.weight}
+                                onChangeText={(v) => {
+                                  const u = [...exercises];
+                                  u[ei].sets[si].weight = v;
+                                  setExercises(u);
+                                }}
+                                placeholder="0"
+                                placeholderTextColor={Colors.textPlaceholder}
+                                keyboardType="decimal-pad"
+                                style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
+                              />
+                              <Text style={{ fontSize: 10, color: Colors.textMuted }}>kg</Text>
+                            </View>
+
+                            <View
+                              style={{
+                                flex: 1,
+                                height: 30,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                backgroundColor: Colors.bgSub,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: Colors.border,
+                                paddingHorizontal: 8,
+                              }}
+                            >
+                              <TextInput
+                                value={s.reps}
+                                onChangeText={(v) => {
+                                  const u = [...exercises];
+                                  u[ei].sets[si].reps = v;
+                                  setExercises(u);
+                                }}
+                                placeholder="0"
+                                placeholderTextColor={Colors.textPlaceholder}
+                                keyboardType="number-pad"
+                                style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
+                              />
+                              <Text style={{ fontSize: 10, color: Colors.textMuted }}>회</Text>
+                            </View>
+
+                            {ex.sets.length > 1 ? (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const u = [...exercises];
+                                  u[ei].sets = u[ei].sets.filter((_, i) => i !== si);
+                                  setExercises(u);
+                                }}
                                 style={{
-                                  fontSize: 22,
-                                  color: "#fff",
-                                  fontWeight: "900",
-                                  marginTop: -2,
+                                  width: 24,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  justifyContent: "center",
+                                  alignItems: "center",
                                 }}
                               >
-                                +
-                              </Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={{ width: 36 }} />
-                          )}
-                        </View>
-                      ))}
+                                <Text style={{ fontSize: 14, color: Colors.textMuted }}>✕</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={{ width: 24 }} />
+                            )}
+
+                            {si === ex.sets.length - 1 ? (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const u = [...exercises];
+                                  u[ei].sets.push({ weight: "", reps: "" });
+                                  setExercises(u);
+                                }}
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 8,
+                                  backgroundColor: Colors.green,
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Text style={{ fontSize: 16, color: "#fff", fontWeight: "900", marginTop: -1 }}>
+                                  +
+                                </Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={{ width: 28 }} />
+                            )}
+                          </View>
+                        ))}
+                      </View>
 
                       {(() => {
                         const latest = getLatestSameExercise(ex.name);
@@ -1847,18 +1814,18 @@ useEffect(() => {
                             style={{
                               marginTop: 6,
                               backgroundColor: Colors.greenLight,
-                              borderRadius: 12,
-                              padding: 10,
+                              borderRadius: 8,
+                              padding: 6,
                               borderWidth: 1,
                               borderColor: Colors.green + "33",
                             }}
                           >
                             <Text
                               style={{
-                                fontSize: 11,
+                                fontSize: 10,
                                 color: Colors.green,
                                 fontWeight: "800",
-                                marginBottom: 8,
+                                marginBottom: 5,
                               }}
                             >
                               이전 기록 {latest.date} · 누르면 입력
@@ -1886,8 +1853,8 @@ useEffect(() => {
                                       alignItems: "center",
                                       backgroundColor: "#fff",
                                       borderRadius: 999,
-                                      paddingHorizontal: 10,
-                                      paddingVertical: 6,
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 4,
                                       borderWidth: 1,
                                       borderColor: Colors.green + "33",
                                     }}
@@ -1903,7 +1870,7 @@ useEffect(() => {
                                     </Text>
                                     <Text
                                       style={{
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         color: Colors.text,
                                         fontWeight: "700",
                                       }}
@@ -1934,10 +1901,10 @@ useEffect(() => {
                       borderWidth: 1,
                       borderColor: Colors.green + "44",
                       borderRadius: 10,
-                      padding: 10,
+                      padding: 8,
                       alignItems: "center",
-                      marginTop: 4,
-                      marginBottom: 12,
+                      marginTop: 2,
+                      marginBottom: 10,
                     }}
                   >
                     <Text
@@ -1956,7 +1923,7 @@ useEffect(() => {
                     style={{
                       backgroundColor: Colors.green,
                       borderRadius: 12,
-                      padding: 14,
+                      padding: 12,
                       alignItems: "center",
                     }}
                   >
@@ -2013,9 +1980,9 @@ useEffect(() => {
                     >
                       <View
                         style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
+                          width: 7,
+                          height: 7,
+                          borderRadius: 3.5,
                           backgroundColor: Colors.green,
                         }}
                       />
@@ -2196,9 +2163,9 @@ useEffect(() => {
                     >
                       <View
                         style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
+                          width: 7,
+                          height: 7,
+                          borderRadius: 3.5,
                           backgroundColor: "#4A90FF",
                         }}
                       />
@@ -2372,8 +2339,8 @@ useEffect(() => {
                     style={{
                       backgroundColor: Colors.bgSub,
                       borderRadius: 14,
-                      padding: 16,
-                      paddingBottom: 10,
+                      padding: 12,
+                      paddingBottom: 4,
                       marginBottom: 16,
                       borderWidth: 1,
                       borderColor: Colors.border,
@@ -2391,7 +2358,7 @@ useEffect(() => {
                     <BodyGraph
                       logs={bodyLogs}
                       metric="bodyFat"
-                      color={Colors.blue}
+                      color={Colors.green}
                       label="체지방률 변화"
                       unit="%"
                       isLast
@@ -2443,47 +2410,102 @@ useEffect(() => {
                         {[
                           {
                             label: "몸무게",
+                            key: "weight",
                             val: log.weight,
                             unit: "kg",
                             color: Colors.text,
                           },
                           {
                             label: "체지방량",
+                            key: "bodyFatMass",
                             val: log.bodyFatMass,
                             unit: "kg",
-                            color: "#4A90FF",
+                            color: Colors.text,
                           },
                           {
                             label: "체지방률",
+                            key: "bodyFat",
                             val: log.bodyFat,
                             unit: "%",
-                            color: Colors.red,
+                            color: Colors.text,
                           },
                           {
                             label: "근육량",
+                            key: "muscleMass",
                             val: log.muscleMass,
                             unit: "kg",
-                            color: Colors.green,
+                            color: Colors.text,
                           },
-                        ].map(({ label, val, unit, color }) => (
-                          <View key={label} style={{ alignItems: "center" }}>
-                            <Text
-                              style={{ fontSize: 14, fontWeight: "800", color }}
-                            >
-                              {val ?? "-"}
-                              {val ? unit : ""}
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: 10,
-                                color: Colors.textMuted,
-                                marginTop: 2,
-                              }}
-                            >
-                              {label}
-                            </Text>
-                          </View>
-                        ))}
+                        ].map(({ label, key, val, unit, color }) => {
+                          const prev = bodyLogs
+                            .slice()
+                            .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+                            [i + 1];
+
+                          const prevVal = prev?.[key as keyof BodyLog];
+                          const diff =
+                            typeof val === "number" && typeof prevVal === "number"
+                              ? Number((val - prevVal).toFixed(1))
+                              : null;
+
+                          const isUp = diff !== null && diff > 0;
+                          const isDown = diff !== null && diff < 0;
+
+                          return (
+                            <View key={label} style={{ alignItems: "center" }}>
+                              <View
+                                style={{
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 14,
+                                    fontWeight: "800",
+                                    color,
+                                  }}
+                                >
+                                  {val ?? "-"}
+                                  {val ? unit : ""}
+                                </Text>
+
+                                {diff !== null && diff !== 0 && (
+                                  <View
+                                    style={{
+                                      alignItems: "center",
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: "700",
+                                        color: isUp
+                                          ? Colors.green
+                                          : Colors.textMuted,
+                                      }}
+                                    >
+                                      {isUp ? "↑" : "↓"}
+                                      {Math.abs(diff)}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  color: Colors.textMuted,
+                                  marginTop: 2,
+                                }}
+                              >
+                                {label}
+                              </Text>
+                            </View>
+                          );
+                        })}
                       </View>
                     </View>
                   ))}

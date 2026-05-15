@@ -1,4 +1,5 @@
 import { Tabs } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "../../../constants/Colors";
 
 export default function TrainerTabLayout() {
@@ -11,21 +12,23 @@ export default function TrainerTabLayout() {
         tabBarInactiveTintColor: Colors.textMuted,
 
         tabBarStyle: {
-          backgroundColor: "#fff",
-          borderTopWidth: 1,
-          borderTopColor: Colors.border,
-          height: 56,
-          paddingTop: 8,
-          paddingBottom: 8,
-        },
+        backgroundColor: "#fff",
+        borderTopWidth: 1,
+        borderTopColor: Colors.border,
+        height: 62,
+        paddingTop: 4,
+        paddingBottom: 4,
+      },
 
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: "700",
+          marginTop: -1,
         },
 
         tabBarIconStyle: {
-          display: "none",
+          marginTop: 2,
+          marginBottom: 0,
         },
       }}
     >
@@ -33,6 +36,13 @@ export default function TrainerTabLayout() {
         name="home"
         options={{
           title: "홈",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
+          ),
         }}
       />
 
@@ -40,6 +50,13 @@ export default function TrainerTabLayout() {
         name="members"
         options={{
           title: "회원",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "people" : "people-outline"}
+              size={25}
+              color={color}
+            />
+          ),
         }}
       />
 
@@ -47,6 +64,13 @@ export default function TrainerTabLayout() {
         name="schedule"
         options={{
           title: "일정",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "calendar" : "calendar-outline"}
+              size={24}
+              color={color}
+            />
+          ),
         }}
       />
 
@@ -54,6 +78,13 @@ export default function TrainerTabLayout() {
         name="more"
         options={{
           title: "더보기",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="dots-horizontal"
+              size={27}
+              color={color}
+            />
+          ),
         }}
       />
 

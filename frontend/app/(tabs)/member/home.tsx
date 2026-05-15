@@ -21,7 +21,11 @@ import { getWeekDates, toDateKey } from "../../../hooks/useApi";
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 interface ThisWeekSchedule {
-  scheduleId: number; date: string; startTime: string; endTime: string;
+  scheduleId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status?: string;
 }
 interface NextWeekSlot {
   id: number; date: string; startTime: string; endTime: string;
@@ -193,6 +197,13 @@ export default function MemberHomeScreen() {
   const ptPct   = data && data.ptTotal > 0 ? Math.min((data.ptRemaining / data.ptTotal) * 100, 100) : 0;
   const dietPct = data ? Math.min((data.todayDietCalories / data.goalCalories) * 100, 100) : 0;
 
+  // 현재 시간이 수업 종료시간을 지나면 홈의 "이번 주 내 수업"에서 숨김
+  const now = new Date();
+  const activeThisWeek = thisWeek.filter((s) => {
+    const end = new Date(`${s.date}T${String(s.endTime).slice(0, 5)}:00`);
+    return end > now;
+  });
+
   return (
     <>
       <ScrollView
@@ -299,7 +310,7 @@ export default function MemberHomeScreen() {
         {/* 이번 주 내 수업 */}
         <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: Colors.border }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>📅 이번 주 내 수업</Text>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>이번 주 내 수업</Text>
             <TouchableOpacity onPress={() => {
               if (!data?.member.trainerName) {
                 Alert.alert("트레이너 연결 필요", "수업 신청을 하려면 먼저 트레이너를 연결해야 해요!", [
@@ -314,13 +325,13 @@ export default function MemberHomeScreen() {
               <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>다음 주 신청 →</Text>
             </TouchableOpacity>
           </View>
-          {thisWeek.length === 0 ? (
+          {activeThisWeek.length === 0 ? (
             <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: "center", paddingVertical: 8 }}>
               이번 주 확정된 수업이 없어요
             </Text>
           ) : (
-            thisWeek.map((s, i) => (
-              <View key={i} style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.blueBg, borderRadius: 10, padding: 12, marginBottom: 6, borderWidth: 1, borderColor: Colors.blue + "44" }}>
+            activeThisWeek.map((s) => (
+              <View key={`${s.scheduleId}-${s.date}-${s.startTime}`} style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.blueBg, borderRadius: 10, padding: 12, marginBottom: 6, borderWidth: 1, borderColor: Colors.blue + "44" }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue, marginRight: 10 }} />
                 <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text, flex: 1 }}>{s.date}</Text>
                 <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.blue }}>{s.startTime}</Text>

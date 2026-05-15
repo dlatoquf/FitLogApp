@@ -176,9 +176,27 @@ export default function TrainerHomeScreen() {
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <View>
             <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}>안녕하세요 👋</Text>
-            <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
-              {data?.trainerName ?? "-"}님
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
+                {data?.trainerName ?? "-"}님
+              </Text>
+              {(data?.plan ?? "").toUpperCase() === "PRO" && (
+                <View
+                  style={{
+                    backgroundColor: Colors.greenLight,
+                    borderWidth: 1,
+                    borderColor: Colors.green + "44",
+                    borderRadius: 999,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>
+                    PRO
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/trainer/notifications")}
@@ -231,15 +249,29 @@ export default function TrainerHomeScreen() {
               const now = new Date();
               const [ah, am] = a.time.split(":").map(Number);
               const [bh, bm] = b.time.split(":").map(Number);
-              const aTime = new Date(); aTime.setHours(ah, am, 0, 0);
-              const bTime = new Date(); bTime.setHours(bh, bm, 0, 0);
-              const aPast = a.completed || now > aTime;
-              const bPast = b.completed || now > bTime;
-              // 지난 것은 뒤로
+
+              // 시작 시간
+              const aStartTime = new Date();
+              aStartTime.setHours(ah, am, 0, 0);
+              const bStartTime = new Date();
+              bStartTime.setHours(bh, bm, 0, 0);
+
+              // 종료 시간: PT 시작 + 1시간
+              // 예: 14:00 수업은 15:00이 지나야 지난 일정으로 내려감
+              const aEndTime = new Date();
+              aEndTime.setHours(ah + 1, am, 0, 0);
+              const bEndTime = new Date();
+              bEndTime.setHours(bh + 1, bm, 0, 0);
+
+              const aPast = a.completed || now > aEndTime;
+              const bPast = b.completed || now > bEndTime;
+
+              // 지난 일정은 아래로
               if (aPast && !bPast) return 1;
               if (!aPast && bPast) return -1;
-              // 같은 그룹 내에서는 시간순
-              return aTime.getTime() - bTime.getTime();
+
+              // 같은 그룹 안에서는 시작 시간순
+              return aStartTime.getTime() - bStartTime.getTime();
             })
             .map((item) => (
             <TouchableOpacity

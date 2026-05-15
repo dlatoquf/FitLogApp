@@ -249,13 +249,13 @@ export default function TrainerScheduleScreen() {
     finally { setAddingMember(false); }
   };
 
-  const buildDefaultDayTimes = (): DayTime[] => {
-    const workDayList = (trainerProfile?.workDays || "월,화,수,목,금")
+  const buildDefaultDayTimesFromProfile = (targetProfile: any): DayTime[] => {
+    const workDayList = (targetProfile?.workDays || "월,화,수,목,금")
       .split(",")
       .map((d: string) => d.trim());
 
-    const startTime = (trainerProfile?.startTime || "09:00").slice(0, 5);
-    const endTime = (trainerProfile?.endTime || "18:00").slice(0, 5);
+    const startTime = (targetProfile?.startTime || "09:00").slice(0, 5);
+    const endTime = (targetProfile?.endTime || "18:00").slice(0, 5);
 
     return DAYS.map(day => ({
       day,
@@ -268,9 +268,59 @@ export default function TrainerScheduleScreen() {
     }));
   };
 
-  const openNextWeek = () => {
-    setDayTimes(buildDefaultDayTimes());
-    setOpenModal(true);
+  const buildDefaultDayTimes = (): DayTime[] => {
+    return buildDefaultDayTimesFromProfile(trainerProfile);
+  };
+
+  const openNextWeek = async () => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const headers = { Authorization: `Bearer ${jwt}` };
+
+      const nextWeekStart = toDateKey(nextWeekDates[0]);
+
+      const [profileRes, nextWeekRes] = await Promise.all([
+        fetch(`${API_URL}/api/profile/trainer`, { headers }),
+        fetch(`${API_URL}/api/schedule/calendar?weekStart=${nextWeekStart}`, { headers }),
+      ]);
+
+      let latestProfile = trainerProfile;
+
+      if (profileRes.ok) {
+        latestProfile = await profileRes.json();
+        setTrainerProfile(latestProfile);
+      }
+
+      if (nextWeekRes.ok) {
+        const nextWeekSlots = await nextWeekRes.json();
+
+        if (Array.isArray(nextWeekSlots) && nextWeekSlots.length > 0) {
+          Alert.alert(
+            "이미 오픈됐어요",
+            "다음 주 일정은 이미 오픈되어 있어요.\n일정 탭에서 다음 주를 선택해서 확인해주세요.",
+            [
+              {
+                text: "다음 주 보기",
+                onPress: () => {
+                  setTab("NEXT");
+                  setSelectedDate(nextWeekDates[0]);
+                  setSlots(nextWeekSlots);
+                },
+              },
+              { text: "확인" },
+            ],
+          );
+          return;
+        }
+      }
+
+      setDayTimes(buildDefaultDayTimesFromProfile(latestProfile));
+      setOpenModal(true);
+    } catch (e) {
+      console.log("openNextWeek error:", e);
+      setDayTimes(buildDefaultDayTimes());
+      setOpenModal(true);
+    }
   };
 
   const validateDayTimes = (targetDayTimes: DayTime[]) => {
@@ -335,7 +385,7 @@ export default function TrainerScheduleScreen() {
         throw new Error(message || "생성 실패");
       }
 
-      Alert.alert("완료 🎉", "다음 주 일정이 오픈됐어요!\n회원들에게 알림이 전송됐어요.");
+      Alert.alert("완료", "다음 주 일정이 오픈됐어요!\n회원들에게 알림이 전송됐어요.");
       setTab("NEXT");
       setSelectedDate(nextWeekDates[0]);
       fetchCalendar(false, "NEXT");
@@ -390,10 +440,10 @@ export default function TrainerScheduleScreen() {
           <TouchableOpacity
             onPress={openNextWeek}
             disabled={generating}
-            style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, opacity: generating ? 0.6 : 1 }}
+            style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, opacity: generating ? 0.6 : 1 }}
           >
             <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
-              {generating ? "처리 중..." : "🔔 다음 주 오픈"}
+              {generating ? "처리 중..." : "다음 주 오픈"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -416,7 +466,6 @@ export default function TrainerScheduleScreen() {
         {/* 날짜 범위 */}
         <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 12, textAlign: "center" }}>
           {weekDates[0].getMonth() + 1}/{weekDates[0].getDate()} ~ {weekDates[6].getMonth() + 1}/{weekDates[6].getDate()}
-          {tab === "THIS" ? " · 전체 슬롯" : " · 전체 슬롯"}
         </Text>
 
         {/* 요일 캘린더 */}
@@ -485,7 +534,7 @@ export default function TrainerScheduleScreen() {
             );
 
             return displaySlots.map((slot, idx) => {
-              const isConfirmed = slot.status === "CONFIRMED";
+              const isConfirmed = slot.status === "CONFIRMED" || slot.status === "COMPLETED";
               const isRequested = slot.status === "REQUESTED";
               const isOpen      = slot.status === "OPEN";
               const isVirtual   = slot.status === "VIRTUAL";
@@ -496,7 +545,7 @@ export default function TrainerScheduleScreen() {
                   activeOpacity={isRequested ? 0.7 : 1}
                   style={{
                     flexDirection: "row", alignItems: "center",
-                    borderRadius: 12, padding: 14, marginBottom: 8,
+                    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 6,
                     backgroundColor: isConfirmed ? Colors.greenLight : isRequested ? Colors.goldBg ?? "#FFFBEB" : "#fff",
                     borderWidth: 1,
                     borderColor: isConfirmed ? Colors.green + "44" : isRequested ? "#F59E0B44" : Colors.border,
@@ -513,9 +562,29 @@ export default function TrainerScheduleScreen() {
                   {/* 내용 */}
                   <View style={{ flex: 1 }}>
                     {isConfirmed && (
-                      <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>
-                        ✓ {slot.memberName}
-                      </Text>
+                      <View>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "800",
+                            color: Colors.text,
+                          }}
+                        >
+                          {slot.memberName}
+                        </Text>
+                        {slot.status === "COMPLETED" && (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: Colors.textMuted,
+                              marginTop: 2,
+                              fontWeight: "700",
+                            }}
+                          >
+                            수업 완료
+                          </Text>
+                        )}
+                      </View>
                     )}
                     {isRequested && (
                       <View style={{ flex: 1 }}>
@@ -532,15 +601,15 @@ export default function TrainerScheduleScreen() {
                       </View>
                     )}
                     {(isOpen || isVirtual) && (
-                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                      <Text style={{ fontSize: 12, color: Colors.textMuted, opacity: 0.7 }}>
                         {tab === "NEXT" ? "신청자 없음" : "비어있음"}
                       </Text>
                     )}
                   </View>
 
                   {/* 확정된 수업 취소 버튼 */}
-                  {isConfirmed && slot.id && (
-                    <TouchableOpacity
+                    {slot.status === "CONFIRMED" && slot.id && (
+                      <TouchableOpacity
                       onPress={() => {
                         Alert.alert("수업 취소", `${slot.memberName}님 수업을 취소할까요?`, [
                           { text: "아니요", style: "cancel" },
@@ -701,12 +770,9 @@ export default function TrainerScheduleScreen() {
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "85%" }}>
             <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-            <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>다음 주 일정 오픈</Text>
-            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 4 }}>
-              요일별 시작 시간과 끝나는 시간을 확인하고 수정하세요.
-            </Text>
-            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>
-              끝나는 시간을 넘지 않는 1시간 단위 슬롯이 생성됩니다.
+            <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text, marginBottom: 6 }}>다음 주 일정 오픈</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 18, lineHeight: 20 }}>
+              근무 요일과 시간을 확인한 뒤 다음 주 신청 슬롯을 열 수 있어요.
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
               {dayTimes.map((item, idx) => {
@@ -853,7 +919,7 @@ export default function TrainerScheduleScreen() {
             </ScrollView>
             {/* 확인 멘트 */}
             <View style={{ backgroundColor: Colors.greenLight, borderRadius: 12, padding: 12, marginTop: 8, marginBottom: 16, borderWidth: 1, borderColor: Colors.green + "44" }}>
-              <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700", marginBottom: 4 }}>📋 오픈될 일정</Text>
+              <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "800", marginBottom: 6 }}>오픈될 일정</Text>
               {dayTimes.filter(d => d.enabled).map(d => {
                 const start = d.useDefault ? d.defaultStart : d.start;
                 const end = d.useDefault ? d.defaultEnd : d.end;
@@ -875,7 +941,7 @@ export default function TrainerScheduleScreen() {
                 <Text style={{ fontSize: 14, color: Colors.textSub }}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={confirmOpenNextWeek} style={{ flex: 2, backgroundColor: Colors.green, borderRadius: 12, padding: 14, alignItems: "center" }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>오픈하기 🔔</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>오픈하기</Text>
               </TouchableOpacity>
             </View>
           </View>
