@@ -107,36 +107,48 @@ export default function MemberGrowthScreen() {
   useEffect(() => { fetchBodyLogs(); }, []);
 
   // 그래프
-  const BodyGraph = ({ logs, metric, color, label, unit, isLast = false }: {
-    logs: BodyLog[], metric: keyof BodyLog, color: string, label: string, unit: string, isLast?: boolean
+  const BodyGraph = ({
+    logs,
+    metric,
+    color,
+    label,
+    unit,
+    isLast = false,
+  }: {
+    logs: BodyLog[];
+    metric: keyof BodyLog;
+    color: string;
+    label: string;
+    unit: string;
+    isLast?: boolean;
   }) => {
-    const data = logs
-      .slice()
-      .filter(log => log.date)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .slice(-8);
-    const validData = data.filter(log => {
+    const TOTAL_SLOTS = 8;
+    const data = logs.slice(-8);
+
+    const validData = data.filter((log) => {
       const value = log[metric] as number | undefined;
       return value !== undefined && value !== null && value > 0;
     });
 
     if (validData.length < 1) return null;
 
-    const chartH = 64;
+    const chartH = 42;
     const chartPadX = 18;
-    const chartW = SCREEN_W - chartPadX * 2;
+    const chartW = SCREEN_W - 36;
     const stepX = chartW / (TOTAL_SLOTS - 1);
 
-    const values = validData.map(log => log[metric] as number);
+    const values = validData.map((log) => log[metric] as number);
     let minV = Math.min(...values);
     let maxV = Math.max(...values);
 
     const diff = maxV - minV;
-    const padding = diff === 0 ? 1 : diff * 0.3;
+    const padding = diff === 0 ? 0.5 : diff * 0.15;
     minV = minV - padding;
     maxV = maxV + padding;
-
     const range = maxV - minV || 1;
+
+    const graphColor = color;
+
     const points = validData.map((log, i) => {
       const value = log[metric] as number;
       const x = chartPadX + i * stepX;
@@ -151,12 +163,29 @@ export default function MemberGrowthScreen() {
 
     return (
       <View style={{ marginBottom: isLast ? 0 : 26, width: SCREEN_W }}>
-        <Text style={{ fontSize: 13, fontWeight: "800", color: Colors.text, marginBottom: 16 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "700",
+            color: Colors.text,
+            marginBottom: 18,
+          }}
+        >
           {label}
         </Text>
 
-        <View style={{ height: chartH + 28, position: "relative", width: SCREEN_W }}>
-          <View style={{ position: "absolute", left: 0, top: 0, width: SCREEN_W, height: chartH }}>
+        <View
+          style={{ height: chartH + 24, position: "relative", width: SCREEN_W }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: SCREEN_W,
+              height: chartH,
+            }}
+          >
             {/* 그리드 라인 */}
             {Array.from({ length: TOTAL_SLOTS }).map((_, i) => (
               <View
@@ -191,7 +220,7 @@ export default function MemberGrowthScreen() {
                     top: p.y,
                     width: len,
                     height: 2,
-                    backgroundColor: color,
+                    backgroundColor: graphColor,
                     transformOrigin: "left center",
                     transform: [{ rotate: `${angle}deg` }],
                   }}
@@ -205,12 +234,12 @@ export default function MemberGrowthScreen() {
                 <View
                   style={{
                     position: "absolute",
-                    left: p.x - 5,
-                    top: p.y - 5,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: color,
+                    left: p.x - 3.5,
+                    top: p.y - 3.5,
+                    width: 7,
+                    height: 7,
+                    borderRadius: 3.5,
+                    backgroundColor: graphColor,
                     borderWidth: 2,
                     borderColor: "#fff",
                   }}
@@ -219,14 +248,21 @@ export default function MemberGrowthScreen() {
                 <View
                   style={{
                     position: "absolute",
-                    left: p.x - 24,
-                    top: p.y - 22,
-                    width: 48,
+                    left: p.x - 22,
+                    top: p.y - 16,
+                    width: 44,
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.text }}>
-                    {Number(p.val).toFixed(1).replace(/\.0$/, "")}{unit}
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: "700",
+                      color: graphColor,
+                    }}
+                  >
+                    {Number(p.val).toFixed(1).replace(/\.0$/, "")}
+                    {unit}
                   </Text>
                 </View>
               </View>
@@ -234,16 +270,24 @@ export default function MemberGrowthScreen() {
           </View>
 
           {/* x축 날짜 라벨 */}
-          <View style={{ position: "absolute", left: 0, top: chartH + 8, width: SCREEN_W, height: 16 }}>
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: chartH + 8,
+              width: SCREEN_W,
+              height: 16,
+            }}
+          >
             {points.map((p, i) => (
               <Text
                 key={i}
                 style={{
                   position: "absolute",
-                  left: p.x - 24,
-                  width: 48,
+                  left: p.x - 22,
+                  width: 44,
                   textAlign: "center",
-                  fontSize: 9,
+                  fontSize: 7,
                   color: Colors.textMuted,
                 }}
               >
@@ -255,6 +299,7 @@ export default function MemberGrowthScreen() {
       </View>
     );
   };
+
 
   if (loading) {
     return (
@@ -321,38 +366,172 @@ export default function MemberGrowthScreen() {
 
       {/* 그래프 */}
       {bodyLogs.length > 0 && (
-        <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, paddingBottom: 12, marginBottom: 20, borderWidth: 1, borderColor: Colors.border, overflow: "hidden" }}>
-          <BodyGraph logs={bodyLogs} metric="weight"      color={Colors.green} label="체중 변화"    unit="kg" />
-          <BodyGraph logs={bodyLogs} metric="bodyFat"     color={Colors.blue}  label="체지방률 변화" unit="%" isLast />
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 12,
+            paddingBottom: 4,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: Colors.border,
+            alignItems: "flex-start",
+            overflow: "hidden",
+          }}
+        >
+          <BodyGraph
+            logs={bodyLogs}
+            metric="weight"
+            color={Colors.green}
+            label="체중 변화"
+            unit="kg"
+          />
+          <BodyGraph
+            logs={bodyLogs}
+            metric="bodyFat"
+            color={Colors.green}
+            label="체지방률 변화"
+            unit="%"
+            isLast
+          />
         </View>
       )}
 
       {/* 기록 목록 */}
-      <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub, marginBottom: 10 }}>기록 목록</Text>
+      <Text
+        style={{
+          fontSize: 14,
+          fontWeight: "700",
+          color: Colors.textSub,
+          marginBottom: 10,
+        }}
+      >
+        기록 목록
+      </Text>
+
       {bodyLogs.length === 0 ? (
         <View style={{ alignItems: "center", paddingVertical: 40 }}>
           <Text style={{ fontSize: 36, marginBottom: 12 }}>📊</Text>
-          <Text style={{ fontSize: 14, color: Colors.textMuted }}>등록된 바디로그가 없어요</Text>
+          <Text style={{ fontSize: 14, color: Colors.textMuted }}>
+            등록된 바디로그가 없어요
+          </Text>
         </View>
       ) : (
-        bodyLogs.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map((log, i) => (
-          <View key={i} style={{ backgroundColor: Colors.bgSub, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.border }}>
-            <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 8 }}>{log.date}</Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              {[
-                { label: "몸무게",  val: log.weight,      unit: "kg", color: Colors.text },
-                { label: "체지방량", val: log.bodyFatMass, unit: "kg", color: Colors.blue },
-                { label: "체지방률", val: log.bodyFat,     unit: "%",  color: Colors.red },
-                { label: "근육량",  val: log.muscleMass,  unit: "kg", color: Colors.green },
-              ].map(({ label, val, unit, color }) => (
-                <View key={label} style={{ alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color }}>{val ?? "-"}{val ? unit : ""}</Text>
-                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 2 }}>{label}</Text>
+        bodyLogs
+          .slice()
+          .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+          .map((log, i, arr) => {
+            const prev = arr[i + 1];
+
+            const diffText = (key: keyof BodyLog) => {
+              const cur = log[key] as number | undefined;
+              const before = prev?.[key] as number | undefined;
+              if (cur == null || before == null) return null;
+              const diff = Number((cur - before).toFixed(1));
+              if (diff === 0) return null;
+              return diff > 0 ? `↑${diff}` : `↓${Math.abs(diff)}`;
+            };
+
+            return (
+              <View
+                key={`${log.date}-${i}`}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 8,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: Colors.textMuted,
+                    marginBottom: 8,
+                  }}
+                >
+                  {log.date}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  {[
+                    {
+                      label: "몸무게",
+                      val: log.weight,
+                      unit: "kg",
+                      color: Colors.text,
+                      diff: null,
+                    },
+                    {
+                      label: "체지방량",
+                      val: log.bodyFatMass,
+                      unit: "kg",
+                      color: Colors.text,
+                      diff: diffText("bodyFatMass"),
+                    },
+                    {
+                      label: "체지방률",
+                      val: log.bodyFat,
+                      unit: "%",
+                      color: Colors.text,
+                      diff: diffText("bodyFat"),
+                    },
+                    {
+                      label: "근육량",
+                      val: log.muscleMass,
+                      unit: "kg",
+                      color: Colors.text,
+                      diff: diffText("muscleMass"),
+                    },
+                  ].map(({ label, val, unit, color, diff }) => (
+                    <View key={label} style={{ alignItems: "center", flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color,
+                        }}
+                      >
+                        {val ?? "-"}
+                        {val ? unit : ""}
+                      </Text>
+
+                      {diff ? (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: String(diff).startsWith("↑")
+                              ? Colors.green
+                              : Colors.textMuted,
+                            fontWeight: "800",
+                            marginTop: 2,
+                          }}
+                        >
+                          {diff}
+                        </Text>
+                      ) : null}
+
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: Colors.textMuted,
+                          marginTop: diff ? 0 : 2,
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-          </View>
-        ))
+              </View>
+            );
+          })
       )}
     </ScrollView>
   );

@@ -184,6 +184,7 @@ public class FoodSearchService {
             for (Object i : items) {
                 if (!(i instanceof Map)) continue;
                 Map<Object, Object> item = (Map<Object, Object>) i;
+                System.out.println("식약처 item 원본 = " + item);
 
                 String foodName = getString(item, "FOOD_NM_KR");
                 if (foodName == null || foodName.isBlank()) continue;
