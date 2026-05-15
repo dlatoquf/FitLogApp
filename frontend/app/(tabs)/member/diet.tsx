@@ -120,6 +120,8 @@ export default function MemberDietScreen() {
     return Number.isFinite(n) ? n : 0;
   };
 
+  const fmt = (n: number) => Math.round((n ?? 0) * 10) / 10;
+
   const calcAdjustedFood = () => {
     const baseAmount = safeNumber(addForm.baseAmount) || 1;
     const amount = safeNumber(addForm.amount) || 0;
@@ -367,16 +369,15 @@ export default function MemberDietScreen() {
   };
 
   const selectSearchFood = (food: FoodSearchResult) => {
-    const round1 = (n: number) => Math.round((n ?? 0) * 10) / 10;
     setAddForm({
       foodName: food.foodName,
       baseAmount: "100",
       amount: "100",
       unit: "g",
-      calories: String(round1(food.calories)),
-      carbs: String(round1(food.carbs)),
-      protein: String(round1(food.protein)),
-      fat: String(round1(food.fat)),
+      calories: String(fmt(food.calories)),
+      carbs: String(fmt(food.carbs)),
+      protein: String(fmt(food.protein)),
+      fat: String(fmt(food.fat)),
       fatSecretFoodId: food.foodId,
     });
     setSearchQuery(food.foodName);
@@ -910,7 +911,7 @@ export default function MemberDietScreen() {
                           marginTop: 2,
                         }}
                       >
-                        탄 {food.carbs}g · 단 {food.protein}g · 지 {food.fat}g
+                        탄 {fmt(food.carbs)}g · 단 {fmt(food.protein)}g · 지 {fmt(food.fat)}g
                       </Text>
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 6 }}>
@@ -1424,7 +1425,7 @@ export default function MemberDietScreen() {
                             marginTop: 2,
                           }}
                         >
-                          탄 {item.carbs}g · 단 {item.protein}g · 지 {item.fat}g
+                          탄 {fmt(item.carbs)}g · 단 {fmt(item.protein)}g · 지 {fmt(item.fat)}g
                         </Text>
                       </View>
                       <Text
@@ -1434,7 +1435,7 @@ export default function MemberDietScreen() {
                           color: Colors.gold,
                         }}
                       >
-                        {item.calories}kcal
+                        {fmt(item.calories)}kcal
                       </Text>
                     </TouchableOpacity>
                   ))}

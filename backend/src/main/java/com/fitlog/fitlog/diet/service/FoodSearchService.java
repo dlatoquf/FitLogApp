@@ -34,7 +34,7 @@ public class FoodSearchService {
             .clientConnector(new ReactorClientHttpConnector(
                     HttpClient.create()
                             .resolver(DefaultAddressResolverGroup.INSTANCE)
-                            .responseTimeout(Duration.ofSeconds(2))
+                            .responseTimeout(Duration.ofSeconds(5))
             ))
             .build();
 
@@ -56,18 +56,24 @@ public class FoodSearchService {
 
     public List<FoodSearchResult> search(String query) {
 
+        String normalizedQuery = query.replace(" ", "").toLowerCase();
+
         // Step 1: 내부 DB 조회
         List<FoodSearchResult> internalResults = foodRepository.findByFoodNameContaining(query)
                 .stream()
-                .map(f -> new FoodSearchResult(
-                        "internal:" + f.getFoodId(),
-                        f.getFoodName(),
-                        f.getCalories() != null ? f.getCalories() : 0,
-                        f.getCarbohydrate() != null ? f.getCarbohydrate() : 0,
-                        f.getProtein() != null ? f.getProtein() : 0,
-                        f.getFat() != null ? f.getFat() : 0,
-                        "internal"
-                ))
+                .map(f -> {
+                    String cleanName = f.getFoodName().replaceAll("_.*", "").trim();
+                    return new FoodSearchResult(
+                            "internal:" + f.getFoodId(),
+                            cleanName,
+                            f.getCalories() != null ? Math.round(f.getCalories() * 10.0) / 10.0 : 0,
+                            f.getCarbohydrate() != null ? Math.round(f.getCarbohydrate() * 10.0) / 10.0 : 0,
+                            f.getProtein() != null ? Math.round(f.getProtein() * 10.0) / 10.0 : 0,
+                            f.getFat() != null ? Math.round(f.getFat() * 10.0) / 10.0 : 0,
+                            "internal"
+                    );
+                })
+                .filter(r -> r.foodName().replace(" ", "").toLowerCase().contains(normalizedQuery))
                 .toList();
 
         // Step 2: 식약처 + FatSecret 병렬 호출
@@ -88,11 +94,11 @@ public class FoodSearchService {
                 return fsResults.stream()
                         .map(f -> new FoodSearchResult(
                                 "fatsecret:" + f.foodId(),
-                                query,
-                                f.calories(),
-                                f.carbs(),
-                                f.protein(),
-                                f.fat(),
+                                f.foodName(),
+                                Math.round(f.calories() * 10.0) / 10.0,
+                                Math.round(f.carbs() * 10.0) / 10.0,
+                                Math.round(f.protein() * 10.0) / 10.0,
+                                Math.round(f.fat() * 10.0) / 10.0,
                                 "fatsecret"
                         ))
                         .collect(Collectors.toList());
@@ -118,8 +124,6 @@ public class FoodSearchService {
 
         executor.shutdown();
 
-        // 합치기: FatSecret(정확한 식품) 먼저, 내부DB, 식약처 순
-        // 내부DB → 식약처 → FatSecret 순
         List<FoodSearchResult> combined = Stream.concat(
                 internalResults.stream(),
                 Stream.concat(
@@ -128,16 +132,10 @@ public class FoodSearchService {
                 )
         ).collect(Collectors.toList());
 
-        combined = sortResults(combined, query)
+        return sortResults(combined, query)
                 .stream()
                 .limit(10)
                 .toList();
-
-        if (!combined.isEmpty()) {
-            return sortResults(combined, query);
-        }
-
-        return List.of();
     }
 
     private List<FoodSearchResult> sortResults(List<FoodSearchResult> results, String query) {
