@@ -73,8 +73,20 @@ public class MemberDeleteService {
                 scheduleRequestRepository.findByMember(member)
         );
 
-        // 2. 트레이너 스케줄 슬롯에서 회원 참조 해제
-        scheduleRepository.detachMemberFromSchedules(member);
+        // 2. 미래 일정 삭제 (스케줄 요청 먼저 삭제 후 슬롯 삭제)
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.util.List<com.fitlog.fitlog.schedule.entity.Schedule> futureSchedules =
+                scheduleRepository.findFutureSchedulesByMember(member, today);
+        if (!futureSchedules.isEmpty()) {
+            java.util.List<Long> futureIds = futureSchedules.stream()
+                    .map(com.fitlog.fitlog.schedule.entity.Schedule::getId)
+                    .toList();
+            scheduleRequestRepository.deleteByScheduleIds(futureIds);
+            scheduleRepository.deleteAll(futureSchedules);
+        }
+
+        // 3. 과거 일정은 member 참조만 해제 (트레이너 기록 유지)
+        scheduleRepository.detachMemberFromPastSchedules(member, today);
 
         // 3. 운동 로그 삭제
         workoutLogRepository.deleteAll(
