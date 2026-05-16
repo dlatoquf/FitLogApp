@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -104,7 +105,7 @@ export default function MemberGrowthScreen() {
     finally { setSaving(false); }
   };
 
-  useEffect(() => { fetchBodyLogs(); }, []);
+  useFocusEffect(useCallback(() => { fetchBodyLogs(); }, []));
 
   // 그래프
   const BodyGraph = ({

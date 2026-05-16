@@ -1,5 +1,22 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
+
+// 날짜(+시간) 포맷 헬퍼
+const formatDateTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "";
+  if (dateStr.includes("T") || (dateStr.includes(" ") && dateStr.length > 10)) {
+    const d = new Date(dateStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = d.getHours();
+    const min = String(d.getMinutes()).padStart(2, "0");
+    const ampm = h >= 12 ? "오후" : "오전";
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${y}.${m}.${day} ${ampm} ${h12}:${min}`;
+  }
+  return dateStr.replace(/-/g, ".");
+};
 import {
   ActivityIndicator,
   Dimensions,
@@ -42,7 +59,14 @@ export default function TrainerGrowthScreen() {
   const fetchBodyLogs = async (memberId: number, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const data = await apiGet<BodyLog[]>(ENDPOINTS.bodylog.member(memberId));
+      const raw = await apiGet<any[]>(ENDPOINTS.bodylog.member(memberId));
+      // createdAt 있으면 우선 사용, 없으면 date 폴백
+      const data: BodyLog[] = raw.map((l: any) => ({
+        date: l.createdAt || l.logDate || l.date,
+        weight: l.weight,
+        bodyFat: l.bodyFat,
+        muscleMass: l.muscleMass,
+      }));
       setBodyLogs(data);
     } catch {
       setBodyLogs([
@@ -295,7 +319,7 @@ export default function TrainerGrowthScreen() {
       <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub, marginBottom: 10 }}>기록 목록</Text>
       {bodyLogs.slice().reverse().map((log, i) => (
         <View key={i} style={{ backgroundColor: Colors.bgSub, borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: Colors.textMuted }}>{log.date}</Text>
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>{formatDateTime(log.date)}</Text>
           <View style={{ flexDirection: "row", gap: 16 }}>
             {[
               { label: "체중", val: log.weight, unit: "kg", color: Colors.blue },

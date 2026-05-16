@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import messaging from "@react-native-firebase/messaging";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { API_URL } from "../../constants/api";
+import { saveFcmToken } from "../../utils/fcm";
 
 // 카카오 로그인 라이브러리가 없는 환경을 위한 조건부 import
 let loginWithKakaoAccount: (() => Promise<any>) | null = null;
@@ -139,6 +141,12 @@ export default function LoginScreen() {
       // JWT & role 저장 (자동 로그인에 사용)
       await AsyncStorage.setItem("jwt", jwt);
       if (role) await AsyncStorage.setItem("role", role);
+
+      // FCM 토큰 저장 (로그인 직후 JWT가 생겼으므로 이제 저장 가능)
+      try {
+        const fcmToken = await messaging().getToken();
+        if (fcmToken) await saveFcmToken(fcmToken);
+      } catch {}
 
       // 3. 라우팅
       if (isNewUser || !role) {

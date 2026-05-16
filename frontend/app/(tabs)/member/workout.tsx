@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
     ActivityIndicator,
     Alert,
@@ -55,7 +56,6 @@ export default function WorkoutScreen() {
     { name: "", sets: [{ weight: "", reps: "" }] },
   ]);
 
-  const didFetchInitial = useRef(false);
   const prevWeekOffset = useRef(weekOffset);
 
   const weekDates = getWeekDates(weekOffset);
@@ -285,25 +285,20 @@ export default function WorkoutScreen() {
     }
   };
 
+  // 탭 포커스될 때마다 자동 새로고침 (현재 weekOffset 기준)
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [weekOffset])
+  );
+
+  // weekOffset 변경 시 날짜 리셋 + 재조회
   useEffect(() => {
-    if (didFetchInitial.current) return;
-
-    didFetchInitial.current = true;
-    prevWeekOffset.current = weekOffset;
-
-    fetchAll();
-  }, []);
-
-  useEffect(() => {
-    if (!didFetchInitial.current) return;
     if (prevWeekOffset.current === weekOffset) return;
-
     prevWeekOffset.current = weekOffset;
-
     const dates = getWeekDates(weekOffset);
     const todayKey = toDateKey(new Date());
     const inThisWeek = dates.some((d) => toDateKey(d) === todayKey);
-
     setSelectedDate(inThisWeek ? todayKey : toDateKey(dates[0]));
     fetchLogs(null, weekOffset);
   }, [weekOffset]);

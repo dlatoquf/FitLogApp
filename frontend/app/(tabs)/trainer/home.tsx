@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import KakaoShare from "@react-native-kakao/share";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -54,7 +55,6 @@ const NOTI_ICON: Record<string, string> = {
 
 export default function TrainerHomeScreen() {
   const [data, setData] = useState<HomeData | null>(null);
-  const didFetch = useRef(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(false);
@@ -129,15 +129,7 @@ export default function TrainerHomeScreen() {
     }
   };
 
-  useEffect(() => {
-    if (didFetch.current) return;
-
-    didFetch.current = true;
-
-    console.log("🔥 TrainerHome fetchHome 실행");
-
-    fetchHome();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchHome(); }, []));
 
   const handleCopy = () => {
     const code = data?.trainerCode ?? "";

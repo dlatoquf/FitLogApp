@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -109,6 +110,9 @@ export default function MemberScheduleScreen() {
     ]);
   };
 
+  // 탭 포커스 시 자동 새로고침
+  useFocusEffect(useCallback(() => { fetchCalendar(); }, []));
+  // weekOffset 변경 시 재조회 (현재는 고정값이지만 확장 대비)
   useEffect(() => { fetchCalendar(); }, [weekOffset]);
 
   return (

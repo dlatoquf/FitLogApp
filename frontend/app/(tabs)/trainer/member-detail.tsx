@@ -45,13 +45,30 @@ const DEFAULT_GOALS = {
   fat: 0,
 };
 
+// 날짜(+시간) 포맷 헬퍼: "2024-01-15T14:30:00" → "2024.01.15 오후 2:30"
+const formatDateTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "";
+  if (dateStr.includes("T") || (dateStr.includes(" ") && dateStr.length > 10)) {
+    const d = new Date(dateStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = d.getHours();
+    const min = String(d.getMinutes()).padStart(2, "0");
+    const ampm = h >= 12 ? "오후" : "오전";
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${y}.${m}.${day} ${ampm} ${h12}:${min}`;
+  }
+  return dateStr.replace(/-/g, ".");
+};
+
 export default function MemberDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, initialTab } = useLocalSearchParams<{ id: string; initialTab?: string }>();
   const memberId = Number(id);
 
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(initialTab ? Number(initialTab) : 0);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
   const weekDates = getWeekDates(weekOffset);
@@ -327,7 +344,7 @@ export default function MemberDetailScreen() {
       const raw = await apiGet<any[]>(ENDPOINTS.bodylog.member(memberId));
       // 체지방률 자동계산: bodyFatMass / weight * 100
       const processed: BodyLog[] = raw.map((l) => ({
-        date: l.logDate || l.date,
+        date: l.createdAt || l.logDate || l.date,
         weight: l.weight,
         bodyFatMass: l.bodyFatMass,
         bodyFat:
@@ -341,6 +358,13 @@ export default function MemberDetailScreen() {
       setBodyLogs([]);
     }
   };
+
+// 알림에서 initialTab param이 오면 해당 탭으로 이동
+useEffect(() => {
+  if (initialTab !== undefined) {
+    setTab(Number(initialTab));
+  }
+}, [initialTab]);
 
 // 회원 기본 정보 + 최신 목표
 useEffect(() => {
@@ -2277,7 +2301,7 @@ useEffect(() => {
                           marginBottom: 8,
                         }}
                       >
-                        {log.date}
+                        {formatDateTime(log.date)}
                       </Text>
                       <View
                         style={{

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fitlog.fitlog.member.entity.Member;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "Body_Logs")
@@ -35,6 +36,9 @@ public class BodyLog {
 
     private String memo;
 
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     public Long getId() { return id; }
     public Member getMember() { return member; }
     public LocalDate getLogDate() { return logDate; }
@@ -43,6 +47,7 @@ public class BodyLog {
     public Double getBodyFatMass() { return bodyFatMass; }
     public Double getMuscleMass() { return muscleMass; }
     public String getMemo() { return memo; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 
     public void setMember(Member member) { this.member = member; }
     public void setLogDate(LocalDate logDate) { this.logDate = logDate; }
@@ -51,4 +56,5 @@ public class BodyLog {
     public void setBodyFatMass(Double bodyFatMass) { this.bodyFatMass = bodyFatMass; }
     public void setMuscleMass(Double muscleMass) { this.muscleMass = muscleMass; }
     public void setMemo(String memo) { this.memo = memo; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

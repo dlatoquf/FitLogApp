@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -115,7 +116,6 @@ export default function MemberHomeScreen() {
   const [slotsLoading, setSlotsLoading]         = useState(false);
   const [requesting, setRequesting]             = useState<number | null>(null);
   const [notifications, setNotifications]       = useState<Noti[]>([]);
-  const didFetch = useRef(false);
   const [selectedDate, setSelectedDate]         = useState(() => {
     const d = new Date();
     const day = d.getDay();
@@ -226,10 +226,7 @@ export default function MemberHomeScreen() {
       }
     });
 
-  useEffect(() => { if (didFetch.current) return;
-    didFetch.current = true;
-    fetchHome();
-  }, []);
+  useFocusEffect(useCallback(() => { fetchHome(); }, []));
 
   // 알림에서 "다음 주 수업 오픈"을 눌러 들어온 경우,
   // 홈 화면의 다음 주 수업 신청 모달을 바로 열어준다.

@@ -74,12 +74,12 @@ import { API_URL } from "../../../constants/api";
             await markOneRead(n.notificationId);
         
             if (n.targetType === "WORKOUT_LOG") {
-            router.push(`/(tabs)/trainer/member-detail?workoutId=${n.targetId}`);
+            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=1`);
             return;
             }
-        
+
             if (n.targetType === "DIET_LOG") {
-            router.push(`/(tabs)/trainer/member-detail?dietLogId=${n.targetId}`);
+            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0`);
             return;
             }
         

@@ -38,6 +38,7 @@ public class BodyLogController {
         map.put("bodyFatMass", log.getBodyFatMass());
         map.put("muscleMass",  log.getMuscleMass());
         map.put("memo",        log.getMemo());
+        map.put("createdAt",   log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
         return map;
     }
 
@@ -68,6 +69,7 @@ public class BodyLogController {
         BodyLog log = new BodyLog();
         log.setMember(member);
         log.setLogDate(java.time.LocalDate.now());
+        log.setCreatedAt(java.time.LocalDateTime.now());
         if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
         if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
         if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());

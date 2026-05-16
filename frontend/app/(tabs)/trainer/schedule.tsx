@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -400,17 +401,12 @@ export default function TrainerScheduleScreen() {
     await openNextWeekByDayTimes(dayTimes);
   };
 
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    fetchCalendar(false, "THIS");
-    setInitialized(true);
-  }, []);
-
-  useEffect(() => {
-    if (!initialized) return;
-    fetchCalendar(false, tab);
-  }, [tab]);
+  // 탭 포커스 시 자동 새로고침 + tab 전환 시 재조회
+  useFocusEffect(
+    useCallback(() => {
+      fetchCalendar(false, tab);
+    }, [tab])
+  );
 
   // 회원 목록은 모달 열 때 lazy 로딩 (아직 없을 때만)
 
