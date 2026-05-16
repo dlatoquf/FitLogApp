@@ -30,7 +30,7 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     List<WorkoutLog> findByMember(Member member);
 
     // 계정 삭제용 - 트레이너 참조 해제 (회원 운동 기록 유지)
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkoutLog w SET w.trainer = null WHERE w.trainer = :trainer")
     void detachTrainerFromWorkoutLogs(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer);
 }

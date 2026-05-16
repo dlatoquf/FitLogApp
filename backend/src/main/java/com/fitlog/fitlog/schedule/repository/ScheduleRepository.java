@@ -160,7 +160,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     List<Schedule> findByTrainer(Trainer trainer);
 
     // 계정 삭제용 - 스케줄 슬롯에서 회원 참조 해제
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member")
     void detachMemberFromSchedules(@Param("member") Member member);
 }

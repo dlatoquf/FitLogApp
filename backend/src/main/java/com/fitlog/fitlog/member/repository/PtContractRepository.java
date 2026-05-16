@@ -16,7 +16,7 @@ public interface PtContractRepository extends JpaRepository<PtContract, Long> {
     List<PtContract> findByMemberId(@Param("memberId") Long memberId);
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE PtContract p SET p.trainer = null WHERE p.trainer = :trainer")
     void detachTrainerFromContracts(@Param("trainer") Trainer trainer);
 }
