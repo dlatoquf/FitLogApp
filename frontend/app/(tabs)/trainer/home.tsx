@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { GestureDetector, Gesture } from "react-native-gesture-handler";
-import Purchases from "react-native-purchases";
+import KakaoShare from "@react-native-kakao/share";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -15,7 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import KakaoShare from "@react-native-kakao/share";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 
@@ -45,7 +45,11 @@ interface Noti {
 }
 
 const NOTI_ICON: Record<string, string> = {
-  WORKOUT_LOG: "💪", SCHEDULE: "📅", FEEDBACK: "💬", PT_EXPIRY: "⏰", GENERAL: "🔔",
+  WORKOUT_LOG: "💪",
+  SCHEDULE: "📅",
+  FEEDBACK: "💬",
+  PT_EXPIRY: "⏰",
+  GENERAL: "🔔",
 };
 
 export default function TrainerHomeScreen() {
@@ -79,16 +83,16 @@ export default function TrainerHomeScreen() {
   };
 
   const inviteDragGesture = Gesture.Pan()
-  .runOnJS(true)
-  .onEnd((e) => {
-    if (e.translationY > 60) {
-      setInviteVisible(false);
-    }
-  });
-
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationY > 60) {
+        setInviteVisible(false);
+      }
+    });
 
   const fetchHome = async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       const headers = { Authorization: `Bearer ${jwt}` };
@@ -103,7 +107,9 @@ export default function TrainerHomeScreen() {
       // RevenueCat 초기화 + 트레이너 userId 연결
       try {
         if (Purchases && typeof Purchases.configure === "function") {
-          await Purchases.configure({ apiKey: "test_XvTfkaGFYgntevQoXLZXZHUhVZy" });
+          await Purchases.configure({
+            apiKey: "appl_vMgKlaKdscTldAQsfRPuZuXlXLT",
+          });
           const jwt = await AsyncStorage.getItem("jwt");
           if (jwt) {
             const payload = JSON.parse(atob(jwt.split(".")[1]));
@@ -118,17 +124,18 @@ export default function TrainerHomeScreen() {
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
     } finally {
-      setLoading(false); setRefreshing(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     if (didFetch.current) return;
-  
+
     didFetch.current = true;
-  
+
     console.log("🔥 TrainerHome fetchHome 실행");
-  
+
     fetchHome();
   }, []);
 
@@ -145,12 +152,17 @@ export default function TrainerHomeScreen() {
       await KakaoShare.shareTextTemplate({
         template: {
           text: `안녕하세요! ${trainerName} 트레이너입니다 💪\n\nFitlog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
-          link: { mobileWebUrl: "https://fitlog.app", webUrl: "https://fitlog.app" },
+          link: {
+            mobileWebUrl: "https://fitlog.app",
+            webUrl: "https://fitlog.app",
+          },
         },
       });
     } catch {
-      Alert.alert("카카오톡 공유 실패", "코드를 복사해서 공유해주세요.",
-        [{ text: "코드 복사", onPress: handleCopy }, { text: "닫기" }]);
+      Alert.alert("카카오톡 공유 실패", "코드를 복사해서 공유해주세요.", [
+        { text: "코드 복사", onPress: handleCopy },
+        { text: "닫기" },
+      ]);
     }
   };
 
@@ -158,35 +170,68 @@ export default function TrainerHomeScreen() {
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       await fetch(`${API_URL}/api/notifications/read-all`, {
-        method: "PUT", headers: { Authorization: `Bearer ${jwt}` },
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}` },
       });
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch {}
   };
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#fff",
+        }}
+      >
         <ActivityIndicator color={Colors.green} size="large" />
       </View>
     );
   }
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <>
       <ScrollView
         style={{ flex: 1, backgroundColor: "#fff" }}
-        contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchHome(true)} tintColor={Colors.green} />}
+        contentContainerStyle={{
+          padding: 20,
+          paddingTop: 56,
+          paddingBottom: 32,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchHome(true)}
+            tintColor={Colors.green}
+          />
+        }
       >
         {/* 인사 + 알림 버튼 */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 16,
+          }}
+        >
           <View>
-            <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}>안녕하세요 👋</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
+            <Text
+              style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}
+            >
+              안녕하세요 👋
+            </Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Text
+                style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}
+              >
                 {data?.trainerName ?? "-"}님
               </Text>
               {(data?.plan ?? "FREE").toUpperCase() === "PRO" && (
@@ -216,25 +261,89 @@ export default function TrainerHomeScreen() {
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/trainer/notifications")}
             style={{
-              flexDirection: "row", alignItems: "center", gap: 6,
-              backgroundColor: unreadCount > 0 ? Colors.greenLight : Colors.bgSub,
-              borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
-              borderWidth: 1, borderColor: unreadCount > 0 ? Colors.green + "44" : Colors.border,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              backgroundColor:
+                unreadCount > 0 ? Colors.greenLight : Colors.bgSub,
+              borderRadius: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderWidth: 1,
+              borderColor:
+                unreadCount > 0 ? Colors.green + "44" : Colors.border,
               marginTop: 6,
             }}
           >
             {/* 커스텀 종 아이콘 */}
-            <View style={{ width: 18, height: 18, justifyContent: "center", alignItems: "center" }}>
-              <View style={{ width: 12, height: 10, backgroundColor: unreadCount > 0 ? Colors.green : Colors.textMuted, borderRadius: 6, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
-              <View style={{ width: 14, height: 3, backgroundColor: unreadCount > 0 ? Colors.green : Colors.textMuted, borderRadius: 1 }} />
-              <View style={{ width: 5, height: 5, borderRadius: 3, borderWidth: 1.5, borderColor: unreadCount > 0 ? Colors.green : Colors.textMuted, marginTop: 1 }} />
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  width: 12,
+                  height: 10,
+                  backgroundColor:
+                    unreadCount > 0 ? Colors.green : Colors.textMuted,
+                  borderRadius: 6,
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                }}
+              />
+              <View
+                style={{
+                  width: 14,
+                  height: 3,
+                  backgroundColor:
+                    unreadCount > 0 ? Colors.green : Colors.textMuted,
+                  borderRadius: 1,
+                }}
+              />
+              <View
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 3,
+                  borderWidth: 1.5,
+                  borderColor:
+                    unreadCount > 0 ? Colors.green : Colors.textMuted,
+                  marginTop: 1,
+                }}
+              />
             </View>
             {unreadCount > 0 ? (
-              <View style={{ backgroundColor: Colors.green, borderRadius: 10, minWidth: 20, height: 20, justifyContent: "center", alignItems: "center", paddingHorizontal: 5 }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{unreadCount}</Text>
+              <View
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 10,
+                  minWidth: 20,
+                  height: 20,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 5,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}
+                >
+                  {unreadCount}
+                </Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: "600" }}>알림</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: Colors.textMuted,
+                  fontWeight: "600",
+                }}
+              >
+                알림
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -242,15 +351,36 @@ export default function TrainerHomeScreen() {
         {/* 회원 초대 버튼 */}
         <TouchableOpacity
           onPress={handleInvitePress}
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 12, marginBottom: 20, gap: 6 }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: Colors.green,
+            borderRadius: 12,
+            paddingVertical: 12,
+            marginBottom: 20,
+            gap: 6,
+          }}
         >
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>🔗 회원 초대하기</Text>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+            🔗 회원 초대하기
+          </Text>
         </TouchableOpacity>
 
         {/* 요약 카드 */}
         <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
-          <SummaryCard value={String(data?.totalMembers ?? 0)} label="총 회원" color={Colors.green} pct={Math.min((data?.totalMembers ?? 0) * 5, 100)} />
-          <SummaryCard value={String(data?.todaySchedules ?? 0)} label="오늘 PT" color={Colors.blue} pct={Math.min((data?.todaySchedules ?? 0) * 20, 100)} />
+          <SummaryCard
+            value={String(data?.totalMembers ?? 0)}
+            label="총 회원"
+            color={Colors.green}
+            pct={Math.min((data?.totalMembers ?? 0) * 5, 100)}
+          />
+          <SummaryCard
+            value={String(data?.todaySchedules ?? 0)}
+            label="오늘 PT"
+            color={Colors.blue}
+            pct={Math.min((data?.todaySchedules ?? 0) * 20, 100)}
+          />
         </View>
 
         {/* 하루 출석률 카드 */}
@@ -289,46 +419,150 @@ export default function TrainerHomeScreen() {
               return aStartTime.getTime() - bStartTime.getTime();
             })
             .map((item) => (
-            <TouchableOpacity
-              key={`${item.memberId}-${item.time}`}
-              onPress={() => router.push(`/(tabs)/trainer/member-detail?id=${item.memberId}`)}
-              style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 12, padding: 14, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: Colors.green, borderWidth: 1, borderColor: Colors.border }}
-            >
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center", marginRight: 12 }}>
-                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>{item.memberName[0]}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>{item.memberName}</Text>
-                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 1 }}>PT 수업 · 잔여 {item.ptRemaining}회</Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 4 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}>{item.time}</Text>
-                <View style={{ backgroundColor: item.completed ? Colors.green : Colors.blue + "22", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "800", color: item.completed ? "#fff" : Colors.blue }}>
-                    {item.completed ? "완료" : "확정"}
+              <TouchableOpacity
+                key={`${item.memberId}-${item.time}`}
+                onPress={() =>
+                  router.push(
+                    `/(tabs)/trainer/member-detail?id=${item.memberId}`,
+                  )
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 10,
+                  borderLeftWidth: 3,
+                  borderLeftColor: Colors.green,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: Colors.green,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 12,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}
+                  >
+                    {item.memberName[0]}
                   </Text>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "700",
+                      color: Colors.text,
+                    }}
+                  >
+                    {item.memberName}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: Colors.textMuted,
+                      marginTop: 1,
+                    }}
+                  >
+                    PT 수업 · 잔여 {item.ptRemaining}회
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: Colors.textSub,
+                    }}
+                  >
+                    {item.time}
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: item.completed
+                        ? Colors.green
+                        : Colors.blue + "22",
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "800",
+                        color: item.completed ? "#fff" : Colors.blue,
+                      }}
+                    >
+                      {item.completed ? "완료" : "확정"}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
         ) : (
-          <View style={{ backgroundColor: Colors.bgSub, borderRadius: 12, padding: 20, alignItems: "center", borderWidth: 1, borderColor: Colors.border, marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, color: Colors.textMuted }}>오늘 예정된 PT가 없어요</Text>
+          <View
+            style={{
+              backgroundColor: Colors.bgSub,
+              borderRadius: 12,
+              padding: 20,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: Colors.border,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: Colors.textMuted }}>
+              오늘 예정된 PT가 없어요
+            </Text>
           </View>
         )}
-
       </ScrollView>
 
       {/* 초대 모달 */}
-      <Modal visible={inviteVisible} transparent animationType="slide" onRequestClose={() => setInviteVisible(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }} activeOpacity={1} onPress={() => setInviteVisible(false)}>
+      <Modal
+        visible={inviteVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInviteVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end",
+          }}
+          activeOpacity={1}
+          onPress={() => setInviteVisible(false)}
+        >
           <TouchableOpacity activeOpacity={1}>
-            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: Platform.OS === "ios" ? 40 : 28 }}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: Platform.OS === "ios" ? 40 : 28,
+              }}
+            >
               <GestureDetector gesture={inviteDragGesture}>
                 <TouchableOpacity
                   onPress={() => setInviteVisible(false)}
                   activeOpacity={0.8}
-                  style={{ alignItems: "center", paddingBottom: 12, marginTop: -8 }}
+                  style={{
+                    alignItems: "center",
+                    paddingBottom: 12,
+                    marginTop: -8,
+                  }}
                 >
                   <View
                     style={{
@@ -340,17 +574,92 @@ export default function TrainerHomeScreen() {
                   />
                 </TouchableOpacity>
               </GestureDetector>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>회원 초대하기 🔗</Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>아래 코드를 회원에게 공유하면 자동으로 연결돼요</Text>
-              <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 20, alignItems: "center", borderWidth: 1, borderColor: Colors.border, marginBottom: 20 }}>
-                <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 6 }}>🔑 내 트레이너 코드</Text>
-                <Text style={{ fontSize: 32, fontWeight: "900", color: Colors.green, letterSpacing: 4 }}>{data?.trainerCode ?? "-"}</Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 6,
+                }}
+              >
+                회원 초대하기 🔗
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  marginBottom: 24,
+                }}
+              >
+                아래 코드를 회원에게 공유하면 자동으로 연결돼요
+              </Text>
+              <View
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 14,
+                  padding: 20,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  marginBottom: 20,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  🔑 내 트레이너 코드
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 32,
+                    fontWeight: "900",
+                    color: Colors.green,
+                    letterSpacing: 4,
+                  }}
+                >
+                  {data?.trainerCode ?? "-"}
+                </Text>
               </View>
-              <TouchableOpacity onPress={handleKakaoShare} style={{ backgroundColor: "#FEE500", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#3C1E1E" }}>카카오톡으로 공유하기</Text>
+              <TouchableOpacity
+                onPress={handleKakaoShare}
+                style={{
+                  backgroundColor: "#FEE500",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 15, fontWeight: "700", color: "#3C1E1E" }}
+                >
+                  카카오톡으로 공유하기
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleCopy} style={{ backgroundColor: Colors.bgSub, borderRadius: 12, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: Colors.border }}>
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>코드 복사하기</Text>
+              <TouchableOpacity
+                onPress={handleCopy}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "700",
+                    color: Colors.text,
+                  }}
+                >
+                  코드 복사하기
+                </Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -363,35 +672,127 @@ export default function TrainerHomeScreen() {
           - 토스페이먼츠: 토스페이먼츠 SDK 연동
           현재는 UI만 구현된 상태 (Alert으로 준비 중 표시)
       ──────────────────────────────────────────────────────────────────────── */}
-      <Modal visible={paymentVisible} transparent animationType="slide" onRequestClose={() => setPaymentVisible(false)}>
+      <Modal
+        visible={paymentVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentVisible(false)}
+      >
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end",
+          }}
           activeOpacity={1}
           onPress={() => setPaymentVisible(false)}
         >
-          <GestureDetector gesture={Gesture.Pan().onEnd((e) => { if (e.translationY > 80) setPaymentVisible(false); })}>
-            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: Platform.OS === "ios" ? 44 : 28 }}>
+          <GestureDetector
+            gesture={Gesture.Pan().onEnd((e) => {
+              if (e.translationY > 80) setPaymentVisible(false);
+            })}
+          >
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+              }}
+            >
               {/* 핸들 바 */}
-              <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  backgroundColor: Colors.border,
+                  borderRadius: 99,
+                  alignSelf: "center",
+                  marginBottom: 20,
+                }}
+              />
 
               {/* 타이틀 */}
-              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 4,
+                }}
+              >
                 PRO로 업그레이드하세요 🚀
               </Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 20 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
                 {/* TODO: 실제 배포 시 "무료 플랜은 회원 3명까지"로 변경 */}
                 무료 플랜은 회원 3명까지 연결할 수 있어요.{"\n"}
                 PRO 플랜으로 업그레이드하면 무제한으로 회원을 관리할 수 있어요.
               </Text>
 
               {/* 요금 안내 */}
-              <View style={{ backgroundColor: Colors.greenLight, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.green + "33" }}>
-                <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 4 }}>PRO 플랜</Text>
-                <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
-                  <Text style={{ fontSize: 30, fontWeight: "900", color: Colors.green }}>6,900</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.green, marginBottom: 4 }}>원 / 월</Text>
+              <View
+                style={{
+                  backgroundColor: Colors.greenLight,
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 20,
+                  borderWidth: 1,
+                  borderColor: Colors.green + "33",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  PRO 플랜
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-end",
+                    gap: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 30,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
+                    6,900
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "700",
+                      color: Colors.green,
+                      marginBottom: 4,
+                    }}
+                  >
+                    원 / 월
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>✓ 회원 무제한 · ✓ 모든 기능 이용 · ✓ 알림 기능 제공</Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginTop: 4,
+                  }}
+                >
+                  ✓ 회원 무제한 · ✓ 모든 기능 이용 · ✓ 알림 기능 제공
+                </Text>
               </View>
 
               {/* 결제 수단 3가지 */}
@@ -405,14 +806,21 @@ export default function TrainerHomeScreen() {
               <TouchableOpacity
                 onPress={async () => {
                   try {
-                    if (!Purchases || typeof Purchases.getOfferings !== "function") {
-                      Alert.alert("오류", "결제 모듈을 불러오지 못했어요. 앱을 재시작해주세요.");
+                    if (
+                      !Purchases ||
+                      typeof Purchases.getOfferings !== "function"
+                    ) {
+                      Alert.alert(
+                        "오류",
+                        "결제 모듈을 불러오지 못했어요. 앱을 재시작해주세요.",
+                      );
                       return;
                     }
                     const offerings = await Purchases.getOfferings();
-                    const pkg = offerings.current?.availablePackages.find(
-                      (p: any) => p.packageType === "MONTHLY"
-                    ) ?? offerings.current?.availablePackages[0];
+                    const pkg =
+                      offerings.current?.availablePackages.find(
+                        (p: any) => p.packageType === "MONTHLY",
+                      ) ?? offerings.current?.availablePackages[0];
 
                     if (!pkg) {
                       Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
@@ -424,13 +832,30 @@ export default function TrainerHomeScreen() {
                     fetchHome(); // 홈 새로고침
                   } catch (e: any) {
                     if (!e.userCancelled) {
-                      Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
+                      Alert.alert(
+                        "결제 실패",
+                        e.message ?? "다시 시도해주세요.",
+                      );
                     }
                   }
                 }}
-                style={{ backgroundColor: "#000", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10, flexDirection: "row", justifyContent: "center", gap: 8 }}
+                style={{
+                  backgroundColor: "#000",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}> Apple Pay로 구독</Text>
+                <Text
+                  style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}
+                >
+                  {" "}
+                  Apple Pay로 구독
+                </Text>
               </TouchableOpacity>
 
               {/* 카카오페이 */}
@@ -455,7 +880,15 @@ export default function TrainerHomeScreen() {
 
               {/* 닫기 */}
               <TouchableOpacity onPress={() => setPaymentVisible(false)}>
-                <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 14,
+                    color: Colors.textMuted,
+                  }}
+                >
+                  나중에 할게요
+                </Text>
               </TouchableOpacity>
             </View>
           </GestureDetector>
@@ -465,11 +898,36 @@ export default function TrainerHomeScreen() {
   );
 }
 
-function SummaryCard({ value, label, color, pct }: { value: string; label: string; color: string; pct: number }) {
+function SummaryCard({
+  value,
+  label,
+  color,
+  pct,
+}: {
+  value: string;
+  label: string;
+  color: string;
+  pct: number;
+}) {
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, borderLeftWidth: 3, borderLeftColor: color, borderWidth: 1, borderColor: Colors.border }}>
-      <Text style={{ fontSize: 28, fontWeight: "800", color, marginBottom: 2 }}>{value}</Text>
-      <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 8 }}>{label}</Text>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: Colors.bgSub,
+        borderRadius: 14,
+        padding: 16,
+        borderLeftWidth: 3,
+        borderLeftColor: color,
+        borderWidth: 1,
+        borderColor: Colors.border,
+      }}
+    >
+      <Text style={{ fontSize: 28, fontWeight: "800", color, marginBottom: 2 }}>
+        {value}
+      </Text>
+      <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 8 }}>
+        {label}
+      </Text>
       <ProgressBar pct={pct} color={color} />
     </View>
   );
@@ -477,8 +935,17 @@ function SummaryCard({ value, label, color, pct }: { value: string; label: strin
 
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
-    <View style={{ backgroundColor: Colors.border, borderRadius: 99, height: 5 }}>
-      <View style={{ width: `${Math.min(pct, 100)}%` as any, height: 5, backgroundColor: color, borderRadius: 99 }} />
+    <View
+      style={{ backgroundColor: Colors.border, borderRadius: 99, height: 5 }}
+    >
+      <View
+        style={{
+          width: `${Math.min(pct, 100)}%` as any,
+          height: 5,
+          backgroundColor: color,
+          borderRadius: 99,
+        }}
+      />
     </View>
   );
 }
@@ -486,8 +953,8 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
 function AttendanceCard({ todayPtList }: { todayPtList: TodayPt[] }) {
   const now = new Date();
   const total = todayPtList.length;
-  const completed = todayPtList.filter(item => item.completed).length;
-  const noShow = todayPtList.filter(item => {
+  const completed = todayPtList.filter((item) => item.completed).length;
+  const noShow = todayPtList.filter((item) => {
     if (item.completed) return false;
     const [h, m] = item.time.split(":").map(Number);
     const scheduleEnd = new Date();
@@ -497,26 +964,77 @@ function AttendanceCard({ todayPtList }: { todayPtList: TodayPt[] }) {
   const attendancePct = total > 0 ? Math.round((completed / total) * 100) : 0;
   if (total === 0) return null;
   return (
-    <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: Colors.green }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "700" }}>하루 출석률</Text>
-        <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.green }}>{attendancePct}%</Text>
+    <View
+      style={{
+        backgroundColor: Colors.bgSub,
+        borderRadius: 14,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        marginBottom: 20,
+        borderLeftWidth: 3,
+        borderLeftColor: Colors.green,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
+        }}
+      >
+        <Text
+          style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "700" }}
+        >
+          하루 출석률
+        </Text>
+        <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.green }}>
+          {attendancePct}%
+        </Text>
       </View>
       <ProgressBar pct={attendancePct} color={Colors.green} />
       <View style={{ flexDirection: "row", gap: 16, marginTop: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green }} />
-          <Text style={{ fontSize: 12, color: Colors.textMuted }}>출석 {completed}명</Text>
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: Colors.green,
+            }}
+          />
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+            출석 {completed}명
+          </Text>
         </View>
         {noShow > 0 && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
-            <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>노쇼 {noShow}명</Text>
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#EF4444",
+              }}
+            />
+            <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "700" }}>
+              노쇼 {noShow}명
+            </Text>
           </View>
         )}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue }} />
-          <Text style={{ fontSize: 12, color: Colors.textMuted }}>전체 {total}명</Text>
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: Colors.blue,
+            }}
+          />
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+            전체 {total}명
+          </Text>
         </View>
       </View>
     </View>
@@ -525,9 +1043,26 @@ function AttendanceCard({ todayPtList }: { todayPtList: TodayPt[] }) {
 
 function SectionTitle({ title }: { title: string }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12, marginTop: 4 }}>
-      <View style={{ width: 3, height: 16, backgroundColor: Colors.green, borderRadius: 2 }} />
-      <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>{title}</Text>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12,
+        marginTop: 4,
+      }}
+    >
+      <View
+        style={{
+          width: 3,
+          height: 16,
+          backgroundColor: Colors.green,
+          borderRadius: 2,
+        }}
+      />
+      <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>
+        {title}
+      </Text>
     </View>
   );
 }
