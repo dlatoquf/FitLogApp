@@ -11,6 +11,7 @@ import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.schedule.service.ScheduleService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
+import com.fitlog.fitlog.trainer.service.TrainerDeleteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,19 +32,22 @@ public class TrainerController {
     private final ScheduleService scheduleService;
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final TrainerDeleteService trainerDeleteService;
 
     public TrainerController(TrainerRepository trainerRepository,
                              MemberRepository memberRepository,
                              ScheduleRepository scheduleRepository,
                              ScheduleService scheduleService,
                              JwtService jwtService,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             TrainerDeleteService trainerDeleteService) {
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
         this.scheduleRepository = scheduleRepository;
         this.scheduleService = scheduleService;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.trainerDeleteService = trainerDeleteService;
     }
 
     /*// 트레이너 프로필 조회
@@ -170,6 +174,14 @@ public class TrainerController {
         result.put("ptTotal", member.getPtTotal());
         result.put("ptRemaining", member.getPtRemaining());
         return ResponseEntity.ok(result);
+    }
+
+    // DELETE /api/trainer/me - 트레이너 계정 삭제
+    @DeleteMapping("/trainer/me")
+    public ResponseEntity<Map<String, Object>> deleteMe(
+            @RequestHeader("Authorization") String authorization) {
+        trainerDeleteService.deleteTrainerAccount(authorization);
+        return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
     }
 
     private Trainer getTrainer(String authorization) {

@@ -1,5 +1,6 @@
 package com.fitlog.fitlog.schedule.repository;
 
+import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -154,4 +155,12 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to
     );
+
+    // 계정 삭제용 - 트레이너의 전체 스케줄
+    List<Schedule> findByTrainer(Trainer trainer);
+
+    // 계정 삭제용 - 스케줄 슬롯에서 회원 참조 해제
+    @Modifying
+    @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member")
+    void detachMemberFromSchedules(@Param("member") Member member);
 }

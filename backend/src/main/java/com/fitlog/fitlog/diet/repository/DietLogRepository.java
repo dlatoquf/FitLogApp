@@ -14,4 +14,6 @@ public interface DietLogRepository extends JpaRepository<DietLog, Long> {
     List<DietLog> findByMemberAndDateBetween(Member member, LocalDate from, LocalDate to);
     // 특정 회원의 특정 날짜 + 식사 유형 조회
     List<DietLog> findByMemberAndDateAndMealType(Member member, LocalDate date, DietLog.MealType mealType);
+    // 계정 삭제용 - 회원의 전체 식단 로그
+    List<DietLog> findByMember(Member member);
 }

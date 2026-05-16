@@ -4,6 +4,7 @@ import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.member.service.MemberDeleteService;
 import com.fitlog.fitlog.member.service.MemberHomeService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
@@ -22,17 +23,20 @@ public class MemberHomeController {
     private final TrainerRepository trainerRepository;
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final MemberDeleteService memberDeleteService;
 
     public MemberHomeController(MemberHomeService memberHomeService,
                                 MemberRepository memberRepository,
                                 TrainerRepository trainerRepository,
                                 JwtService jwtService,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                MemberDeleteService memberDeleteService) {
         this.memberHomeService = memberHomeService;
         this.memberRepository = memberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.memberDeleteService = memberDeleteService;
     }
 
     @GetMapping("/home")
@@ -45,6 +49,14 @@ public class MemberHomeController {
     public ResponseEntity<Map<String, Object>> getMe(
             @RequestHeader("Authorization") String authorization) {
         return ResponseEntity.ok(memberHomeService.getMe(authorization));
+    }
+
+    // DELETE /api/member/me - 회원 계정 삭제
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, Object>> deleteMe(
+            @RequestHeader("Authorization") String authorization) {
+        memberDeleteService.deleteMemberAccount(authorization);
+        return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
     }
 
     // PUT /api/member/me - 회원 프로필 수정

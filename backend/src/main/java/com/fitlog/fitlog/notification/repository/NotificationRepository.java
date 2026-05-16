@@ -5,6 +5,7 @@ import com.fitlog.fitlog.notification.entity.Notification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
@@ -37,4 +38,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Transactional
     @Modifying
     void deleteByCreatedAtBefore(LocalDateTime createdAt);
+
+    // 계정 삭제용 - 유저의 전체 알림 삭제
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.user = :user")
+    void deleteAllByUser(@Param("user") User user);
 }

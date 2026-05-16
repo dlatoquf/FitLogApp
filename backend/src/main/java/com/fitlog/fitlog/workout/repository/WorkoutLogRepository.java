@@ -25,4 +25,12 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     List<WorkoutLog> findByTrainerAndLogDateBetween(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer,
                                                     @Param("from") LocalDate from,
                                                     @Param("to") LocalDate to);
+
+    // 계정 삭제용 - 회원의 전체 운동 로그
+    List<WorkoutLog> findByMember(Member member);
+
+    // 계정 삭제용 - 트레이너 참조 해제 (회원 운동 기록 유지)
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE WorkoutLog w SET w.trainer = null WHERE w.trainer = :trainer")
+    void detachTrainerFromWorkoutLogs(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer);
 }

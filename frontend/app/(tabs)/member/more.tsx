@@ -398,6 +398,36 @@ export default function MemberMoreScreen() {
         <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>로그아웃</Text>
       </TouchableOpacity>
 
+      {/* 계정 삭제 */}
+      <TouchableOpacity
+        onPress={() => {
+          Alert.alert("계정 삭제", "정말 계정을 삭제할까요?\n삭제 후 복구는 불가능해요.", [
+            { text: "취소", style: "cancel" },
+            {
+              text: "삭제",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  const jwt = await AsyncStorage.getItem("jwt");
+                  const res = await fetch(`${API_URL}/api/member/me`, {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${jwt}` },
+                  });
+                  if (!res.ok) throw new Error("계정 삭제 실패");
+                  await AsyncStorage.multiRemove(["jwt", "pendingName"]);
+                  router.replace("/auth/login");
+                } catch (e: any) {
+                  Alert.alert("오류", e.message ?? "계정 삭제 중 오류가 발생했어요.");
+                }
+              },
+            },
+          ]);
+        }}
+        style={{ alignItems: "center", marginTop: 12, paddingVertical: 8 }}
+      >
+        <Text style={{ fontSize: 12, color: Colors.textMuted }}>계정삭제</Text>
+      </TouchableOpacity>
+
       {/* 프로필 수정 모달 */}
       <Modal visible={showEditModal} transparent animationType="slide">
         <KeyboardAvoidingView
