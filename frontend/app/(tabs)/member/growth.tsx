@@ -1,6 +1,23 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+
+// 날짜+시간 포맷 헬퍼
+const formatDateTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "";
+  if (dateStr.includes("T") || (dateStr.includes(" ") && dateStr.length > 10)) {
+    const d = new Date(dateStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = d.getHours();
+    const min = String(d.getMinutes()).padStart(2, "0");
+    const ampm = h >= 12 ? "오후" : "오전";
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${y}.${m}.${day} ${ampm} ${h12}:${min}`;
+  }
+  return dateStr.replace(/-/g, ".");
+};
 import {
   ActivityIndicator,
   Alert,
@@ -54,7 +71,7 @@ export default function MemberGrowthScreen() {
       if (!res.ok) throw new Error();
       const raw = await res.json();
       setBodyLogs(raw.map((l: any) => ({
-        date: l.date || l.logDate,
+        date: l.createdAt || l.date || l.logDate,
         weight: l.weight,
         bodyFatMass: l.bodyFatMass,
         bodyFat: l.bodyFatMass && l.weight
@@ -90,7 +107,7 @@ export default function MemberGrowthScreen() {
       // 재조회 없이 응답에서 바로 목록 업데이트
       if (data.logs) {
         setBodyLogs(data.logs.map((l: any) => ({
-          date: l.date || l.logDate,
+          date: l.createdAt || l.date || l.logDate,
           weight: l.weight,
           bodyFatMass: l.bodyFatMass,
           bodyFat: l.bodyFatMass && l.weight
@@ -452,7 +469,7 @@ export default function MemberGrowthScreen() {
                     marginBottom: 8,
                   }}
                 >
-                  {log.date}
+                  {formatDateTime(log.date)}
                 </Text>
 
                 <View

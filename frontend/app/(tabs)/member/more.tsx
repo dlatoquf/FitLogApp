@@ -26,6 +26,7 @@ interface MemberProfileWithTrainerCode extends MemberProfile {
 interface BodyLog {
   date?: string;
   logDate?: string;
+  createdAt?: string;
   weight?: number;
   bodyFat?: number;
   bodyFatMass?: number;
@@ -64,9 +65,11 @@ export default function MemberMoreScreen() {
           const bodyLogs = await apiGet<BodyLog[]>(ENDPOINTS.bodylog.me);
 
           latestBodyLog = [...bodyLogs]
-            .filter((log) => log.logDate || log.date)
+            .filter((log) => log.createdAt || log.logDate || log.date)
             .sort((a, b) =>
-              String(b.logDate ?? b.date).localeCompare(String(a.logDate ?? a.date))
+              String(b.createdAt ?? b.logDate ?? b.date).localeCompare(
+                String(a.createdAt ?? a.logDate ?? a.date)
+              )
             )[0] ?? null;
         } catch (e) {
           console.log("최신 바디로그 조회 실패:", e);
