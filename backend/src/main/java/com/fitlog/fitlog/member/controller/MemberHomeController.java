@@ -55,8 +55,14 @@ public class MemberHomeController {
     @DeleteMapping("/me")
     public ResponseEntity<Map<String, Object>> deleteMe(
             @RequestHeader("Authorization") String authorization) {
-        memberDeleteService.deleteMemberAccount(authorization);
-        return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
+        try {
+            memberDeleteService.deleteMemberAccount(authorization);
+            return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "message", e.getMessage() != null ? e.getMessage() : "알 수 없는 오류"));
+        }
     }
 
     // PUT /api/member/me - 회원 프로필 수정

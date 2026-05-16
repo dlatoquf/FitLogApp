@@ -307,7 +307,7 @@ export default function TrainerGrowthScreen() {
             <View style={{ position: "absolute", left: 40, right: 0, bottom: 0, height: 24, flexDirection: "row", justifyContent: "space-between" }}>
               {points.map((p, i) => (
                 <Text key={i} style={{ fontSize: 9, color: Colors.textMuted, textAlign: "center" }}>
-                  {p.date.slice(5)}
+                  {String(p.date).slice(0, 10).slice(5)}
                 </Text>
               ))}
             </View>

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -49,78 +50,76 @@ export default function MemberMoreScreen() {
   const [notifPush, setNotifPush] = useState(true);
   const [notifFeedback, setNotifFeedback] = useState(true);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const pairs = await AsyncStorage.multiGet(["notif_push_member", "notif_feedback"]);
-      if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
-      if (pairs[1][1] !== null) setNotifFeedback(pairs[1][1] === "true");
+  const fetchProfile = async () => {
+    const pairs = await AsyncStorage.multiGet(["notif_push_member", "notif_feedback"]);
+    if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
+    if (pairs[1][1] !== null) setNotifFeedback(pairs[1][1] === "true");
+
+    try {
+      const data = await apiGet<MemberProfile>(ENDPOINTS.member.me);
+
+      // 최신 바디로그가 있으면 더보기 카드에는 최신 체중/체지방/근육 값을 우선 표시
+      let latestBodyLog: BodyLog | null = null;
 
       try {
-        const data = await apiGet<MemberProfile>(ENDPOINTS.member.me);
+        const bodyLogs = await apiGet<BodyLog[]>(ENDPOINTS.bodylog.me);
 
-        // 최신 바디로그가 있으면 더보기 카드에는 최신 체중/체지방/근육 값을 우선 표시
-        let latestBodyLog: BodyLog | null = null;
-
-        try {
-          const bodyLogs = await apiGet<BodyLog[]>(ENDPOINTS.bodylog.me);
-
-          latestBodyLog = [...bodyLogs]
-            .filter((log) => log.createdAt || log.logDate || log.date)
-            .sort((a, b) =>
-              String(b.createdAt ?? b.logDate ?? b.date).localeCompare(
-                String(a.createdAt ?? a.logDate ?? a.date)
-              )
-            )[0] ?? null;
-        } catch (e) {
-          console.log("최신 바디로그 조회 실패:", e);
-        }
-
-        const latestProfile: MemberProfileWithTrainerCode = {
-          ...data,
-          weight: latestBodyLog?.weight ?? data.weight,
-          bodyFat:
-            latestBodyLog?.bodyFat ??
-            (latestBodyLog?.bodyFatMass && latestBodyLog?.weight
-              ? Math.round((latestBodyLog.bodyFatMass / latestBodyLog.weight) * 1000) / 10
-              : data.bodyFat),
-          muscleMass: latestBodyLog?.muscleMass ?? data.muscleMass,
-        };
-
-        setProfile(latestProfile);
-        setEditForm({
-          name: latestProfile.name ?? "",
-          phone: latestProfile.phone ?? "",
-          height: String(latestProfile.height ?? ""),
-        });
-      } catch {
-        const dummy: MemberProfileWithTrainerCode = {
-          id: 1,
-          name: "김지수",
-          phone: "010-1234-5678",
-          height: 165,
-          weight: 60,
-          bodyFat: 22,
-          muscleMass: 28,
-          ptRemaining: 12,
-          ptTotal: 20,
-          ptStartDate: "2025-03-01",
-          ptExpDate: "2025-06-30",
-          goal: "체지방 감량",
-          trainerName: "김트레이너",
-        };
-        setProfile(dummy);
-        setEditForm({
-          name: dummy.name ?? "",
-          phone: dummy.phone ?? "",
-          height: String(dummy.height ?? ""),
-        });
-      } finally {
-        setLoading(false);
+        latestBodyLog = [...bodyLogs]
+          .filter((log) => log.createdAt || log.logDate || log.date)
+          .sort((a, b) =>
+            String(b.createdAt ?? b.logDate ?? b.date).localeCompare(
+              String(a.createdAt ?? a.logDate ?? a.date)
+            )
+          )[0] ?? null;
+      } catch (e) {
+        console.log("최신 바디로그 조회 실패:", e);
       }
-    };
 
-    fetchProfile();
-  }, []);
+      const latestProfile: MemberProfileWithTrainerCode = {
+        ...data,
+        weight: latestBodyLog?.weight ?? data.weight,
+        bodyFat:
+          latestBodyLog?.bodyFat ??
+          (latestBodyLog?.bodyFatMass && latestBodyLog?.weight
+            ? Math.round((latestBodyLog.bodyFatMass / latestBodyLog.weight) * 1000) / 10
+            : data.bodyFat),
+        muscleMass: latestBodyLog?.muscleMass ?? data.muscleMass,
+      };
+
+      setProfile(latestProfile);
+      setEditForm({
+        name: latestProfile.name ?? "",
+        phone: latestProfile.phone ?? "",
+        height: String(latestProfile.height ?? ""),
+      });
+    } catch {
+      const dummy: MemberProfileWithTrainerCode = {
+        id: 1,
+        name: "김지수",
+        phone: "010-1234-5678",
+        height: 165,
+        weight: 60,
+        bodyFat: 22,
+        muscleMass: 28,
+        ptRemaining: 12,
+        ptTotal: 20,
+        ptStartDate: "2025-03-01",
+        ptExpDate: "2025-06-30",
+        goal: "체지방 감량",
+        trainerName: "김트레이너",
+      };
+      setProfile(dummy);
+      setEditForm({
+        name: dummy.name ?? "",
+        phone: dummy.phone ?? "",
+        height: String(dummy.height ?? ""),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(useCallback(() => { fetchProfile(); }, []));
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -416,7 +415,10 @@ export default function MemberMoreScreen() {
                     method: "DELETE",
                     headers: { Authorization: `Bearer ${jwt}` },
                   });
-                  if (!res.ok) throw new Error("계정 삭제 실패");
+                  if (!res.ok) {
+                    const errText = await res.text().catch(() => "");
+                    throw new Error(`삭제 실패 (${res.status}): ${errText}`);
+                  }
                   await AsyncStorage.multiRemove(["jwt", "pendingName"]);
                   router.replace("/auth/login");
                 } catch (e: any) {

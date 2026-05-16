@@ -832,7 +832,7 @@ useEffect(() => {
         x,
         y: chartH - ((value - minV) / range) * (chartH - 20) - 10,
         val: value,
-        date: log.date?.slice(5) ?? "",
+        date: String(log.date ?? "").slice(0, 10).slice(5),
       };
     });
 

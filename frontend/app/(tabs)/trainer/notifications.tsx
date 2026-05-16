@@ -74,33 +74,34 @@ import { API_URL } from "../../../constants/api";
             await markOneRead(n.notificationId);
         
             if (n.targetType === "WORKOUT_LOG") {
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=1`);
-            return;
+                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=1`);
+                return;
             }
 
-            if (n.targetType === "DIET_LOG") {
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0`);
-            return;
+            // DIET_LOG: type="DIET_LOG", targetType="MEMBER" 로 저장됨
+            if (n.type === "DIET_LOG") {
+                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0`);
+                return;
             }
-        
+
             if (n.targetType === "FEEDBACK") {
                 router.push("/(tabs)/member/diet");
                 return;
             }
-        
+
             if (n.type === "SCHEDULE_REQUEST") {
                 router.push("/(tabs)/trainer/schedule?tab=NEXT");
                 return;
             }
-        
+
             if (n.targetType === "SCHEDULE_OPEN") {
-            router.push("/(tabs)/trainer/schedule");
-            return;
+                router.push("/(tabs)/trainer/schedule");
+                return;
             }
-        
+
             if (n.targetType === "MEMBER") {
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}`);
-            return;
+                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}`);
+                return;
             }
         
             router.push("/(tabs)/trainer/home");

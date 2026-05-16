@@ -6,6 +6,7 @@ import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.diet.repository.DietFeedbackRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
@@ -30,6 +31,7 @@ public class TrainerDeleteService {
     private final WorkoutLogRepository workoutLogRepository;
     private final DietFeedbackRepository dietFeedbackRepository;
     private final NotificationRepository notificationRepository;
+    private final PtContractRepository ptContractRepository;
 
     public TrainerDeleteService(JwtService jwtService,
                                 TrainerRepository trainerRepository,
@@ -39,7 +41,8 @@ public class TrainerDeleteService {
                                 ScheduleRequestRepository scheduleRequestRepository,
                                 WorkoutLogRepository workoutLogRepository,
                                 DietFeedbackRepository dietFeedbackRepository,
-                                NotificationRepository notificationRepository) {
+                                NotificationRepository notificationRepository,
+                                PtContractRepository ptContractRepository) {
         this.jwtService = jwtService;
         this.trainerRepository = trainerRepository;
         this.userRepository = userRepository;
@@ -49,6 +52,7 @@ public class TrainerDeleteService {
         this.workoutLogRepository = workoutLogRepository;
         this.dietFeedbackRepository = dietFeedbackRepository;
         this.notificationRepository = notificationRepository;
+        this.ptContractRepository = ptContractRepository;
     }
 
     @Transactional
@@ -79,21 +83,24 @@ public class TrainerDeleteService {
         members.forEach(m -> m.setTrainer(null));
         memberRepository.saveAll(members);
 
-        // 5. 운동 로그에서 trainer 참조 해제 (회원 운동 기록은 유지)
+        // 5. PT 계약에서 trainer 참조 해제 (회원 계약 기록은 유지)
+        ptContractRepository.detachTrainerFromContracts(trainer);
+
+        // 6. 운동 로그에서 trainer 참조 해제 (회원 운동 기록은 유지)
         workoutLogRepository.detachTrainerFromWorkoutLogs(trainer);
 
-        // 6. 식단 피드백 삭제 (트레이너가 작성한 피드백)
+        // 7. 식단 피드백 삭제 (트레이너가 작성한 피드백)
         dietFeedbackRepository.deleteAll(
                 dietFeedbackRepository.findByTrainer(trainer)
         );
 
-        // 7. 알림 삭제
+        // 8. 알림 삭제
         notificationRepository.deleteAllByUser(user);
 
-        // 8. 트레이너 삭제
+        // 9. 트레이너 삭제
         trainerRepository.delete(trainer);
 
-        // 9. 유저 삭제
+        // 10. 유저 삭제
         userRepository.delete(user);
     }
 }
