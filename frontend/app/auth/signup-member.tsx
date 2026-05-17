@@ -107,8 +107,6 @@ export default function SignupMemberScreen() {
         } catch {}
 
         if (message.includes("무료 플랜") || message.includes("회원 3명")) {
-          // TODO: 실제 배포 시 문구 그대로 유지 (회원 3명 초과)
-          // 현재는 테스트용으로 1명 초과 시 동일 메시지 표시
           Alert.alert(
             "연결 불가",
             "트레이너의 무료 플랜은 회원 3명까지 연결할 수 있어요.\n트레이너에게 PRO 업그레이드를 요청해주세요."

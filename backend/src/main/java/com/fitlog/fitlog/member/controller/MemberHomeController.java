@@ -118,8 +118,7 @@ public class MemberHomeController {
         long memberCount = memberRepository.countByTrainer(trainer);
         boolean isFree = "FREE".equals(trainer.getPlan());
 
-        // TODO: 실제 배포 시 memberCount >= 3 으로 변경
-        if (isFree && memberCount >= 1) {
+        if (isFree && memberCount >= 3) {
             return ResponseEntity.ok(Map.of(
                     "valid", false,
                     "full", true,
@@ -159,9 +158,7 @@ public class MemberHomeController {
         long memberCount = memberRepository.countByTrainer(trainer);
         boolean isFree = "FREE".equals(trainer.getPlan());
 
-        // TODO: 실제 배포 시 memberCount >= 3 으로 변경 (FREE 플랜 3명 제한)
-        // 현재는 테스트용으로 1명 초과 시 결제 유도
-        if (isFree && memberCount >= 1) {
+        if (isFree && memberCount >= 3) {
             return ResponseEntity.badRequest().body(
                     Map.of(
                             "message",

@@ -14,7 +14,8 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
     @EntityGraph(attributePaths = {"user"})
     Optional<Trainer> findByUser(User user);
 
-    Optional<Trainer> findByTrainerCode(String trainerCode);
+    @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.trainerCode = :code")
+    Optional<Trainer> findByTrainerCode(@Param("code") String code);
 
     // 홈 화면용 조회
     // trainer + user 정보만 JOIN FETCH
