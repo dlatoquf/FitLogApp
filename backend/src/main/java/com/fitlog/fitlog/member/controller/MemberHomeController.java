@@ -116,7 +116,8 @@ public class MemberHomeController {
         long memberCount = memberRepository.countByTrainer(trainer);
         boolean isFree = "FREE".equals(trainer.getPlan());
 
-        if (isFree && memberCount >= 3) {
+        // TODO: 실제 배포 시 memberCount >= 3 으로 변경
+        if (isFree && memberCount >= 1) {
             return ResponseEntity.ok(Map.of(
                     "valid", false,
                     "full", true,
