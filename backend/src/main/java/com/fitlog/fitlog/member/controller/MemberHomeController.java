@@ -100,6 +100,38 @@ public class MemberHomeController {
         return ResponseEntity.ok(memberHomeService.getMyThisWeek(authorization));
     }
 
+    // GET /api/member/check-trainer?code=XXXX - 트레이너 코드 유효성 확인 (연결 X)
+    @GetMapping("/check-trainer")
+    public ResponseEntity<Map<String, Object>> checkTrainer(
+            @RequestParam("code") String code) {
+
+        if (code == null || code.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "코드를 입력해주세요."));
+
+        Trainer trainer = trainerRepository.findByTrainerCode(code.trim().toUpperCase()).orElse(null);
+
+        if (trainer == null)
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "유효하지 않은 트레이너 코드예요."));
+
+        long memberCount = memberRepository.countByTrainer(trainer);
+        boolean isFree = "FREE".equals(trainer.getPlan());
+
+        if (isFree && memberCount >= 3) {
+            return ResponseEntity.ok(Map.of(
+                    "valid", false,
+                    "full", true,
+                    "message", "해당 트레이너는 현재 무료 플랜으로 회원을 더 받을 수 없어요.\n트레이너에게 PRO 플랜 업그레이드를 요청해주세요.",
+                    "trainerName", trainer.getUser().getName()
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "trainerName", trainer.getUser().getName(),
+                "gymName", trainer.getGymName() != null ? trainer.getGymName() : ""
+        ));
+    }
+
     // POST /api/member/connect-trainer
     @PostMapping("/connect-trainer")
     public ResponseEntity<Map<String, Object>> connectTrainer(

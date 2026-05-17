@@ -31,6 +31,7 @@ export default function SignupMemberScreen() {
   const [loading, setLoading] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [trainerName, setTrainerName] = useState("");
 
   const handleVerifyCode = async () => {
     if (trainerCode.trim().length < 4) {
@@ -38,11 +39,33 @@ export default function SignupMemberScreen() {
       return;
     }
     setVerifying(true);
-    // 실제 연결 가능 여부는 가입 완료 시 서버에서 최종 확인합니다.
-    setTimeout(() => {
-      setVerifying(false);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/member/check-trainer?code=${trainerCode.trim().toUpperCase()}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const data = await res.json();
+
+      if (data.full) {
+        Alert.alert(
+          "연결 불가",
+          data.message ?? "트레이너에게 PRO 플랜 업그레이드를 요청해주세요."
+        );
+        return;
+      }
+
+      if (!data.valid) {
+        Alert.alert("확인 실패", data.message ?? "유효하지 않은 트레이너 코드예요.");
+        return;
+      }
+
+      setTrainerName(data.trainerName ?? "");
       setCodeVerified(true);
-    }, 300);
+    } catch {
+      Alert.alert("오류", "네트워크 오류가 발생했어요. 다시 시도해주세요.");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -202,7 +225,7 @@ export default function SignupMemberScreen() {
 
           {/* 트레이너 코드 */}
           <FieldLabel label="트레이너 코드 (선택)" />
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: codeVerified ? 6 : 20 }}>
             <TextInput
               placeholder="트레이너에게 받은 코드 입력"
               placeholderTextColor={Colors.textPlaceholder}
@@ -210,6 +233,7 @@ export default function SignupMemberScreen() {
               onChangeText={(v) => {
                 setTrainerCode(v.toUpperCase());
                 setCodeVerified(false);
+                setTrainerName("");
               }}
               autoCapitalize="characters"
               style={[inputStyle(!!trainerCode), { flex: 1, marginBottom: 0 }]}
@@ -218,9 +242,7 @@ export default function SignupMemberScreen() {
               onPress={handleVerifyCode}
               disabled={verifying || codeVerified}
               style={{
-                backgroundColor: codeVerified
-                  ? Colors.green
-                  : Colors.bgSub,
+                backgroundColor: codeVerified ? Colors.green : Colors.bgSub,
                 borderWidth: 1.5,
                 borderColor: codeVerified ? Colors.green : Colors.border,
                 borderRadius: 12,
@@ -229,17 +251,16 @@ export default function SignupMemberScreen() {
                 alignItems: "center",
               }}
             >
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: codeVerified ? "#fff" : Colors.textSub,
-                }}
-              >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: codeVerified ? "#fff" : Colors.textSub }}>
                 {verifying ? "..." : codeVerified ? "✓ 확인" : "확인"}
               </Text>
             </Pressable>
           </View>
+          {codeVerified && trainerName ? (
+            <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "600", marginBottom: 20 }}>
+              ✓ {trainerName} 트레이너 확인됐어요!
+            </Text>
+          ) : null}
 
           {/* 신체 정보 */}
           <Text
@@ -307,31 +328,26 @@ export default function SignupMemberScreen() {
           <View style={{ flex: 1 }} />
 
           {/* 가입 완료 버튼 */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={loading || !phone.trim()}
-            style={({ pressed }) => ({
-              backgroundColor:
-                loading || !phone.trim()
-                  ? Colors.border
-                  : pressed
-                  ? "#256e47"
-                  : Colors.green,
-              padding: 17,
-              borderRadius: 14,
-              alignItems: "center",
-            })}
-          >
-            <Text
-              style={{
-                color: loading || !phone.trim() ? Colors.textMuted : "#fff",
-                fontWeight: "700",
-                fontSize: 16,
-              }}
-            >
-              {loading ? "처리 중..." : "가입 완료 ✓"}
-            </Text>
-          </Pressable>
+          {(() => {
+            const needsVerify = trainerCode.trim().length > 0 && !codeVerified;
+            const disabled = loading || !phone.trim() || needsVerify;
+            return (
+              <Pressable
+                onPress={handleSubmit}
+                disabled={disabled}
+                style={({ pressed }) => ({
+                  backgroundColor: disabled ? Colors.border : pressed ? "#256e47" : Colors.green,
+                  padding: 17,
+                  borderRadius: 14,
+                  alignItems: "center",
+                })}
+              >
+                <Text style={{ color: disabled ? Colors.textMuted : "#fff", fontWeight: "700", fontSize: 16 }}>
+                  {loading ? "처리 중..." : needsVerify ? "트레이너 코드를 먼저 확인해주세요" : "가입 완료 ✓"}
+                </Text>
+              </Pressable>
+            );
+          })()}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
