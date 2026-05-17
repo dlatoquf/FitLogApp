@@ -27,7 +27,7 @@ public class MemberGoalService {
         this.jwtService = jwtService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MemberGoalResponse getMyGoals(String authorization) {
 
         Member member = getMemberFromToken(authorization);

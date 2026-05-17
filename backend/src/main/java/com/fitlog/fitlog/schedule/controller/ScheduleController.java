@@ -95,9 +95,10 @@ public class ScheduleController {
                     "success", true,
                     "message", "다음 주 일정이 오픈됐어요."
             ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            String msg = e.getMessage() != null ? e.getMessage() : "일정 생성 중 오류가 발생했어요.";
+        } catch (Throwable t) {
+            t.printStackTrace();
+            System.err.println("[다음주오픈 크래시] " + t.getClass().getName() + ": " + t.getMessage());
+            String msg = t.getMessage() != null ? t.getMessage() : "일정 생성 중 오류가 발생했어요.";
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", msg
