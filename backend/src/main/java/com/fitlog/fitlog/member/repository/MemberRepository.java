@@ -45,6 +45,9 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     """)
     List<Member> findActiveMembersByTrainerIdWithUser(@Param("trainerId") Long trainerId);
 
+    @Query("SELECT m.id FROM Member m WHERE m.trainer.id = :trainerId AND m.status = 'ACTIVE'")
+    List<Long> findActiveMemberIdsByTrainerId(@Param("trainerId") Long trainerId);
+
     @Query("""
         SELECT m
         FROM Member m

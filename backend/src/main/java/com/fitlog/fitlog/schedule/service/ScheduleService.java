@@ -315,23 +315,22 @@ public class ScheduleService {
     @Transactional
     public List<Long> generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {
         User user = getUserFromAuth(auth);
-        Trainer trainer = trainerRepository.findByUserIdWithMembers(user.getId())
+        // 회원 목록을 영속성 컨텍스트에 올리지 않는 경량 쿼리 사용
+        Trainer trainer = trainerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
         generateNextWeekSlots(trainer, customDayTimes);
 
-        // 알림 대상 회원 ID 목록 반환 (트랜잭션 커밋 후 컨트롤러에서 알림 전송)
-        if (trainer.getMembers() == null) return List.of();
-        return trainer.getMembers().stream()
-                .map(m -> m.getId())
-                .collect(java.util.stream.Collectors.toList());
+        // 트랜잭션 커밋 전에 ID만 조회 (member/user 엔티티를 컨텍스트에 올리지 않음)
+        return memberRepository.findActiveMemberIdsByTrainerId(trainer.getId());
     }
 
     // 슬롯 오픈 알림 전송 (트랜잭션 밖에서 호출)
     public void sendScheduleOpenNotifications(List<Long> memberIds) {
         for (Long memberId : memberIds) {
             try {
-                memberRepository.findById(memberId).ifPresent(member ->
+                // findByIdWithUser: user JOIN FETCH로 LazyInitializationException 방지
+                memberRepository.findByIdWithUser(memberId).ifPresent(member ->
                     notificationService.sendNotification(
                             member.getUser(),
                             "SCHEDULE_OPEN",
