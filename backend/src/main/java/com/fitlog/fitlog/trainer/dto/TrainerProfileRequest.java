@@ -12,5 +12,11 @@ public class TrainerProfileRequest {
     public String getWorkDays() { return workDays; }
     public String getStartTime() { return startTime; }
     public String getEndTime() { return endTime; }
+
+    public void setName(String name) { this.name = name; }
+    public void setGymName(String gymName) { this.gymName = gymName; }
+    public void setWorkDays(String workDays) { this.workDays = workDays; }
+    public void setStartTime(String startTime) { this.startTime = startTime; }
+    public void setEndTime(String endTime) { this.endTime = endTime; }
 }
 
