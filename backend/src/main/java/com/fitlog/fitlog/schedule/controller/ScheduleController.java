@@ -86,7 +86,10 @@ public class ScheduleController {
             if (body != null && body.get("dayTimes") instanceof List) {
                 dayTimes = (List<Map<String, String>>) body.get("dayTimes");
             }
-            scheduleService.generateSlotsForTrainer(auth, dayTimes);
+            // 슬롯 생성 (트랜잭션 커밋까지 완료)
+            List<Long> memberIds = scheduleService.generateSlotsForTrainer(auth, dayTimes);
+            // 트랜잭션 밖에서 알림 전송 (알림 실패가 슬롯 생성에 영향 없음)
+            scheduleService.sendScheduleOpenNotifications(memberIds);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,

@@ -311,36 +311,39 @@ public class ScheduleService {
         }).collect(Collectors.toList());
     }
 
-    // 슬롯 생성 (트레이너용)
-    public void generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {
+    // 슬롯 생성 (트레이너용) - 슬롯 DB 저장만 담당, 알림은 컨트롤러에서 처리
+    @Transactional
+    public List<Long> generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {
         User user = getUserFromAuth(auth);
         Trainer trainer = trainerRepository.findByUserIdWithMembers(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
-        // 슬롯 생성은 별도 트랜잭션으로 커밋 완료 후 알림 전송
-        generateSlotsInTransaction(trainer, customDayTimes);
+        generateNextWeekSlots(trainer, customDayTimes);
 
-        // 트랜잭션 커밋 후 알림 전송 (알림 실패가 슬롯 생성 롤백하지 않도록 분리)
-        if (trainer.getMembers() != null) {
-            for (Member member : trainer.getMembers()) {
-                try {
+        // 알림 대상 회원 ID 목록 반환 (트랜잭션 커밋 후 컨트롤러에서 알림 전송)
+        if (trainer.getMembers() == null) return List.of();
+        return trainer.getMembers().stream()
+                .map(m -> m.getId())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    // 슬롯 오픈 알림 전송 (트랜잭션 밖에서 호출)
+    public void sendScheduleOpenNotifications(List<Long> memberIds) {
+        for (Long memberId : memberIds) {
+            try {
+                memberRepository.findById(memberId).ifPresent(member ->
                     notificationService.sendNotification(
                             member.getUser(),
                             "SCHEDULE_OPEN",
                             "다음 주 수업 신청이 오픈됐어요!",
                             "SCHEDULE_OPEN",
                             null
-                    );
-                } catch (Exception e) {
-                    System.out.println("알림 전송 실패 (회원 " + member.getId() + "): " + e.getMessage());
-                }
+                    )
+                );
+            } catch (Exception e) {
+                System.out.println("알림 전송 실패 (회원 " + memberId + "): " + e.getMessage());
             }
         }
-    }
-
-    @Transactional
-    public void generateSlotsInTransaction(Trainer trainer, List<Map<String, String>> customDayTimes) {
-        generateNextWeekSlots(trainer, customDayTimes);
     }
 
     // 슬롯 직접 생성 및 확정 (트레이너용 - 직접 일정 추가)
