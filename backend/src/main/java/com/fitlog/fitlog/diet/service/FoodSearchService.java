@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.HashSet;
@@ -32,17 +31,8 @@ public class FoodSearchService {
             .clientConnector(new ReactorClientHttpConnector(
                     HttpClient.create()
                             .resolver(DefaultAddressResolverGroup.INSTANCE)
-                            .responseTimeout(Duration.ofSeconds(5))
+                            .responseTimeout(Duration.ofSeconds(4))
             ))
-            .build();
-
-    private final WebClient offClient = WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(
-                    HttpClient.create()
-                            .resolver(DefaultAddressResolverGroup.INSTANCE)
-                            .responseTimeout(Duration.ofSeconds(5))
-            ))
-            .baseUrl("https://world.openfoodfacts.org")
             .build();
 
     public FoodSearchService(FoodRepository foodRepository) {
@@ -81,47 +71,19 @@ public class FoodSearchService {
                 .filter(r -> r.foodName().replace(" ", "").toLowerCase().contains(normalizedQuery))
                 .toList();
 
-        // Step 2: 식약처 + OpenFoodFacts 병렬 호출
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-
-        Future<List<FoodSearchResult>> kfoodFuture = executor.submit(() -> {
-            if (kfoodApiKey != null && !kfoodApiKey.isBlank()) {
-                return searchKfood(query);
-            }
-            return List.of();
-        });
-
-        Future<List<FoodSearchResult>> offFuture = executor.submit(() -> {
+        // Step 2: 식약처 API (순차 호출, 타임아웃 내 실패 시 빈 결과)
+        List<FoodSearchResult> kfoodResults = List.of();
+        if (kfoodApiKey != null && !kfoodApiKey.isBlank()) {
             try {
-                return searchOpenFoodFacts(query);
+                kfoodResults = searchKfood(query);
             } catch (Exception e) {
-                return List.of();
+                System.out.println("식약처 API 오류: " + e.getMessage());
             }
-        });
-
-        List<FoodSearchResult> kfoodResults = new ArrayList<>();
-        List<FoodSearchResult> offResults = new ArrayList<>();
-
-        try {
-            kfoodResults = kfoodFuture.get(4, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            System.out.println("식약처 타임아웃 또는 오류");
         }
-
-        try {
-            offResults = offFuture.get(5, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            System.out.println("OpenFoodFacts 타임아웃 또는 오류");
-        }
-
-        executor.shutdown();
 
         List<FoodSearchResult> combined = Stream.concat(
                 internalResults.stream(),
-                Stream.concat(
-                        kfoodResults.stream(),
-                        offResults.stream()
-                )
+                kfoodResults.stream()
         ).collect(Collectors.toList());
 
         return sortResults(combined, query)
@@ -306,76 +268,6 @@ public class FoodSearchService {
             );
 
             return List.of();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<FoodSearchResult> searchOpenFoodFacts(String query) {
-        try {
-            String encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
-            String rawUrl = "https://world.openfoodfacts.org/cgi/search.pl"
-                    + "?search_terms=" + encodedQuery
-                    + "&search_simple=1&action=process&json=1&page_size=20&lc=ko";
-
-            Map<?, ?> response = offClient.get()
-                    .uri(java.net.URI.create(rawUrl))
-                    .header("User-Agent", "FitLogApp/1.0")
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block(Duration.ofSeconds(4));
-
-            if (response == null) return List.of();
-
-            List<?> products = (List<?>) response.get("products");
-            if (products == null) return List.of();
-
-            String normalizedQuery = query.replace(" ", "").toLowerCase();
-            List<FoodSearchResult> results = new ArrayList<>();
-
-            for (Object p : products) {
-                if (!(p instanceof Map)) continue;
-                Map<Object, Object> product = (Map<Object, Object>) p;
-
-                String name = getString(product, "product_name_ko");
-                if (name == null || name.isBlank()) name = getString(product, "product_name");
-                if (name == null || name.isBlank()) continue;
-                if (!name.replace(" ", "").toLowerCase().contains(normalizedQuery)) continue;
-
-                Map<?, ?> nutriments = (Map<?, ?>) product.get("nutriments");
-                if (nutriments == null) continue;
-
-                double calories = parseDoubleFromMap(nutriments, "energy-kcal_100g");
-                double carbs    = parseDoubleFromMap(nutriments, "carbohydrates_100g");
-                double protein  = parseDoubleFromMap(nutriments, "proteins_100g");
-                double fat      = parseDoubleFromMap(nutriments, "fat_100g");
-
-                if (calories == 0 && carbs == 0 && protein == 0) continue;
-
-                String id = getString(product, "code");
-                results.add(new FoodSearchResult(
-                        "off:" + (id != null ? id : name),
-                        name.trim(),
-                        Math.round(calories * 10.0) / 10.0,
-                        Math.round(carbs * 10.0) / 10.0,
-                        Math.round(protein * 10.0) / 10.0,
-                        Math.round(fat * 10.0) / 10.0,
-                        "openfoodfacts"
-                ));
-            }
-            return results;
-        } catch (Exception e) {
-            System.out.println("OpenFoodFacts 오류: " + e.getMessage());
-            return List.of();
-        }
-    }
-
-    private double parseDoubleFromMap(Map<?, ?> map, String key) {
-        try {
-            Object val = map.get(key);
-            if (val == null) return 0.0;
-            return Double.parseDouble(String.valueOf(val));
-        } catch (Exception e) {
-            return 0.0;
         }
     }
 

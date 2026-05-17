@@ -494,6 +494,9 @@ public class ScheduleService {
             }
         }
 
+        // @Modifying(clearAutomatically=true)가 PC를 클리어하므로, saveAll 전에 proxy로 재획득
+        Trainer managedTrainer = trainerRepository.getReferenceById(trainer.getId());
+
         List<Schedule> slots = new ArrayList<>();
         for (LocalDate date = nextMonday; !date.isAfter(nextSunday); date = date.plusDays(1)) {
             DayOfWeek dow = date.getDayOfWeek();
@@ -503,7 +506,7 @@ public class ScheduleService {
                 LocalTime cur = range[0];
                 while (cur.plusHours(1).compareTo(range[1]) <= 0) {
                     Schedule s = new Schedule();
-                    s.setTrainer(trainer);
+                    s.setTrainer(managedTrainer);
                     s.setDate(date);
                     s.setStartTime(cur);
                     s.setEndTime(cur.plusHours(1));
