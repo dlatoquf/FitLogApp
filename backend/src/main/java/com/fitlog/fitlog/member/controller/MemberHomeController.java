@@ -9,6 +9,7 @@ import com.fitlog.fitlog.member.service.MemberHomeService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -101,6 +102,7 @@ public class MemberHomeController {
     }
 
     // GET /api/member/check-trainer?code=XXXX - 트레이너 코드 유효성 확인 (연결 X)
+    @Transactional(readOnly = true)
     @GetMapping("/check-trainer")
     public ResponseEntity<Map<String, Object>> checkTrainer(
             @RequestParam("code") String code) {
