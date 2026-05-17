@@ -136,6 +136,7 @@ public class MemberHomeController {
     }
 
     // POST /api/member/connect-trainer
+    @Transactional
     @PostMapping("/connect-trainer")
     public ResponseEntity<Map<String, Object>> connectTrainer(
             @RequestHeader("Authorization") String authorization,
