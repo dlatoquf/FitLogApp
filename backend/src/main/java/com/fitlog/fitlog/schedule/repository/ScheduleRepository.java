@@ -159,9 +159,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     // 계정 삭제용 - 트레이너의 전체 스케줄
     List<Schedule> findByTrainer(Trainer trainer);
 
-    // 계정 삭제용 - 과거 스케줄 슬롯에서 회원 참조 해제
+    // 계정 삭제용 - 과거 스케줄 슬롯에서 회원 참조 해제 + 상태 OPEN 리셋
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member AND s.date < :today")
+    @Query("UPDATE Schedule s SET s.member = null, s.status = 'OPEN' WHERE s.member = :member AND s.date < :today")
     void detachMemberFromPastSchedules(@Param("member") Member member, @Param("today") java.time.LocalDate today);
 
     // 계정 삭제용 - 미래 스케줄 조회 (요청 삭제 후 슬롯 삭제용)
