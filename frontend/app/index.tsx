@@ -27,9 +27,23 @@ export default function IndexScreen() {
         }
 
         const data = await res.json();
+        const headers = { Authorization: `Bearer ${jwt}` };
+
         if (data.role === "TRAINER") {
+          const profileRes = await fetch(`${API_URL}/api/trainer/me`, { headers });
+          if (!profileRes.ok) {
+            await AsyncStorage.multiRemove(["jwt", "role"]);
+            router.replace("/auth/login");
+            return;
+          }
           router.replace("/(tabs)/trainer/home");
         } else {
+          const profileRes = await fetch(`${API_URL}/api/member/me`, { headers });
+          if (!profileRes.ok) {
+            await AsyncStorage.multiRemove(["jwt", "role"]);
+            router.replace("/auth/login");
+            return;
+          }
           router.replace("/(tabs)/member/home");
         }
       } catch {

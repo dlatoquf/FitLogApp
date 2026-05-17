@@ -17,7 +17,7 @@ import { Colors } from "../../constants/Colors";
 import { API_URL } from "../../constants/api";
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
-const HOURS = Array.from({ length: 20 }, (_, i) => `${String(i + 4).padStart(2, "0")}:00`);
+const HOURS = Array.from({ length: 21 }, (_, i) => `${String(i + 4).padStart(2, "0")}:00`);
 
 export default function SignupTrainerScreen() {
   const [gymName, setGymName] = useState("");

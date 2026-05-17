@@ -24,8 +24,6 @@ import java.util.Set;
 public class FoodSearchService {
 
     private final FoodRepository foodRepository;
-    private final FatSecretService fatSecretService;
-    private final DeepLService deepLService;
 
     @Value("${kfood.api-key:}")
     private String kfoodApiKey;
@@ -38,10 +36,17 @@ public class FoodSearchService {
             ))
             .build();
 
-    public FoodSearchService(FoodRepository foodRepository, FatSecretService fatSecretService, DeepLService deepLService) {
+    private final WebClient offClient = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(
+                    HttpClient.create()
+                            .resolver(DefaultAddressResolverGroup.INSTANCE)
+                            .responseTimeout(Duration.ofSeconds(5))
+            ))
+            .baseUrl("https://world.openfoodfacts.org")
+            .build();
+
+    public FoodSearchService(FoodRepository foodRepository) {
         this.foodRepository = foodRepository;
-        this.fatSecretService = fatSecretService;
-        this.deepLService = deepLService;
     }
 
     public record FoodSearchResult(
@@ -76,7 +81,7 @@ public class FoodSearchService {
                 .filter(r -> r.foodName().replace(" ", "").toLowerCase().contains(normalizedQuery))
                 .toList();
 
-        // Step 2: 식약처 + FatSecret 병렬 호출
+        // Step 2: 식약처 + OpenFoodFacts 병렬 호출
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         Future<List<FoodSearchResult>> kfoodFuture = executor.submit(() -> {
@@ -86,40 +91,27 @@ public class FoodSearchService {
             return List.of();
         });
 
-        Future<List<FoodSearchResult>> fatSecretFuture = executor.submit(() -> {
+        Future<List<FoodSearchResult>> offFuture = executor.submit(() -> {
             try {
-                String englishQuery = deepLService.translateToEnglish(query);
-                System.out.println("DeepL 번역: " + query + " → " + englishQuery);
-                List<FatSecretService.FoodSearchResult> fsResults = fatSecretService.searchFood(englishQuery);
-                return fsResults.stream()
-                        .map(f -> new FoodSearchResult(
-                                "fatsecret:" + f.foodId(),
-                                f.foodName(),
-                                Math.round(f.calories() * 10.0) / 10.0,
-                                Math.round(f.carbs() * 10.0) / 10.0,
-                                Math.round(f.protein() * 10.0) / 10.0,
-                                Math.round(f.fat() * 10.0) / 10.0,
-                                "fatsecret"
-                        ))
-                        .collect(Collectors.toList());
+                return searchOpenFoodFacts(query);
             } catch (Exception e) {
                 return List.of();
             }
         });
 
         List<FoodSearchResult> kfoodResults = new ArrayList<>();
-        List<FoodSearchResult> fatSecretResults = new ArrayList<>();
+        List<FoodSearchResult> offResults = new ArrayList<>();
 
         try {
-            kfoodResults = kfoodFuture.get(3, TimeUnit.SECONDS);
+            kfoodResults = kfoodFuture.get(4, TimeUnit.SECONDS);
         } catch (Exception e) {
             System.out.println("식약처 타임아웃 또는 오류");
         }
 
         try {
-            fatSecretResults = fatSecretFuture.get(5, TimeUnit.SECONDS);
+            offResults = offFuture.get(5, TimeUnit.SECONDS);
         } catch (Exception e) {
-            System.out.println("FatSecret 타임아웃 또는 오류");
+            System.out.println("OpenFoodFacts 타임아웃 또는 오류");
         }
 
         executor.shutdown();
@@ -128,7 +120,7 @@ public class FoodSearchService {
                 internalResults.stream(),
                 Stream.concat(
                         kfoodResults.stream(),
-                        fatSecretResults.stream()
+                        offResults.stream()
                 )
         ).collect(Collectors.toList());
 
@@ -314,6 +306,76 @@ public class FoodSearchService {
             );
 
             return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<FoodSearchResult> searchOpenFoodFacts(String query) {
+        try {
+            String encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
+            String rawUrl = "https://world.openfoodfacts.org/cgi/search.pl"
+                    + "?search_terms=" + encodedQuery
+                    + "&search_simple=1&action=process&json=1&page_size=20&lc=ko";
+
+            Map<?, ?> response = offClient.get()
+                    .uri(java.net.URI.create(rawUrl))
+                    .header("User-Agent", "FitLogApp/1.0")
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(Duration.ofSeconds(4));
+
+            if (response == null) return List.of();
+
+            List<?> products = (List<?>) response.get("products");
+            if (products == null) return List.of();
+
+            String normalizedQuery = query.replace(" ", "").toLowerCase();
+            List<FoodSearchResult> results = new ArrayList<>();
+
+            for (Object p : products) {
+                if (!(p instanceof Map)) continue;
+                Map<Object, Object> product = (Map<Object, Object>) p;
+
+                String name = getString(product, "product_name_ko");
+                if (name == null || name.isBlank()) name = getString(product, "product_name");
+                if (name == null || name.isBlank()) continue;
+                if (!name.replace(" ", "").toLowerCase().contains(normalizedQuery)) continue;
+
+                Map<?, ?> nutriments = (Map<?, ?>) product.get("nutriments");
+                if (nutriments == null) continue;
+
+                double calories = parseDoubleFromMap(nutriments, "energy-kcal_100g");
+                double carbs    = parseDoubleFromMap(nutriments, "carbohydrates_100g");
+                double protein  = parseDoubleFromMap(nutriments, "proteins_100g");
+                double fat      = parseDoubleFromMap(nutriments, "fat_100g");
+
+                if (calories == 0 && carbs == 0 && protein == 0) continue;
+
+                String id = getString(product, "code");
+                results.add(new FoodSearchResult(
+                        "off:" + (id != null ? id : name),
+                        name.trim(),
+                        Math.round(calories * 10.0) / 10.0,
+                        Math.round(carbs * 10.0) / 10.0,
+                        Math.round(protein * 10.0) / 10.0,
+                        Math.round(fat * 10.0) / 10.0,
+                        "openfoodfacts"
+                ));
+            }
+            return results;
+        } catch (Exception e) {
+            System.out.println("OpenFoodFacts 오류: " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private double parseDoubleFromMap(Map<?, ?> map, String key) {
+        try {
+            Object val = map.get(key);
+            if (val == null) return 0.0;
+            return Double.parseDouble(String.valueOf(val));
+        } catch (Exception e) {
+            return 0.0;
         }
     }
 

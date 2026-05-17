@@ -48,7 +48,7 @@ export default function SignupScreen() {
           }}
         >
           {/* 뒤로가기 */}
-          <Pressable onPress={() => router.back()} style={{ marginBottom: 32 }}>
+          <Pressable onPress={() => router.replace("/auth/login")} style={{ marginBottom: 32 }}>
             <Text style={{ fontSize: 22, color: Colors.text }}>←</Text>
           </Pressable>
 
