@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -1259,6 +1260,40 @@ useEffect(() => {
           )}
         </View>
 
+        {/* 목표 칼로리/탄단지 카드 */}
+        {goalKcal > 0 && (
+          <View
+            style={{
+              backgroundColor: Colors.bgSub,
+              borderRadius: 14,
+              padding: 14,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: Colors.border,
+            }}
+          >
+            <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 8, fontWeight: "600" }}>
+              목표 영양소 (유지)
+            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              {[
+                { label: "칼로리", value: `${Math.round(goalKcal)}`, unit: "kcal" },
+                { label: "탄수화물", value: `${Math.round(goalCarbs)}`, unit: "g" },
+                { label: "단백질", value: `${Math.round(goalProtein)}`, unit: "g" },
+                { label: "지방", value: `${Math.round(goalFat)}`, unit: "g" },
+              ].map(({ label, value, unit }) => (
+                <View key={label} style={{ alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 2 }}>{label}</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>
+                    {value}
+                    <Text style={{ fontSize: 10, fontWeight: "400", color: Colors.textMuted }}>{unit}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* 탭 */}
         <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
           {["식단로그", "운동로그", "바디로그"].map((t, i) => (
@@ -2422,7 +2457,10 @@ useEffect(() => {
         visible={showPTEdit}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowPTEdit(false)}
+        onRequestClose={() => {
+          setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+          setShowPTEdit(false);
+        }}
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -2431,7 +2469,10 @@ useEffect(() => {
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
             activeOpacity={1}
-            onPress={() => setShowPTEdit(false)}
+            onPress={() => {
+              setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+              setShowPTEdit(false);
+            }}
           />
           <View
             style={{
@@ -2624,6 +2665,7 @@ useEffect(() => {
                       ? `${n.slice(0, 4)}-${n.slice(4)}`
                       : n;
                 setPtForm((f) => ({ ...f, startDate: fmt }));
+                if (n.length === 8) Keyboard.dismiss();
               }}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={Colors.textPlaceholder}
@@ -2656,6 +2698,7 @@ useEffect(() => {
                       ? `${n.slice(0, 4)}-${n.slice(4)}`
                       : n;
                 setPtForm((f) => ({ ...f, endDate: fmt }));
+                if (n.length === 8) Keyboard.dismiss();
               }}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={Colors.textPlaceholder}
@@ -2695,7 +2738,10 @@ useEffect(() => {
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                onPress={() => setShowPTEdit(false)}
+                onPress={() => {
+                  setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+                  setShowPTEdit(false);
+                }}
                 style={{
                   flex: 1,
                   borderWidth: 1,

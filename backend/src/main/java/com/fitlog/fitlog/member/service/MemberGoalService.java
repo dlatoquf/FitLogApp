@@ -40,7 +40,7 @@ public class MemberGoalService {
     }
 
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MemberGoalResponse getMemberGoals(Long memberId) {
 
         Member member = memberRepository.findById(memberId)
@@ -51,7 +51,27 @@ public class MemberGoalService {
                 .findTopByMemberOrderByCreatedAtDesc(member)
                 .orElseGet(() -> memberGoalRepository.save(createDefaultGoal(member)));
 
+        // 고정 기본값(1800kcal)이고 체중이 있으면 재계산
+        if (goal.getTargetCalories() != null
+                && goal.getTargetCalories() == 1800.0
+                && member.getWeight() != null
+                && member.getWeight() > 0) {
+            applyWeightBasedGoal(goal, member.getWeight());
+            goal = memberGoalRepository.save(goal);
+        }
+
         return new MemberGoalResponse(goal);
+    }
+
+    private void applyWeightBasedGoal(MemberGoal goal, Double weight) {
+        double calories = Math.round(weight * 33);
+        double protein  = Math.round(weight * 2.2);
+        double fat      = Math.round(weight * 1.0);
+        double carbs    = Math.round(Math.max(calories - protein * 4 - fat * 9, 0) / 4);
+        goal.setTargetCalories(calories);
+        goal.setTargetProtein(protein);
+        goal.setTargetFat(fat);
+        goal.setTargetCarbs(carbs);
     }
 
     @Transactional

@@ -312,26 +312,35 @@ public class ScheduleService {
     }
 
     // 슬롯 생성 (트레이너용)
-    @Transactional
     public void generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {
         User user = getUserFromAuth(auth);
         Trainer trainer = trainerRepository.findByUserIdWithMembers(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
-        generateNextWeekSlots(trainer, customDayTimes);
+        // 슬롯 생성은 별도 트랜잭션으로 커밋 완료 후 알림 전송
+        generateSlotsInTransaction(trainer, customDayTimes);
 
-        // 회원들에게 다음 주 수업 오픈 알림 + FCM 푸시
+        // 트랜잭션 커밋 후 알림 전송 (알림 실패가 슬롯 생성 롤백하지 않도록 분리)
         if (trainer.getMembers() != null) {
             for (Member member : trainer.getMembers()) {
-                notificationService.sendNotification(
-                        member.getUser(),
-                        "SCHEDULE_OPEN",
-                        "다음 주 수업 신청이 오픈됐어요!",
-                        "SCHEDULE_OPEN",
-                        null
-                );
+                try {
+                    notificationService.sendNotification(
+                            member.getUser(),
+                            "SCHEDULE_OPEN",
+                            "다음 주 수업 신청이 오픈됐어요!",
+                            "SCHEDULE_OPEN",
+                            null
+                    );
+                } catch (Exception e) {
+                    System.out.println("알림 전송 실패 (회원 " + member.getId() + "): " + e.getMessage());
+                }
             }
         }
+    }
+
+    @Transactional
+    public void generateSlotsInTransaction(Trainer trainer, List<Map<String, String>> customDayTimes) {
+        generateNextWeekSlots(trainer, customDayTimes);
     }
 
     // 슬롯 직접 생성 및 확정 (트레이너용 - 직접 일정 추가)

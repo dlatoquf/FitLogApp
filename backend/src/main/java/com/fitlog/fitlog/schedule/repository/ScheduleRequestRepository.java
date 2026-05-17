@@ -68,12 +68,12 @@ public interface ScheduleRequestRepository extends JpaRepository<ScheduleRequest
     );
 
     // 스케줄 ID 목록으로 벌크 삭제
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM ScheduleRequest sr WHERE sr.schedule.id IN :scheduleIds")
     int deleteByScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
 
     // 스케줄 삭제 전 schedule_id를 null로 업데이트
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE ScheduleRequest sr SET sr.schedule = null WHERE sr.schedule.id IN :scheduleIds")
     int detachScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
 
