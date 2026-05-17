@@ -462,8 +462,7 @@ public class ScheduleService {
         LocalDate nextSunday = nextMonday.plusDays(6);
 
         List<Long> existingIds = scheduleRepository
-                .findByTrainerAndDateBetween(trainer, nextMonday, nextSunday)
-                .stream().map(Schedule::getId).collect(Collectors.toList());
+                .findIdsByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
 
         if (!existingIds.isEmpty()) {
             scheduleRequestRepository.detachScheduleIds(existingIds);

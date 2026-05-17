@@ -21,6 +21,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                                                @Param("from") LocalDate from,
                                                @Param("to") LocalDate to);
 
+    @Query("SELECT s.id FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to")
+    List<Long> findIdsByTrainerAndDateBetween(@Param("trainer") Trainer trainer,
+                                              @Param("from") LocalDate from,
+                                              @Param("to") LocalDate to);
+
     @Query("SELECT s FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.status = :status ORDER BY s.startTime")
     List<Schedule> findByTrainerAndDateAndStatus(@Param("trainer") Trainer trainer,
                                                  @Param("date") LocalDate date,
