@@ -48,8 +48,4 @@ public class AuthController {
         authService.setupProfile(authorization, request);
     }
 
-    @DeleteMapping("/test/users")
-    public void deleteAllUsers() {
-        authService.deleteAllUsers();
-    }
 }

@@ -11,7 +11,15 @@ import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fitlog.fitlog.notification.service.NotificationService;
+import com.fitlog.fitlog.member.repository.PtContractRepository;
+import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
+import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class PtContractService {
@@ -52,6 +60,7 @@ public class PtContractService {
         contract.setMember(member);
         contract.setTotalSessions(request.getSessions());
         contract.setRemainSessions(request.getSessions());
+        contract.setAmount(request.getAmount());
         contract.setStartDate(request.getStartDate());
         contract.setEndDate(request.getEndDate());
         contract.setMemo(request.getMemo());

@@ -1,12 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { ResizeMode, Video } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -14,14 +17,23 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
-import { API_URL, ENDPOINTS } from "../../../constants/api";
+import {
+  API_URL,
+  CLOUDINARY_UPLOAD_PRESET,
+  CLOUDINARY_UPLOAD_URL,
+  ENDPOINTS,
+} from "../../../constants/api";
 import { apiGet, getWeekDates, toDateKey } from "../../../hooks/useApi";
 import { DietFeedback, DietResponse, FitLog, Member } from "../../../types";
 
 const SCREEN_W = Dimensions.get("window").width - 72;
+const FULL_W = Dimensions.get("window").width;
+const FULL_H = Dimensions.get("window").height;
 
 interface BodyLog {
   date: string;
@@ -63,8 +75,1136 @@ const formatDateTime = (dateStr: string | null | undefined): string => {
   return dateStr.replace(/-/g, ".");
 };
 
+// ── 운동 기록 전체보기 표 컴포넌트 ──────────────────────────────────────────────
+const COL = {
+  date: 86,
+  type: 40,
+  condition: 46,
+  bodyPart: 72,
+  exercise: 100,
+  memo: 76,
+  set: 32,
+  weight: 54,
+  reps: 38,
+  feedback: 88,
+  media: 52,
+};
+const ROW_H = 36;
+
+interface SetRow {
+  set: number;
+  weight: string;
+  reps: number;
+}
+interface SimpleEx {
+  exercise: string;
+  sets: SetRow[];
+  memo?: string;
+}
+interface TypeGroup {
+  type: "PT" | "개인";
+  exercises: SimpleEx[];
+  totalRows: number;
+  conditionScore?: number;
+  painPoints?: string;
+  feedback?: string;
+  mediaList?: any[];
+}
+interface DateGroup {
+  date: string;
+  typeGroups: TypeGroup[];
+  totalRows: number;
+}
+interface ExAllEntry {
+  date: string;
+  type: "PT" | "개인";
+  sets: SetRow[];
+  memo?: string;
+  conditionScore?: number;
+  painPoints?: string;
+  feedback?: string;
+  mediaList?: any[];
+}
+interface ExAllGroup {
+  exercise: string;
+  entries: ExAllEntry[];
+  totalRows: number;
+}
+
+function buildDateGroups(logs: FitLog[]): DateGroup[] {
+  const sorted = logs
+    .slice()
+    .sort((a, b) =>
+      String((b as any).date ?? (b as any).logDate ?? "").localeCompare(
+        String((a as any).date ?? (a as any).logDate ?? ""),
+      ),
+    );
+  type TypeData = {
+    exercises: SimpleEx[];
+    conditionScore?: number;
+    painPoints?: string;
+    feedback?: string;
+    mediaList?: any[];
+  };
+  const dateMap = new Map<string, Map<string, TypeData>>();
+  const dateTypeOrder = new Map<string, ("PT" | "개인")[]>();
+
+  for (const log of sorted) {
+    const la = log as any;
+    const date = String(la.date ?? la.logDate ?? "").slice(0, 10);
+    const type: "PT" | "개인" = la.workoutType === "PT" ? "PT" : "개인";
+    if (!dateMap.has(date)) {
+      dateMap.set(date, new Map());
+      dateTypeOrder.set(date, []);
+    }
+    const typeMap = dateMap.get(date)!;
+    const typeOrder = dateTypeOrder.get(date)!;
+    if (!typeMap.has(type)) {
+      typeMap.set(type, {
+        exercises: [],
+        conditionScore: la.conditionScore ?? undefined,
+        painPoints: la.painPoints ?? undefined,
+        feedback: la.feedback ?? undefined,
+        mediaList: la.mediaList ?? [],
+      });
+      typeOrder.push(type);
+    }
+    const td = typeMap.get(type)!;
+    for (const ex of log.exercises ?? []) {
+      let e = td.exercises.find((e) => e.exercise === ex.name);
+      if (!e) {
+        e = {
+          exercise: ex.name,
+          sets: [],
+          memo: (ex as any).memo ?? undefined,
+        };
+        td.exercises.push(e);
+      }
+      (ex.sets ?? []).forEach((s, si) => {
+        e!.sets.push({
+          set: (s as any).setNumber ?? si + 1,
+          weight: s.weight > 0 ? `${s.weight}kg` : "맨몸",
+          reps: s.reps,
+        });
+      });
+    }
+  }
+
+  return Array.from(dateMap.entries()).map(([date, typeMap]) => {
+    const typeGroups: TypeGroup[] = (dateTypeOrder.get(date) ?? []).map(
+      (type) => {
+        const td = typeMap.get(type)!;
+        return {
+          type,
+          exercises: td.exercises,
+          totalRows: td.exercises.reduce((s, e) => s + e.sets.length, 0),
+          conditionScore: td.conditionScore,
+          painPoints: td.painPoints,
+          feedback: td.feedback,
+          mediaList: td.mediaList,
+        };
+      },
+    );
+    return {
+      date,
+      typeGroups,
+      totalRows: typeGroups.reduce((s, tg) => s + tg.totalRows, 0),
+    };
+  });
+}
+
+function buildExGroups(logs: FitLog[]): ExAllGroup[] {
+  const map = new Map<string, ExAllEntry[]>();
+  for (const log of logs) {
+    const la = log as any;
+    const date = String(la.date ?? la.logDate ?? "").slice(0, 10);
+    const type: "PT" | "개인" = la.workoutType === "PT" ? "PT" : "개인";
+    for (const ex of log.exercises ?? []) {
+      if (!map.has(ex.name)) map.set(ex.name, []);
+      const entries = map.get(ex.name)!;
+      let e = entries.find((e) => e.date === date && e.type === type);
+      if (!e) {
+        e = {
+          date,
+          type,
+          sets: [],
+          memo: (ex as any).memo ?? undefined,
+          conditionScore: la.conditionScore ?? undefined,
+          painPoints: la.painPoints ?? undefined,
+          feedback: la.feedback ?? undefined,
+          mediaList: la.mediaList ?? [],
+        };
+        entries.push(e);
+      }
+      (ex.sets ?? []).forEach((s, si) => {
+        e!.sets.push({
+          set: (s as any).setNumber ?? si + 1,
+          weight: s.weight > 0 ? `${s.weight}kg` : "맨몸",
+          reps: s.reps,
+        });
+      });
+    }
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b, "ko"))
+    .map(([exercise, entries]) => {
+      const sorted = entries.slice().sort((a, b) => {
+        const pa = a.painPoints ?? "";
+        const pb = b.painPoints ?? "";
+        if (pa !== pb) return pa.localeCompare(pb, "ko");
+        return b.date.localeCompare(a.date);
+      });
+      return {
+        exercise,
+        entries: sorted,
+        totalRows: sorted.reduce((s, e) => s + e.sets.length, 0),
+      };
+    });
+}
+
+const CELL_BORDER = "#e0e0e0";
+
+function MergedCell({
+  value,
+  width,
+  height,
+  bold,
+  color,
+  center,
+  bg,
+}: {
+  value: string;
+  width: number;
+  height: number;
+  bold?: boolean;
+  color?: string;
+  center?: boolean;
+  bg?: string;
+}) {
+  return (
+    <View
+      style={{
+        width,
+        height,
+        justifyContent: "center",
+        alignItems: center ? "center" : "flex-start",
+        paddingHorizontal: 5,
+        borderRightWidth: 1,
+        borderRightColor: CELL_BORDER,
+        backgroundColor: bg ?? "transparent",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: bold ? "700" : "400",
+          color: color ?? Colors.text,
+          textAlign: center ? "center" : "left",
+        }}
+        numberOfLines={2}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function TableHead({ cols }: { cols: { label: string; w: number }[] }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: "#f0f2f0",
+        borderBottomWidth: 1.5,
+        borderBottomColor: "#ccc",
+      }}
+    >
+      {cols.map((c) => (
+        <View
+          key={c.label}
+          style={{
+            width: c.w,
+            paddingVertical: 8,
+            alignItems: "center",
+            borderRightWidth: 1,
+            borderRightColor: CELL_BORDER,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "#555" }}>
+            {c.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function HistoryTable({
+  logs,
+  trainerPlan,
+  onViewMedia,
+}: {
+  logs: FitLog[];
+  trainerPlan: "FREE" | "PRO";
+  onViewMedia?: (mediaList: any[]) => void;
+}) {
+  const [histTab, setHistTab] = useState<0 | 1>(0);
+
+  // ── 날짜별 ──
+  const [dateInput, setDateInput] = useState("");
+  const [filteredDate, setFilteredDate] = useState<string | null>(null);
+
+  // ── 운동종목별: 드롭다운 ──
+  const [exInput, setExInput] = useState("");
+  const [exDropOpen, setExDropOpen] = useState(false);
+  const [selectedEx, setSelectedEx] = useState<string | null>(null);
+  const [selectorHeight, setSelectorHeight] = useState(44);
+
+  const allDateGroups = buildDateGroups(logs);
+  const dateGroups = filteredDate
+    ? allDateGroups.filter((dg) => dg.date === filteredDate)
+    : allDateGroups;
+
+  const allExGroups = buildExGroups(logs);
+  const filteredExList = exInput.trim()
+    ? allExGroups.filter((eg) => eg.exercise.includes(exInput.trim()))
+    : allExGroups;
+  const exGroups = selectedEx
+    ? allExGroups.filter((eg) => eg.exercise === selectedEx)
+    : allExGroups;
+
+  const condText = (score?: number) =>
+    score === 4
+      ? "최상"
+      : score === 3
+        ? "좋음"
+        : score === 2
+          ? "보통"
+          : score === 1
+            ? "나쁨"
+            : "";
+
+  // ── 날짜별 테이블 렌더 ──
+  const renderDateTable = () => (
+    <ScrollView
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator
+      nestedScrollEnabled
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        <View>
+          <TableHead
+            cols={[
+              { label: "날짜", w: COL.date },
+              { label: "구분", w: COL.type },
+              { label: "부위", w: COL.bodyPart },
+              { label: "운동명", w: COL.exercise },
+              { label: "세트", w: COL.set },
+              { label: "무게", w: COL.weight },
+              { label: "횟수", w: COL.reps },
+              { label: "메모", w: COL.memo },
+              { label: "피드백", w: COL.feedback },
+              { label: "컨디션", w: COL.condition },
+              ...(trainerPlan === "PRO"
+                ? [{ label: "미디어", w: COL.media }]
+                : []),
+            ]}
+          />
+          {dateGroups.map((dg, di) => (
+            <View
+              key={dg.date}
+              style={{
+                flexDirection: "row",
+                borderBottomWidth: 1.5,
+                borderBottomColor: "#ccc",
+              }}
+            >
+              <MergedCell
+                value={dg.date}
+                width={COL.date}
+                height={ROW_H * dg.totalRows}
+                bold
+                center
+                color={Colors.text}
+                bg={di % 2 === 0 ? "#f8f9f8" : "#f2f4f2"}
+              />
+              <View>
+                {dg.typeGroups.map((tg, ti) => (
+                  <View
+                    key={ti}
+                    style={{
+                      flexDirection: "row",
+                      borderBottomWidth: ti < dg.typeGroups.length - 1 ? 1 : 0,
+                      borderBottomColor: "#c8c8c8",
+                    }}
+                  >
+                    <MergedCell
+                      value={tg.type}
+                      width={COL.type}
+                      height={ROW_H * tg.totalRows}
+                      bold
+                      center
+                      color={tg.type === "PT" ? Colors.green : Colors.textMuted}
+                      bg={tg.type === "PT" ? "#f0fff4" : "#fafafa"}
+                    />
+                    <MergedCell
+                      value={tg.painPoints ?? ""}
+                      width={COL.bodyPart}
+                      height={ROW_H * tg.totalRows}
+                      color={Colors.textSub}
+                    />
+                    <View>
+                      {tg.exercises.map((ex, ei) => (
+                        <View
+                          key={ei}
+                          style={{
+                            flexDirection: "row",
+                            borderBottomWidth:
+                              ei < tg.exercises.length - 1 ? 1 : 0,
+                            borderBottomColor: "#e8e8e8",
+                          }}
+                        >
+                          <MergedCell
+                            value={ex.exercise}
+                            width={COL.exercise}
+                            height={ROW_H * ex.sets.length}
+                            bold
+                            color={Colors.text}
+                          />
+                          <View>
+                            {ex.sets.map((s, si) => (
+                              <View
+                                key={si}
+                                style={{
+                                  flexDirection: "row",
+                                  height: ROW_H,
+                                  alignItems: "center",
+                                  borderBottomWidth:
+                                    si < ex.sets.length - 1 ? 1 : 0,
+                                  borderBottomColor: "#efefef",
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: COL.set,
+                                    alignItems: "center",
+                                    borderRightWidth: 1,
+                                    borderRightColor: CELL_BORDER,
+                                    height: "100%",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      color: Colors.textMuted,
+                                    }}
+                                  >
+                                    {s.set}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={{
+                                    width: COL.weight,
+                                    alignItems: "center",
+                                    borderRightWidth: 1,
+                                    borderRightColor: CELL_BORDER,
+                                    height: "100%",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Text
+                                    style={{ fontSize: 12, color: Colors.blue }}
+                                  >
+                                    {s.weight}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={{
+                                    width: COL.reps,
+                                    alignItems: "center",
+                                    borderRightWidth: 1,
+                                    borderRightColor: CELL_BORDER,
+                                    height: "100%",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      color: Colors.textSub,
+                                    }}
+                                  >
+                                    {s.reps}회
+                                  </Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                          <MergedCell
+                            value={ex.memo ?? ""}
+                            width={COL.memo}
+                            height={ROW_H * ex.sets.length}
+                            color={Colors.textMuted}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                    <MergedCell
+                      value={tg.feedback ?? ""}
+                      width={COL.feedback}
+                      height={ROW_H * tg.totalRows}
+                      color={Colors.textMuted}
+                    />
+                    <MergedCell
+                      value={condText(tg.conditionScore)}
+                      width={COL.condition}
+                      height={ROW_H * tg.totalRows}
+                      center
+                      color={Colors.textSub}
+                    />
+                    {trainerPlan === "PRO" && (
+                      <View
+                        style={{
+                          width: COL.media,
+                          height: ROW_H * tg.totalRows,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          borderRightWidth: 1,
+                          borderRightColor: CELL_BORDER,
+                        }}
+                      >
+                        {(tg.mediaList ?? []).length > 0 ? (
+                          <TouchableOpacity
+                            onPress={() => onViewMedia?.(tg.mediaList ?? [])}
+                            style={{
+                              backgroundColor: Colors.green + "22",
+                              borderRadius: 6,
+                              paddingHorizontal: 6,
+                              paddingVertical: 4,
+                              borderWidth: 1,
+                              borderColor: Colors.green + "55",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: Colors.green,
+                                fontWeight: "700",
+                              }}
+                            >
+                              📷{(tg.mediaList ?? []).length}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text
+                            style={{ fontSize: 10, color: Colors.textMuted }}
+                          >
+                            -
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </ScrollView>
+  );
+
+  // ── 운동종목별 테이블 렌더 ──
+  const renderExTable = () => (
+    <ScrollView
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator
+      nestedScrollEnabled
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        <View>
+          <TableHead
+            cols={[
+              { label: "운동명", w: COL.exercise },
+              { label: "날짜", w: COL.date },
+              { label: "구분", w: COL.type },
+              { label: "부위", w: COL.bodyPart },
+              { label: "세트", w: COL.set },
+              { label: "무게", w: COL.weight },
+              { label: "횟수", w: COL.reps },
+              { label: "메모", w: COL.memo },
+              { label: "피드백", w: COL.feedback },
+              { label: "컨디션", w: COL.condition },
+              ...(trainerPlan === "PRO"
+                ? [{ label: "미디어", w: COL.media }]
+                : []),
+            ]}
+          />
+          {exGroups.map((eg, gi) => (
+            <View
+              key={eg.exercise}
+              style={{
+                flexDirection: "row",
+                borderBottomWidth: 1.5,
+                borderBottomColor: "#ccc",
+              }}
+            >
+              <MergedCell
+                value={eg.exercise}
+                width={COL.exercise}
+                height={ROW_H * eg.totalRows}
+                bold
+                color={Colors.text}
+                bg={gi % 2 === 0 ? "#f8f9f8" : "#f2f4f2"}
+              />
+              <View>
+                {eg.entries.map((en, ei) => (
+                  <View
+                    key={ei}
+                    style={{
+                      flexDirection: "row",
+                      borderBottomWidth: ei < eg.entries.length - 1 ? 1 : 0,
+                      borderBottomColor: "#d0d0d0",
+                    }}
+                  >
+                    <MergedCell
+                      value={en.date}
+                      width={COL.date}
+                      height={ROW_H * en.sets.length}
+                      center
+                      color={Colors.textSub}
+                    />
+                    <MergedCell
+                      value={en.type}
+                      width={COL.type}
+                      height={ROW_H * en.sets.length}
+                      bold
+                      center
+                      color={en.type === "PT" ? Colors.green : Colors.textMuted}
+                      bg={en.type === "PT" ? "#f0fff4" : "#fafafa"}
+                    />
+                    <MergedCell
+                      value={en.painPoints ?? ""}
+                      width={COL.bodyPart}
+                      height={ROW_H * en.sets.length}
+                      color={Colors.textSub}
+                    />
+                    <View>
+                      {en.sets.map((s, si) => (
+                        <View
+                          key={si}
+                          style={{
+                            flexDirection: "row",
+                            height: ROW_H,
+                            alignItems: "center",
+                            borderBottomWidth: si < en.sets.length - 1 ? 1 : 0,
+                            borderBottomColor: "#efefef",
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: COL.set,
+                              alignItems: "center",
+                              borderRightWidth: 1,
+                              borderRightColor: CELL_BORDER,
+                              height: "100%",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Text
+                              style={{ fontSize: 12, color: Colors.textMuted }}
+                            >
+                              {s.set}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              width: COL.weight,
+                              alignItems: "center",
+                              borderRightWidth: 1,
+                              borderRightColor: CELL_BORDER,
+                              height: "100%",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: Colors.blue }}>
+                              {s.weight}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              width: COL.reps,
+                              alignItems: "center",
+                              borderRightWidth: 1,
+                              borderRightColor: CELL_BORDER,
+                              height: "100%",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Text
+                              style={{ fontSize: 12, color: Colors.textSub }}
+                            >
+                              {s.reps}회
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                    <MergedCell
+                      value={en.memo ?? ""}
+                      width={COL.memo}
+                      height={ROW_H * en.sets.length}
+                      color={Colors.textMuted}
+                    />
+                    <MergedCell
+                      value={en.feedback ?? ""}
+                      width={COL.feedback}
+                      height={ROW_H * en.sets.length}
+                      color={Colors.textMuted}
+                    />
+                    <MergedCell
+                      value={condText(en.conditionScore)}
+                      width={COL.condition}
+                      height={ROW_H * en.sets.length}
+                      center
+                      color={Colors.textSub}
+                    />
+                    {trainerPlan === "PRO" && (
+                      <View
+                        style={{
+                          width: COL.media,
+                          height: ROW_H * en.sets.length,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          borderRightWidth: 1,
+                          borderRightColor: CELL_BORDER,
+                        }}
+                      >
+                        {(en.mediaList ?? []).length > 0 ? (
+                          <TouchableOpacity
+                            onPress={() => onViewMedia?.(en.mediaList ?? [])}
+                            style={{
+                              backgroundColor: Colors.green + "22",
+                              borderRadius: 6,
+                              paddingHorizontal: 6,
+                              paddingVertical: 4,
+                              borderWidth: 1,
+                              borderColor: Colors.green + "55",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: Colors.green,
+                                fontWeight: "700",
+                              }}
+                            >
+                              📷{(en.mediaList ?? []).length}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text
+                            style={{ fontSize: 10, color: Colors.textMuted }}
+                          >
+                            -
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </ScrollView>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* 내부 탭 */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          gap: 8,
+        }}
+      >
+        {["날짜별", "운동종목별"].map((label, i) => (
+          <TouchableOpacity
+            key={label}
+            onPress={() => setHistTab(i as 0 | 1)}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: histTab === i ? Colors.green : Colors.bgSub,
+              borderWidth: 1,
+              borderColor: histTab === i ? Colors.green : Colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: histTab === i ? "#fff" : Colors.textMuted,
+              }}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── 날짜별 탭 ── */}
+      {histTab === 0 && (
+        <View style={{ flex: 1 }}>
+          {/* 날짜 입력 + 조회 버튼 */}
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <TextInput
+                  value={dateInput}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/\D/g, "").slice(0, 8);
+                    let formatted = digits;
+                    if (digits.length > 4)
+                      formatted = digits.slice(0, 4) + "-" + digits.slice(4);
+                    if (digits.length > 6)
+                      formatted =
+                        digits.slice(0, 4) +
+                        "-" +
+                        digits.slice(4, 6) +
+                        "-" +
+                        digits.slice(6);
+                    setDateInput(formatted);
+                    if (digits.length === 0) setFilteredDate(null);
+                  }}
+                  placeholder="예) 20260508"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="numeric"
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: filteredDate ? Colors.green : Colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 14,
+                    paddingRight: dateInput.length > 0 ? 40 : 14,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: Colors.text,
+                  }}
+                />
+                {dateInput.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setDateInput("");
+                      setFilteredDate(null);
+                      Keyboard.dismiss();
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: 0,
+                      bottom: 0,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                      ✕
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  const digits = dateInput.replace(/\D/g, "");
+                  if (digits.length === 8) {
+                    setFilteredDate(
+                      digits.slice(0, 4) +
+                        "-" +
+                        digits.slice(4, 6) +
+                        "-" +
+                        digits.slice(6),
+                    );
+                  } else if (digits.length === 0) {
+                    setFilteredDate(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 10,
+                  paddingHorizontal: 16,
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}
+                >
+                  조회
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {filteredDate !== null && (
+              <Text style={{ fontSize: 12, color: Colors.green, marginTop: 6 }}>
+                {filteredDate} 조회 중
+              </Text>
+            )}
+            {filteredDate && dateGroups.length === 0 && (
+              <Text
+                style={{ fontSize: 13, color: Colors.textMuted, marginTop: 4 }}
+              >
+                운동 기록이 없어요
+              </Text>
+            )}
+          </View>
+          {renderDateTable()}
+        </View>
+      )}
+
+      {/* ── 운동종목별 탭 ── */}
+      {histTab === 1 && (
+        <View style={{ flex: 1 }}>
+          {/* 바깥 터치 시 드롭다운 닫기 — 테이블보다 위, 드롭다운보다 아래 */}
+          {exDropOpen && (
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {
+                Keyboard.dismiss();
+                setExDropOpen(false);
+                setExInput("");
+              }}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 5,
+              }}
+            />
+          )}
+
+          {/* 드롭다운 영역 — zIndex 10으로 backdrop 위에 */}
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingBottom: 8,
+              zIndex: 10,
+            }}
+          >
+            {/* 선택창 */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {
+                setExDropOpen((prev) => !prev);
+              }}
+              onLayout={(e) => setSelectorHeight(e.nativeEvent.layout.height)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: Colors.bgSub,
+                borderWidth: 1,
+                borderColor:
+                  exDropOpen || selectedEx ? Colors.green : Colors.border,
+                borderRadius: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                gap: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: selectedEx ? Colors.text : Colors.textPlaceholder,
+                  flex: 1,
+                }}
+              >
+                {selectedEx ?? "운동 종목 선택"}
+              </Text>
+              {selectedEx && (
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedEx(null);
+                    setExInput("");
+                    setExDropOpen(false);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                    ✕
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                {exDropOpen ? "▲" : "▼"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 드롭다운 리스트 — 절대 위치로 테이블 위에 float */}
+            {exDropOpen && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: selectorHeight + 16,
+                  left: 16,
+                  right: 16,
+                  zIndex: 20,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: 10,
+                  backgroundColor: Colors.bg,
+                  overflow: "hidden",
+                  maxHeight: 280,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.12,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 8,
+                }}
+              >
+                {/* 검색 인풋 */}
+                <View
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                  }}
+                >
+                  <TextInput
+                    value={exInput}
+                    onChangeText={setExInput}
+                    placeholder="운동명 검색"
+                    placeholderTextColor={Colors.textPlaceholder}
+                    style={{
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      fontSize: 13,
+                      color: Colors.text,
+                    }}
+                  />
+                </View>
+                {/* 모두 + 운동명 목록 — keyboardShouldPersistTaps="always" 로 첫 탭에 바로 선택 */}
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="always"
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setSelectedEx(null);
+                      setExInput("");
+                      setExDropOpen(false);
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      backgroundColor: !selectedEx
+                        ? Colors.green + "12"
+                        : Colors.bg,
+                      borderBottomWidth: 1,
+                      borderBottomColor: Colors.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: !selectedEx ? Colors.green : Colors.text,
+                      }}
+                    >
+                      모두
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                      {allExGroups.length}종목
+                    </Text>
+                  </TouchableOpacity>
+                  {filteredExList.map((eg, idx) => (
+                    <TouchableOpacity
+                      key={eg.exercise}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setSelectedEx(eg.exercise);
+                        setExInput("");
+                        setExDropOpen(false);
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        backgroundColor:
+                          selectedEx === eg.exercise
+                            ? Colors.green + "12"
+                            : Colors.bg,
+                        borderBottomWidth:
+                          idx < filteredExList.length - 1 ? 1 : 0,
+                        borderBottomColor: Colors.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color:
+                            selectedEx === eg.exercise
+                              ? Colors.green
+                              : Colors.text,
+                          fontWeight:
+                            selectedEx === eg.exercise ? "700" : "400",
+                        }}
+                      >
+                        {eg.exercise}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                        총 {eg.entries.length}회
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {filteredExList.length === 0 && (
+                    <View style={{ alignItems: "center", paddingVertical: 20 }}>
+                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                        &quot;{exInput}&quot; 결과 없음
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {renderExTable()}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function MemberDetailScreen() {
-  const { id, initialTab } = useLocalSearchParams<{ id: string; initialTab?: string }>();
+  const { id, initialTab } = useLocalSearchParams<{
+    id: string;
+    initialTab?: string;
+  }>();
   const memberId = Number(id);
 
   const [member, setMember] = useState<Member | null>(null);
@@ -84,10 +1224,15 @@ export default function MemberDetailScreen() {
   const [feedbackText, setFeedbackText] = useState("");
   const [sendingFeedback, setSendingFeedback] = useState(false);
 
+  const [weekDietDates, setWeekDietDates] = useState<Set<string>>(new Set());
+
   const [fitLogs, setFitLogs] = useState<FitLog[]>([]);
   const [allFitLogs, setAllFitLogs] = useState<FitLog[]>([]);
   const [fitLogHistoryLoaded, setFitLogHistoryLoaded] = useState(false);
-  const [exerciseSuggest, setExerciseSuggest] = useState<{ ei: number; names: string[] } | null>(null);
+  const [exerciseSuggest, setExerciseSuggest] = useState<{
+    ei: number;
+    names: string[];
+  } | null>(null);
   // 주 단위 캐시: weekKey → logs
   const [fitLogCache, setFitLogCache] = useState<{
     [weekKey: string]: FitLog[];
@@ -96,12 +1241,45 @@ export default function MemberDetailScreen() {
   const didLoadWorkoutRef = useRef(false);
   const fetchingFitLogKeyRef = useRef<string | null>(null);
   const fetchingFitLogHistoryRef = useRef(false);
-  const [exercises, setExercises] = useState([
-    { name: "", sets: [{ weight: "", reps: "" }] },
+  const [exercises, setExercises] = useState<
+    {
+      name: string;
+      sets: { weight: string; reps: string }[];
+      memo: string;
+      mediaFile: { uri: string; type: "image" | "video" } | null;
+      existingMedia: {
+        id: number;
+        url: string;
+        publicId: string;
+        mediaType: string;
+      } | null;
+    }[]
+  >([
+    {
+      name: "",
+      sets: [{ weight: "", reps: "" }],
+      memo: "",
+      mediaFile: null,
+      existingMedia: null,
+    },
   ]);
+  const [ptBodyParts, setPtBodyParts] = useState<string[]>([]);
+  const [ptCondition, setPtCondition] = useState<number | null>(null);
+  const [ptWorkoutFeedback, setPtWorkoutFeedback] = useState("");
   const [showFitLogForm, setShowFitLogForm] = useState(false);
   const [editingFitLogId, setEditingFitLogId] = useState<number | null>(null);
   const [savingFitLog, setSavingFitLog] = useState(false);
+  const [trainerPlan, setTrainerPlan] = useState<"FREE" | "PRO">("FREE");
+  const [paymentVisible, setPaymentVisible] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [mediaGallery, setMediaGallery] = useState<
+    { url: string; mediaType: string }[]
+  >([]);
+  const [mediaGalleryIndex, setMediaGalleryIndex] = useState(0);
+  const [selectedMedia, setSelectedMedia] = useState<{
+    url: string;
+    mediaType: string;
+  } | null>(null);
 
   const [bodyLogs, setBodyLogs] = useState<BodyLog[]>([]);
   const [showPTEdit, setShowPTEdit] = useState(false);
@@ -248,6 +1426,32 @@ export default function MemberDetailScreen() {
     }
   };
 
+  const fetchWeekDietDates = async () => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const weekStart = toDateKey(getWeekDates(weekOffset)[0]);
+      const res = await fetch(
+        `${API_URL}/api/diet/member/${memberId}/week?weekStart=${weekStart}`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      );
+      if (!res.ok) return;
+      const data: { date: string; totalCalories: number; meals: { mealType: string; foods: any[] }[] }[] = await res.json();
+      // 실제로 음식이 입력된 날만 (totalCalories > 0 이거나 foods가 있는 날)
+      const dates = new Set(
+        data
+          .filter((d) => {
+            if (!d.date) return false;
+            if (d.totalCalories > 0) return true;
+            return d.meals?.some((m) => m.foods && m.foods.length > 0);
+          })
+          .map((d) => d.date.slice(0, 10))
+      );
+      setWeekDietDates(dates);
+    } catch {
+      setWeekDietDates(new Set());
+    }
+  };
+
   const fetchFitLogHistory = async (forceRefresh = false) => {
     if (!forceRefresh && fitLogHistoryLoaded) return;
     if (!forceRefresh && fetchingFitLogHistoryRef.current) return;
@@ -360,51 +1564,84 @@ export default function MemberDetailScreen() {
     }
   };
 
-// 알림에서 initialTab param이 오면 해당 탭으로 이동
-useEffect(() => {
-  if (initialTab !== undefined) {
-    setTab(Number(initialTab));
-  }
-}, [initialTab]);
+  // 알림에서 initialTab param이 오면 해당 탭으로 이동
+  useEffect(() => {
+    if (initialTab !== undefined) {
+      setTab(Number(initialTab));
+    }
+  }, [initialTab]);
 
-// 회원 기본 정보 + 최신 목표
-useEffect(() => {
-  const init = async () => {
-    setLoading(true);
-    await fetchMember();
-    await fetchMemberGoals();
-    setLoading(false);
-  };
+  // 트레이너 플랜 조회
+  useEffect(() => {
+    (async () => {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/trainer/home`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setTrainerPlan(
+          (d?.plan ?? "FREE").toUpperCase() === "PRO" ? "PRO" : "FREE",
+        );
+      }
+    })();
+  }, []);
 
-  init();
-}, [memberId]);
-
-// 탭 전환 시 운동/바디만 처리
-useEffect(() => {
-  if (tab === 1) {
-    if (!didLoadWorkoutRef.current) {
+  // 회원 기본 정보 + 최신 목표
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      resetFitLogForm();
+      // 회원 변경 시 운동 기록 상태 초기화
+      setFitLogs([]);
+      setAllFitLogs([]);
+      setFitLogCache({});
+      setFitLogHistoryLoaded(false);
+      didLoadWorkoutRef.current = false;
+      await fetchMember();
+      await fetchMemberGoals();
+      setLoading(false);
+      // 탭과 무관하게 항상 운동 기록 로드 (캘린더 점 표시용)
       didLoadWorkoutRef.current = true;
       fetchFitLogs();
       fetchFitLogHistory();
+    };
+
+    init();
+  }, [memberId]);
+
+  // 탭 전환 시 운동/바디만 처리
+  useEffect(() => {
+    if (tab === 1) {
+      if (!didLoadWorkoutRef.current) {
+        didLoadWorkoutRef.current = true;
+        fetchFitLogs();
+        fetchFitLogHistory();
+      }
+    } else if (tab === 2) {
+      fetchBodyLogs();
     }
-  } else if (tab === 2) {
-    fetchBodyLogs();
-  }
-}, [tab]);
+  }, [tab]);
 
-// 식단 탭: 날짜 변경 시 식단 + 피드백 조회
-useEffect(() => {
-  if (tab === 0) {
-    fetchDiet();
-    fetchFeedbacks();
-  }
-}, [tab, selectedDate, memberId]);
+  // 식단 탭: 날짜 변경 시 식단 + 피드백 조회
+  useEffect(() => {
+    if (tab === 0) {
+      fetchDiet();
+      fetchFeedbacks();
+    }
+  }, [tab, selectedDate, memberId]);
 
-// 운동 탭: 주 변경 시만
-useEffect(() => {
-  if (tab !== 1 || !didLoadWorkoutRef.current) return;
-  fetchFitLogs();
-}, [weekOffset]);
+  // 운동 탭: 주 변경 시만
+  useEffect(() => {
+    if (tab !== 1 || !didLoadWorkoutRef.current) return;
+    fetchFitLogs();
+    fetchWeekDietDates();
+  }, [weekOffset]);
+
+  // 첫 진입 시 식단 날짜 로드
+  useEffect(() => {
+    fetchWeekDietDates();
+  }, [memberId]);
 
   const sendFeedback = async () => {
     if (!feedbackText.trim()) return;
@@ -443,7 +1680,18 @@ useEffect(() => {
   };
 
   const resetFitLogForm = () => {
-    setExercises([{ name: "", sets: [{ weight: "", reps: "" }] }]);
+    setExercises([
+      {
+        name: "",
+        sets: [{ weight: "", reps: "" }],
+        memo: "",
+        mediaFile: null,
+        existingMedia: null,
+      },
+    ]);
+    setPtBodyParts([]);
+    setPtCondition(null);
+    setPtWorkoutFeedback("");
     setEditingFitLogId(null);
     setShowFitLogForm(false);
   };
@@ -453,13 +1701,162 @@ useEffect(() => {
     setExercises(
       (log.exercises ?? []).map((ex: any) => ({
         name: ex.name ?? "",
+        memo: ex.memo ?? "",
+        mediaFile: null,
+        existingMedia: ex.media ?? null,
         sets: (ex.sets ?? []).map((s: any) => ({
           weight: s.weight != null ? String(s.weight) : "",
           reps: s.reps != null ? String(s.reps) : "",
         })),
       })),
     );
+    const rawPainPoints = log.painPoints ?? "";
+    setPtBodyParts(
+      rawPainPoints
+        ? rawPainPoints
+            .split(",")
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : [],
+    );
+    setPtCondition(log.conditionScore ?? null);
+    setPtWorkoutFeedback(log.feedback ?? "");
     setShowFitLogForm(true);
+  };
+
+  const uploadToCloudinary = async (
+    uri: string,
+    type: "image" | "video",
+  ): Promise<{ url: string; publicId: string; mediaType: string }> => {
+    const formData = new FormData();
+    const filename = uri.split("/").pop() ?? "upload";
+    const mimeType = type === "video" ? "video/mp4" : "image/jpeg";
+
+    formData.append("file", { uri, name: filename, type: mimeType } as any);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("folder", "fitlog");
+
+    const resourceType = type === "video" ? "video" : "image";
+    const res = await fetch(
+      CLOUDINARY_UPLOAD_URL.replace("/upload", `/${resourceType}/upload`),
+      { method: "POST", body: formData },
+    );
+
+    if (!res.ok) throw new Error("Cloudinary 업로드 실패");
+    const data = await res.json();
+    return {
+      url: data.secure_url,
+      publicId: data.public_id,
+      mediaType: type.toUpperCase(),
+    };
+  };
+
+  const handlePickMedia = async (exerciseIndex: number) => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("권한 필요", "사진/영상 접근 권한이 필요해요.");
+      return;
+    }
+
+    Alert.alert("사진/영상 추가", "어떤 방식으로 추가할까요?", [
+      {
+        text: "카메라로 촬영",
+        onPress: async () => {
+          const camStatus = await ImagePicker.requestCameraPermissionsAsync();
+          if (camStatus.status !== "granted") {
+            Alert.alert("권한 필요", "카메라 접근 권한이 필요해요.");
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            quality: 0.8,
+            videoMaxDuration: 120,
+          });
+          if (!result.canceled && result.assets.length > 0) {
+            const asset = result.assets[0];
+            const u = [...exercises];
+            u[exerciseIndex].mediaFile = {
+              uri: asset.uri,
+              type: asset.type === "video" ? "video" : "image",
+            };
+            setExercises(u);
+          }
+        },
+      },
+      {
+        text: "갤러리에서 선택",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            quality: 0.8,
+            videoMaxDuration: 120,
+          });
+          if (!result.canceled && result.assets.length > 0) {
+            const asset = result.assets[0];
+            const u = [...exercises];
+            u[exerciseIndex].mediaFile = {
+              uri: asset.uri,
+              type: (asset.type === "video" ? "video" : "image") as
+                | "image"
+                | "video",
+            };
+            setExercises(u);
+          }
+        },
+      },
+      { text: "취소", style: "cancel" },
+    ]);
+  };
+
+  const removeMedia = (exerciseIndex: number) => {
+    const u = [...exercises];
+    u[exerciseIndex].mediaFile = null;
+    setExercises(u);
+  };
+
+  const checkScheduleAndSave = async () => {
+    if (editingFitLogId) {
+      saveFitLog();
+      return;
+    }
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const dateKey = toDateKey(selectedDate);
+      const weekStart = toDateKey(
+        new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate() - ((selectedDate.getDay() + 6) % 7),
+        ),
+      );
+      const res = await fetch(
+        `${API_URL}/api/schedule/calendar?weekStart=${weekStart}`,
+        {
+          headers: { Authorization: `Bearer ${jwt}` },
+        },
+      );
+      if (res.ok) {
+        const slots: any[] = await res.json();
+        const hasSchedule = slots.some(
+          (s) =>
+            s.date === dateKey &&
+            s.status === "CONFIRMED" &&
+            s.memberId === memberId,
+        );
+        if (!hasSchedule) {
+          Alert.alert(
+            "스케줄 없음",
+            `${dateKey}에 이 회원의 확정된 수업이 없어요.\n그래도 등록할까요?`,
+            [
+              { text: "취소", style: "cancel" },
+              { text: "등록", onPress: saveFitLog },
+            ],
+          );
+          return;
+        }
+      }
+    } catch (_) {}
+    saveFitLog();
   };
 
   const saveFitLog = async () => {
@@ -470,6 +1867,37 @@ useEffect(() => {
     }
     setSavingFitLog(true);
     try {
+      // 운동별 Cloudinary 업로드
+      const exercisesWithMedia = await Promise.all(
+        valid.map(async (ex) => {
+          let mediaUrl:
+            | { url: string; publicId: string; mediaType: string }
+            | undefined;
+          if (ex.mediaFile) {
+            mediaUrl = await uploadToCloudinary(
+              ex.mediaFile.uri,
+              ex.mediaFile.type,
+            );
+          }
+          return {
+            name: ex.name,
+            memo: ex.memo?.trim() || undefined,
+            mediaUrl: mediaUrl ?? undefined,
+            keepMediaId:
+              editingFitLogId && ex.existingMedia
+                ? ex.existingMedia.id
+                : undefined,
+            sets: ex.sets
+              .filter((s) => s.weight || s.reps)
+              .map((s, i) => ({
+                setNumber: i + 1,
+                weight: parseFloat(s.weight) || 0,
+                reps: parseInt(s.reps) || 0,
+              })),
+          };
+        }),
+      );
+
       const jwt = await AsyncStorage.getItem("jwt");
       const url = editingFitLogId
         ? `${API_URL}/api/fitlog/${editingFitLogId}`
@@ -484,28 +1912,19 @@ useEffect(() => {
         body: JSON.stringify({
           memberId,
           date: toDateKey(selectedDate),
-          exercises: valid.map((ex) => ({
-            name: ex.name,
-            sets: ex.sets
-              .filter((s) => s.weight || s.reps)
-              .map((s, i) => ({
-                setNumber: i + 1,
-                weight: parseFloat(s.weight) || 0,
-                reps: parseInt(s.reps) || 0,
-              })),
-          })),
+          conditionScore: ptCondition ?? undefined,
+          painPoints:
+            ptBodyParts.length > 0 ? ptBodyParts.join(", ") : undefined,
+          feedback: ptWorkoutFeedback.trim() || undefined,
+          exercises: exercisesWithMedia,
         }),
       });
 
       if (!res.ok) {
         const message = await res.text();
-
         if (editingFitLogId && res.status === 404) {
-          throw new Error(
-            "운동 기록 수정 API를 찾지 못했어요. 백엔드 FitLogController에 PUT /api/fitlog/{id}가 있는지 확인해주세요.",
-          );
+          throw new Error("운동 기록 수정 API를 찾지 못했어요.");
         }
-
         throw new Error(message || "PT 기록 저장 실패");
       }
       Alert.alert(
@@ -655,6 +2074,8 @@ useEffect(() => {
             return type === "PERSONAL" || type === "PERSONAL_WORKOUT";
           });
 
+          const dayHasDiet = weekDietDates.has(key);
+
           return (
             <TouchableOpacity
               key={i}
@@ -730,6 +2151,16 @@ useEffect(() => {
                     }}
                   />
                 ) : null}
+                {dayHasDiet ? (
+                  <View
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 3,
+                      backgroundColor: "#F59E0B",
+                    }}
+                  />
+                ) : null}
               </View>
             </TouchableOpacity>
           );
@@ -776,6 +2207,21 @@ useEffect(() => {
             style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600" }}
           >
             개인운동
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: "#F59E0B",
+            }}
+          />
+          <Text
+            style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600" }}
+          >
+            식단
           </Text>
         </View>
       </View>
@@ -833,7 +2279,9 @@ useEffect(() => {
         x,
         y: chartH - ((value - minV) / range) * (chartH - 20) - 10,
         val: value,
-        date: String(log.date ?? "").slice(0, 10).slice(5),
+        date: String(log.date ?? "")
+          .slice(0, 10)
+          .slice(5),
       };
     });
 
@@ -976,7 +2424,6 @@ useEffect(() => {
     );
   };
 
-
   const renderFitLogCard = (
     log: any,
     color: string,
@@ -984,7 +2431,20 @@ useEffect(() => {
     onEdit?: () => void,
   ) => {
     const exercises = log.exercises ?? [];
-    const logDate = String(log.date ?? log.logDate ?? log.log_date ?? "").slice(0, 10);
+    const logDate = String(log.date ?? log.logDate ?? log.log_date ?? "").slice(
+      0,
+      10,
+    );
+    const conditionLabel =
+      log.conditionScore === 4
+        ? "최상"
+        : log.conditionScore === 3
+          ? "좋음"
+          : log.conditionScore === 2
+            ? "보통"
+            : log.conditionScore === 1
+              ? "나쁨"
+              : null;
 
     return (
       <View
@@ -1003,14 +2463,18 @@ useEffect(() => {
             flexDirection: "row",
             alignItems: "flex-start",
             justifyContent: "space-between",
-            marginBottom: 14,
+            marginBottom: conditionLabel || log.painPoints ? 8 : 14,
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}>
+            <Text
+              style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}
+            >
               {title}
             </Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}>
+            <Text
+              style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}
+            >
               {logDate} · {exercises.length}개 운동
             </Text>
           </View>
@@ -1034,6 +2498,63 @@ useEffect(() => {
           )}
         </View>
 
+        {/* 부위 + 컨디션 */}
+        {(log.painPoints || conditionLabel) && (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 6,
+              marginBottom: 12,
+            }}
+          >
+            {log.painPoints &&
+              log.painPoints
+                .split(",")
+                .map((p: string) => p.trim())
+                .filter(Boolean)
+                .map((part: string) => (
+                  <View
+                    key={part}
+                    style={{
+                      backgroundColor: color + "18",
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderWidth: 1,
+                      borderColor: color + "44",
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "700", color }}>
+                      {part}
+                    </Text>
+                  </View>
+                ))}
+            {conditionLabel && (
+              <View
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 20,
+                  paddingHorizontal: 10,
+                  paddingVertical: 3,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                  }}
+                >
+                  컨디션 {conditionLabel}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {exercises.map((exercise: any, exIdx: number) => {
           const sets = exercise.sets ?? [];
 
@@ -1055,7 +2576,13 @@ useEffect(() => {
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "900",
+                    color: Colors.text,
+                  }}
+                >
                   {exercise.name}
                 </Text>
                 <Text style={{ fontSize: 12, fontWeight: "900", color }}>
@@ -1098,7 +2625,11 @@ useEffect(() => {
                     </Text>
                     <Text
                       numberOfLines={1}
-                      style={{ fontSize: 12, fontWeight: "800", color: Colors.text }}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "800",
+                        color: Colors.text,
+                      }}
                     >
                       {set.weight ? `${set.weight}kg × ` : ""}
                       {set.reps}회
@@ -1106,9 +2637,90 @@ useEffect(() => {
                   </View>
                 ))}
               </View>
+              {exercise.memo ? (
+                <View
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: Colors.textSub,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    메모: {exercise.memo}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           );
         })}
+
+        {log.feedback ? (
+          <View
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: Colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: Colors.textSub,
+                marginBottom: 4,
+              }}
+            >
+              피드백
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>
+              {log.feedback}
+            </Text>
+          </View>
+        ) : null}
+
+        {(log.mediaList ?? []).length > 0 && (
+          <View
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: Colors.border,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                setMediaGallery(log.mediaList ?? []);
+                setMediaGalleryIndex(0);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                paddingVertical: 10,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: color + "44",
+                backgroundColor: color + "0d",
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color }}>
+                사진 / 영상 보기
+              </Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                ({(log.mediaList ?? []).length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -1207,24 +2819,6 @@ useEffect(() => {
                 </View>
               )}
             </View>
-            <View style={{ flexDirection: "row", gap: 6 }}>
-              <TouchableOpacity
-                onPress={() => setShowPTEdit(true)}
-                style={{
-                  backgroundColor: Colors.green,
-                  borderRadius: 8,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  justifyContent: "center",
-                }}
-              >
-                <Text
-                  style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}
-                >
-                  + 추가
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
           {member.ptTotal > 0 && (
             <>
@@ -1259,40 +2853,6 @@ useEffect(() => {
             </>
           )}
         </View>
-
-        {/* 목표 칼로리/탄단지 카드 */}
-        {goalKcal > 0 && (
-          <View
-            style={{
-              backgroundColor: Colors.bgSub,
-              borderRadius: 14,
-              padding: 14,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: Colors.border,
-            }}
-          >
-            <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 8, fontWeight: "600" }}>
-              목표 영양소 (유지)
-            </Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              {[
-                { label: "칼로리", value: `${Math.round(goalKcal)}`, unit: "kcal" },
-                { label: "탄수화물", value: `${Math.round(goalCarbs)}`, unit: "g" },
-                { label: "단백질", value: `${Math.round(goalProtein)}`, unit: "g" },
-                { label: "지방", value: `${Math.round(goalFat)}`, unit: "g" },
-              ].map(({ label, value, unit }) => (
-                <View key={label} style={{ alignItems: "center" }}>
-                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 2 }}>{label}</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>
-                    {value}
-                    <Text style={{ fontSize: 10, fontWeight: "400", color: Colors.textMuted }}>{unit}</Text>
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
 
         {/* 탭 */}
         <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
@@ -1421,11 +2981,10 @@ useEffect(() => {
               <View
                 style={{
                   flexDirection: "row",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
+                  justifyContent: "flex-end",
+                  marginBottom: 4,
                 }}
               >
-                <Text style={{ fontSize: 11, color: Colors.textMuted }}>0</Text>
                 <Text
                   style={{
                     fontSize: 11,
@@ -1447,57 +3006,47 @@ useEffect(() => {
                 }}
               >
                 {[
-                  {
-                    label: "탄수화물",
-                    val: dietData?.totalCarbs ?? 0,
-                    goal: goalCarbs,
-                  },
-                  {
-                    label: "단백질",
-                    val: dietData?.totalProtein ?? 0,
-                    goal: goalProtein,
-                  },
-                  {
-                    label: "지방",
-                    val: dietData?.totalFat ?? 0,
-                    goal: goalFat,
-                  },
+                  { label: "탄수화물", val: dietData?.totalCarbs ?? 0, goal: goalCarbs },
+                  { label: "단백질", val: dietData?.totalProtein ?? 0, goal: goalProtein },
+                  { label: "지방", val: dietData?.totalFat ?? 0, goal: goalFat },
                 ].map(({ label, val, goal }) => {
-                  const isOverGoal = goal > 0 && val > goal;
-                  const valueColor = isOverGoal ? Colors.red : Colors.text;
-
+                  const hasGoal = goal > 0;
+                  const diff = hasGoal ? Math.round(val - goal) : null;
+                  const isOver = diff !== null && diff > 0;
                   return (
-                    <View key={label} style={{ alignItems: "center" }}>
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          fontWeight: "800",
-                          color: valueColor,
-                        }}
-                      >
-                        {Math.round(val)}
-                        <Text style={{ fontSize: 11, color: valueColor }}>
-                          g
-                        </Text>
-                      </Text>
+                    <View key={label} style={{ alignItems: "center", gap: 1 }}>
+                      {/* 차이값 */}
                       <Text
                         style={{
                           fontSize: 11,
-                          color: Colors.textMuted,
-                          marginTop: 2,
+                          fontWeight: "700",
+                          color: isOver ? Colors.red : Colors.green,
+                          minHeight: 14,
+                          lineHeight: 14,
                         }}
                       >
-                        {label}
+                        {diff !== null ? (isOver ? `+${diff}g` : `${diff}g`) : ""}
                       </Text>
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: isOverGoal
-                            ? Colors.red
-                            : Colors.textPlaceholder,
-                        }}
-                      >
-                        / {goal}g
+                      {/* 실제g / 목표g */}
+                      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            fontWeight: "800",
+                            color: isOver ? Colors.red : Colors.text,
+                          }}
+                        >
+                          {Math.round(val)}g
+                        </Text>
+                        {hasGoal && (
+                          <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                            /{Math.round(goal)}g
+                          </Text>
+                        )}
+                      </View>
+                      {/* 레이블 */}
+                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                        {label}
                       </Text>
                     </View>
                   );
@@ -1604,7 +3153,14 @@ useEffect(() => {
             {/* 이전 피드백 - 간식 바로 아래 */}
             {selectedDateFeedbacks.length > 0 && (
               <View style={{ marginTop: 8, marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                    marginBottom: 8,
+                  }}
+                >
                   이전 피드백
                 </Text>
                 {selectedDateFeedbacks.map((fb) => (
@@ -1619,8 +3175,24 @@ useEffect(() => {
                       borderLeftColor: Colors.green,
                     }}
                   >
-                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 4 }}>{fb.targetDate}</Text>
-                    <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>{fb.comment}</Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: Colors.textMuted,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {fb.targetDate}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: Colors.text,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {fb.comment}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -1637,7 +3209,14 @@ useEffect(() => {
                 marginTop: 8,
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.green, marginBottom: 10 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "700",
+                  color: Colors.green,
+                  marginBottom: 10,
+                }}
+              >
                 💬 {member.user.name}님께 피드백
               </Text>
               <TextInput
@@ -1664,14 +3243,22 @@ useEffect(() => {
                 onPress={sendFeedback}
                 disabled={sendingFeedback || !feedbackText.trim()}
                 style={{
-                  backgroundColor: feedbackText.trim() ? Colors.green : Colors.border,
+                  backgroundColor: feedbackText.trim()
+                    ? Colors.green
+                    : Colors.border,
                   borderRadius: 10,
                   padding: 12,
                   alignItems: "center",
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: "700", color: feedbackText.trim() ? "#fff" : Colors.textMuted }}>
-                  {sendingFeedback ? "전송 중..." : "📤 전송 + 알림"}
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: feedbackText.trim() ? "#fff" : Colors.textMuted,
+                  }}
+                >
+                  {sendingFeedback ? "전송 중..." : "전송 + 알림"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1692,15 +3279,50 @@ useEffect(() => {
                 marginBottom: 12,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "700",
-                  color: Colors.textSub,
-                }}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
-                {selectedDateKey} 기록
-              </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                  }}
+                >
+                  {selectedDateKey} 기록
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (trainerPlan !== "PRO") {
+                      Alert.alert(
+                        "PRO 전용 기능",
+                        "PRO 멤버십이 필요한 기능이에요.",
+                      );
+                      return;
+                    }
+                    await fetchFitLogHistory();
+                    setShowHistoryModal(true);
+                  }}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: Colors.green + "55",
+                    borderRadius: 8,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    backgroundColor: Colors.green + "11",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: Colors.green,
+                      fontWeight: "700",
+                    }}
+                  >
+                    전체 운동 기록
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {isToday && dayPtLogs.length === 0 && (
                 <TouchableOpacity
                   onPress={() => {
@@ -1712,7 +3334,9 @@ useEffect(() => {
                     }
                   }}
                   style={{
-                    backgroundColor: showFitLogForm ? Colors.border : Colors.green,
+                    backgroundColor: showFitLogForm
+                      ? Colors.border
+                      : Colors.green,
                     borderRadius: 10,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
@@ -1746,15 +3370,155 @@ useEffect(() => {
                   }}
                 >
                   {/* 헤더 */}
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <View style={{ width: 4, height: 18, backgroundColor: Colors.green, borderRadius: 2 }} />
-                      <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.text }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 4,
+                          height: 18,
+                          backgroundColor: Colors.green,
+                          borderRadius: 2,
+                        }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "800",
+                          color: Colors.text,
+                        }}
+                      >
                         {editingFitLogId ? "PT 수업 수정" : "PT 수업 등록"}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 12, color: Colors.textMuted }}>{toDateKey(selectedDate)}</Text>
+                    <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                      {toDateKey(selectedDate)}
+                    </Text>
                   </View>
+                  {/* 부위 선택 */}
+                  <View style={{ marginBottom: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: Colors.textSub,
+                        marginBottom: 6,
+                      }}
+                    >
+                      부위 (복수 선택)
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+                    >
+                      {["가슴", "등", "어깨", "팔", "하체", "코어", "전신"].map(
+                        (part) => {
+                          const selected = ptBodyParts.includes(part);
+                          return (
+                            <TouchableOpacity
+                              key={part}
+                              onPress={() =>
+                                setPtBodyParts((prev) =>
+                                  selected
+                                    ? prev.filter((p) => p !== part)
+                                    : [...prev, part],
+                                )
+                              }
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 5,
+                                borderRadius: 20,
+                                backgroundColor: selected
+                                  ? Colors.green
+                                  : Colors.bgSub,
+                                borderWidth: 1,
+                                borderColor: selected
+                                  ? Colors.green
+                                  : Colors.border,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                  color: selected ? "#fff" : Colors.textSub,
+                                }}
+                              >
+                                {part}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        },
+                      )}
+                    </View>
+                  </View>
+
+                  {/* 컨디션 선택 */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: Colors.textSub,
+                        marginBottom: 6,
+                      }}
+                    >
+                      컨디션
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {[
+                        { label: "최상", score: 4 },
+                        { label: "좋음", score: 3 },
+                        { label: "보통", score: 2 },
+                        { label: "나쁨", score: 1 },
+                      ].map(({ label, score }) => {
+                        const selected = ptCondition === score;
+                        return (
+                          <TouchableOpacity
+                            key={score}
+                            onPress={() =>
+                              setPtCondition(selected ? null : score)
+                            }
+                            style={{
+                              flex: 1,
+                              paddingVertical: 6,
+                              borderRadius: 20,
+                              alignItems: "center",
+                              backgroundColor: selected
+                                ? Colors.green
+                                : Colors.bgSub,
+                              borderWidth: 1,
+                              borderColor: selected
+                                ? Colors.green
+                                : Colors.border,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: selected ? "#fff" : Colors.textSub,
+                              }}
+                            >
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
                   {exercises.map((ex, ei) => (
                     <View
                       key={ei}
@@ -1785,10 +3549,16 @@ useEffect(() => {
                               setExercises(u);
                               const suggestions = getExerciseNameSuggestions(v);
                               setExerciseSuggest(
-                                suggestions.length > 0 ? { ei, names: suggestions } : null,
+                                suggestions.length > 0
+                                  ? { ei, names: suggestions }
+                                  : null,
                               );
                             }}
-                            onBlur={() => setTimeout(() => setExerciseSuggest(null), 150)}
+                            onBlur={() =>
+                              setTimeout(() => setExerciseSuggest(null), 150)
+                            }
+                            onSubmitEditing={() => setExerciseSuggest(null)}
+                            returnKeyType="done"
                             placeholder="운동명"
                             placeholderTextColor={Colors.textPlaceholder}
                             style={{
@@ -1822,7 +3592,11 @@ useEffect(() => {
                               borderColor: Colors.border,
                             }}
                           >
-                            <Text style={{ fontSize: 16, color: Colors.textMuted }}>✕</Text>
+                            <Text
+                              style={{ fontSize: 16, color: Colors.textMuted }}
+                            >
+                              ✕
+                            </Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -1853,7 +3627,9 @@ useEffect(() => {
                                   paddingHorizontal: 12,
                                   paddingVertical: 8,
                                   borderBottomWidth:
-                                    ni < exerciseSuggest.names.length - 1 ? 1 : 0,
+                                    ni < exerciseSuggest.names.length - 1
+                                      ? 1
+                                      : 0,
                                   borderBottomColor: Colors.border,
                                 }}
                               >
@@ -1892,7 +3668,13 @@ useEffect(() => {
                                 alignItems: "center",
                               }}
                             >
-                              <Text style={{ fontSize: 11, fontWeight: "900", color: "#fff" }}>
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: "900",
+                                  color: "#fff",
+                                }}
+                              >
                                 {si + 1}
                               </Text>
                             </View>
@@ -1920,9 +3702,22 @@ useEffect(() => {
                                 placeholder="0"
                                 placeholderTextColor={Colors.textPlaceholder}
                                 keyboardType="decimal-pad"
-                                style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
+                                style={{
+                                  flex: 1,
+                                  height: 30,
+                                  fontSize: 12,
+                                  color: Colors.text,
+                                  paddingVertical: 0,
+                                }}
                               />
-                              <Text style={{ fontSize: 10, color: Colors.textMuted }}>kg</Text>
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  color: Colors.textMuted,
+                                }}
+                              >
+                                kg
+                              </Text>
                             </View>
 
                             <View
@@ -1948,16 +3743,31 @@ useEffect(() => {
                                 placeholder="0"
                                 placeholderTextColor={Colors.textPlaceholder}
                                 keyboardType="number-pad"
-                                style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
+                                style={{
+                                  flex: 1,
+                                  height: 30,
+                                  fontSize: 12,
+                                  color: Colors.text,
+                                  paddingVertical: 0,
+                                }}
                               />
-                              <Text style={{ fontSize: 10, color: Colors.textMuted }}>회</Text>
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  color: Colors.textMuted,
+                                }}
+                              >
+                                회
+                              </Text>
                             </View>
 
                             {ex.sets.length > 1 ? (
                               <TouchableOpacity
                                 onPress={() => {
                                   const u = [...exercises];
-                                  u[ei].sets = u[ei].sets.filter((_, i) => i !== si);
+                                  u[ei].sets = u[ei].sets.filter(
+                                    (_, i) => i !== si,
+                                  );
                                   setExercises(u);
                                 }}
                                 style={{
@@ -1968,7 +3778,14 @@ useEffect(() => {
                                   alignItems: "center",
                                 }}
                               >
-                                <Text style={{ fontSize: 14, color: Colors.textMuted }}>✕</Text>
+                                <Text
+                                  style={{
+                                    fontSize: 14,
+                                    color: Colors.textMuted,
+                                  }}
+                                >
+                                  ✕
+                                </Text>
                               </TouchableOpacity>
                             ) : (
                               <View style={{ width: 24 }} />
@@ -1990,7 +3807,14 @@ useEffect(() => {
                                   alignItems: "center",
                                 }}
                               >
-                                <Text style={{ fontSize: 16, color: "#fff", fontWeight: "900", marginTop: -1 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 16,
+                                    color: "#fff",
+                                    fontWeight: "900",
+                                    marginTop: -1,
+                                  }}
+                                >
                                   +
                                 </Text>
                               </TouchableOpacity>
@@ -2000,6 +3824,177 @@ useEffect(() => {
                           </View>
                         ))}
                       </View>
+
+                      {/* 운동별 메모 */}
+                      <TextInput
+                        value={ex.memo}
+                        onChangeText={(v) => {
+                          const u = [...exercises];
+                          u[ei].memo = v;
+                          setExercises(u);
+                        }}
+                        placeholder="운동 메모 (선택)"
+                        placeholderTextColor={Colors.textPlaceholder}
+                        style={{
+                          backgroundColor: Colors.bgSub,
+                          borderWidth: 1,
+                          borderColor: Colors.border,
+                          borderRadius: 8,
+                          paddingHorizontal: 9,
+                          paddingVertical: 6,
+                          fontSize: 12,
+                          color: Colors.text,
+                          marginTop: 6,
+                        }}
+                      />
+
+                      {/* 운동별 미디어 (PRO) */}
+                      {trainerPlan !== "FREE" && (
+                        <View style={{ marginTop: 8 }}>
+                          {ex.existingMedia && !ex.mediaFile && (
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 8,
+                                marginBottom: 6,
+                              }}
+                            >
+                              <TouchableOpacity
+                                onPress={() =>
+                                  setSelectedMedia(ex.existingMedia as any)
+                                }
+                              >
+                                <Image
+                                  source={{
+                                    uri:
+                                      ex.existingMedia.mediaType === "VIDEO"
+                                        ? ex.existingMedia.url.replace(
+                                            /\.(mp4|mov|avi|webm)(\?.*)?$/i,
+                                            ".jpg",
+                                          )
+                                        : ex.existingMedia.url,
+                                  }}
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 8,
+                                    backgroundColor: Colors.bgSub,
+                                  }}
+                                  resizeMode="cover"
+                                />
+                                {ex.existingMedia.mediaType === "VIDEO" && (
+                                  <View
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      justifyContent: "center",
+                                      alignItems: "center",
+                                      backgroundColor: "rgba(0,0,0,0.3)",
+                                      borderRadius: 8,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{ color: "#fff", fontSize: 16 }}
+                                    >
+                                      ▶
+                                    </Text>
+                                  </View>
+                                )}
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const u = [...exercises];
+                                  u[ei].existingMedia = null;
+                                  setExercises(u);
+                                }}
+                                style={{ padding: 4 }}
+                              >
+                                <Text
+                                  style={{ fontSize: 12, color: Colors.red }}
+                                >
+                                  삭제
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                          {ex.mediaFile && (
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 8,
+                                marginBottom: 6,
+                              }}
+                            >
+                              {ex.mediaFile.type === "image" ? (
+                                <Image
+                                  source={{ uri: ex.mediaFile.uri }}
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 8,
+                                  }}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View
+                                  style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 8,
+                                    backgroundColor: "#1a1a2e",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 20 }}>🎬</Text>
+                                </View>
+                              )}
+                              <TouchableOpacity
+                                onPress={() => removeMedia(ei)}
+                                style={{ padding: 4 }}
+                              >
+                                <Text
+                                  style={{ fontSize: 12, color: Colors.red }}
+                                >
+                                  삭제
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                          {!ex.mediaFile && !ex.existingMedia && (
+                            <TouchableOpacity
+                              onPress={() => handlePickMedia(ei)}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 5,
+                                paddingVertical: 7,
+                                paddingHorizontal: 10,
+                                borderWidth: 1,
+                                borderStyle: "dashed",
+                                borderColor: Colors.green + "66",
+                                borderRadius: 8,
+                                backgroundColor: Colors.greenLight,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: "700",
+                                }}
+                              >
+                                + 사진/영상
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
 
                       {(() => {
                         const latest = getLatestSameExercise(ex.name);
@@ -2026,7 +4021,13 @@ useEffect(() => {
                             >
                               이전 기록 {latest.date} · 누르면 입력
                             </Text>
-                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                flexWrap: "wrap",
+                                gap: 6,
+                              }}
+                            >
                               {latest.exercise.sets?.map(
                                 (prevSet: any, prevIdx: number) => (
                                   <TouchableOpacity
@@ -2034,11 +4035,15 @@ useEffect(() => {
                                     onPress={() => {
                                       const u = [...exercises];
                                       while (u[ei].sets.length <= prevIdx) {
-                                        u[ei].sets.push({ weight: "", reps: "" });
+                                        u[ei].sets.push({
+                                          weight: "",
+                                          reps: "",
+                                        });
                                       }
-                                      u[ei].sets[prevIdx].weight = prevSet.weight
-                                        ? String(prevSet.weight)
-                                        : "";
+                                      u[ei].sets[prevIdx].weight =
+                                        prevSet.weight
+                                          ? String(prevSet.weight)
+                                          : "";
                                       u[ei].sets[prevIdx].reps = prevSet.reps
                                         ? String(prevSet.reps)
                                         : "";
@@ -2072,7 +4077,9 @@ useEffect(() => {
                                       }}
                                     >
                                       {"  "}
-                                      {prevSet.weight ? `${prevSet.weight}kg × ` : ""}
+                                      {prevSet.weight
+                                        ? `${prevSet.weight}kg × `
+                                        : ""}
                                       {prevSet.reps}회
                                     </Text>
                                   </TouchableOpacity>
@@ -2089,7 +4096,13 @@ useEffect(() => {
                     onPress={() =>
                       setExercises([
                         ...exercises,
-                        { name: "", sets: [{ weight: "", reps: "" }] },
+                        {
+                          name: "",
+                          sets: [{ weight: "", reps: "" }],
+                          memo: "",
+                          mediaFile: null,
+                          existingMedia: null,
+                        },
                       ])
                     }
                     style={{
@@ -2113,8 +4126,41 @@ useEffect(() => {
                       + 운동 추가
                     </Text>
                   </TouchableOpacity>
+                  {/* 운동 피드백 */}
+                  <View style={{ marginBottom: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: Colors.textSub,
+                        marginBottom: 6,
+                      }}
+                    >
+                      오늘 수업 피드백 (선택)
+                    </Text>
+                    <TextInput
+                      value={ptWorkoutFeedback}
+                      onChangeText={setPtWorkoutFeedback}
+                      placeholder="오늘 수업에 대한 피드백을 입력하세요..."
+                      placeholderTextColor={Colors.textPlaceholder}
+                      multiline
+                      numberOfLines={3}
+                      style={{
+                        backgroundColor: "#fff",
+                        borderWidth: 1,
+                        borderColor: Colors.border,
+                        borderRadius: 10,
+                        padding: 10,
+                        fontSize: 13,
+                        color: Colors.text,
+                        textAlignVertical: "top",
+                        minHeight: 70,
+                      }}
+                    />
+                  </View>
+
                   <TouchableOpacity
-                    onPress={saveFitLog}
+                    onPress={checkScheduleAndSave}
                     disabled={savingFitLog}
                     style={{
                       backgroundColor: Colors.green,
@@ -2194,12 +4240,9 @@ useEffect(() => {
                     </View>
 
                     {dayPtLogs.map((log: any) =>
-                      renderFitLogCard(
-                        log,
-                        Colors.green,
-                        "PT 수업 완료",
-                        () => startEditFitLog(log),
-                      )
+                      renderFitLogCard(log, Colors.green, "PT 수업 완료", () =>
+                        startEditFitLog(log),
+                      ),
                     )}
                   </View>
                 )}
@@ -2240,7 +4283,7 @@ useEffect(() => {
                         "#4A90FF",
                         "개인 운동 완료",
                         undefined,
-                      )
+                      ),
                     )}
                   </View>
                 )}
@@ -2263,7 +4306,6 @@ useEffect(() => {
           <View>
             {bodyLogs.length === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <Text style={{ fontSize: 36, marginBottom: 12 }}>📊</Text>
                 <Text style={{ fontSize: 14, color: Colors.textMuted }}>
                   등록된 바디로그가 없어요
                 </Text>
@@ -2376,12 +4418,14 @@ useEffect(() => {
                         ].map(({ label, key, val, unit, color }) => {
                           const prev = bodyLogs
                             .slice()
-                            .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-                            [i + 1];
+                            .sort((a, b) =>
+                              String(b.date).localeCompare(String(a.date)),
+                            )[i + 1];
 
                           const prevVal = prev?.[key as keyof BodyLog];
                           const diff =
-                            typeof val === "number" && typeof prevVal === "number"
+                            typeof val === "number" &&
+                            typeof prevVal === "number"
                               ? Number((val - prevVal).toFixed(1))
                               : null;
 
@@ -2452,13 +4496,86 @@ useEffect(() => {
         )}
       </KeyboardAwareScrollView>
 
+      {/* 운동 기록 전체보기 모달 */}
+      <Modal
+        visible={showHistoryModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHistoryModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}>
+          <View
+            style={{
+              flex: 1,
+              marginTop: 60,
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+          >
+            {/* 헤더 */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                paddingBottom: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Text
+                style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}
+              >
+                {member?.user?.name}님 운동 기록
+              </Text>
+              <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
+                <Text style={{ fontSize: 22, color: Colors.textMuted }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {allFitLogs.length === 0 ? (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 36, marginBottom: 12 }}>📋</Text>
+                <Text style={{ fontSize: 15, color: Colors.textMuted }}>
+                  등록된 운동 기록이 없어요
+                </Text>
+              </View>
+            ) : (
+              <HistoryTable
+                logs={allFitLogs}
+                trainerPlan={trainerPlan}
+                onViewMedia={(mediaList) => {
+                  setShowHistoryModal(false);
+                  setMediaGallery(mediaList);
+                  setMediaGalleryIndex(0);
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* PT 수정 모달 */}
       <Modal
         visible={showPTEdit}
         transparent
         animationType="slide"
         onRequestClose={() => {
-          setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+          setPtForm({
+            sessions: "0",
+            startDate: todayStr,
+            endDate: "",
+            memo: "",
+          });
           setShowPTEdit(false);
         }}
       >
@@ -2470,7 +4587,12 @@ useEffect(() => {
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
             activeOpacity={1}
             onPress={() => {
-              setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+              setPtForm({
+                sessions: "0",
+                startDate: todayStr,
+                endDate: "",
+                memo: "",
+              });
               setShowPTEdit(false);
             }}
           />
@@ -2739,7 +4861,12 @@ useEffect(() => {
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
                 onPress={() => {
-                  setPtForm({ sessions: "0", startDate: todayStr, endDate: "", memo: "" });
+                  setPtForm({
+                    sessions: "0",
+                    startDate: todayStr,
+                    endDate: "",
+                    memo: "",
+                  });
                   setShowPTEdit(false);
                 }}
                 style={{
@@ -2774,6 +4901,320 @@ useEffect(() => {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* 미디어 풀스크린 뷰어 */}
+      {/* 갤러리 뷰어 모달 */}
+      <Modal
+        visible={mediaGallery.length > 0}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMediaGallery([])}
+      >
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          <View
+            style={{
+              position: "absolute",
+              top: 52,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 20,
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: "700",
+                opacity: 0.8,
+              }}
+            >
+              {mediaGalleryIndex + 1} / {mediaGallery.length}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setMediaGallery([])}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / FULL_W);
+              setMediaGalleryIndex(idx);
+            }}
+            style={{ flex: 1 }}
+          >
+            {mediaGallery.map((media, idx) => (
+              <View
+                key={idx}
+                style={{
+                  width: FULL_W,
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                {media.mediaType === "IMAGE" ? (
+                  <ScrollView
+                    style={{ width: FULL_W, height: FULL_H }}
+                    contentContainerStyle={{
+                      flex: 1,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                    maximumZoomScale={4}
+                    minimumZoomScale={1}
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                    centerContent
+                  >
+                    <Image
+                      source={{ uri: media.url }}
+                      style={{ width: FULL_W, height: FULL_H }}
+                      resizeMode="contain"
+                    />
+                  </ScrollView>
+                ) : (
+                  <Video
+                    source={{ uri: media.url }}
+                    style={{ width: FULL_W, height: FULL_H * 0.7 }}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    shouldPlay={idx === mediaGalleryIndex}
+                  />
+                )}
+              </View>
+            ))}
+          </ScrollView>
+
+          {mediaGallery.length > 1 && (
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 6,
+                paddingVertical: 12,
+              }}
+            >
+              {mediaGallery.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor:
+                      i === mediaGalleryIndex
+                        ? "#fff"
+                        : "rgba(255,255,255,0.3)",
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* 업그레이드 바텀시트 */}
+      <Modal
+        visible={paymentVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end",
+          }}
+          activeOpacity={1}
+          onPress={() => setPaymentVisible(false)}
+        >
+          <GestureDetector
+            gesture={Gesture.Pan().onEnd((e) => {
+              if (e.translationY > 80) setPaymentVisible(false);
+            })}
+          >
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+              }}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  backgroundColor: Colors.border,
+                  borderRadius: 99,
+                  alignSelf: "center",
+                  marginBottom: 20,
+                }}
+              />
+
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 4,
+                }}
+              >
+                PRO 플랜으로 업그레이드
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
+                더 많은 회원을 관리하고 모든 기능을 사용해보세요.
+              </Text>
+
+              <View
+                style={{
+                  borderRadius: 16,
+                  padding: 20,
+                  borderWidth: 1.5,
+                  borderColor: Colors.green + "55",
+                  backgroundColor: Colors.greenLight,
+                  marginBottom: 20,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
+                    PRO
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-end",
+                      gap: 2,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 26,
+                        fontWeight: "900",
+                        color: Colors.green,
+                      }}
+                    >
+                      7,900
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.green,
+                        marginBottom: 3,
+                      }}
+                    >
+                      원/월
+                    </Text>
+                  </View>
+                </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textSub,
+                    lineHeight: 22,
+                  }}
+                >
+                  ✓ 회원 무제한{"\n"}✓ 사진/영상 첨부{"\n"}✓ 운동 기록 전체 조회
+                  {"\n"}✓ 데이터 분석{"\n"}✓ 알림 기능
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    if (
+                      !Purchases ||
+                      typeof Purchases.getOfferings !== "function"
+                    ) {
+                      Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                      return;
+                    }
+                    const offerings = await Purchases.getOfferings();
+                    const pkg =
+                      offerings.current?.availablePackages.find(
+                        (p: any) => p.identifier === "pro_monthly",
+                      ) ?? offerings.current?.availablePackages[0];
+                    if (!pkg) {
+                      Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                      return;
+                    }
+                    await Purchases.purchasePackage(pkg);
+                    setTrainerPlan("PRO");
+                    setPaymentVisible(false);
+                    Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                  } catch (e: any) {
+                    if (!e.userCancelled)
+                      Alert.alert(
+                        "결제 실패",
+                        e.message ?? "다시 시도해주세요.",
+                      );
+                  }
+                }}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}
+                >
+                  시작하기
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setPaymentVisible(false)}>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 14,
+                    color: Colors.textMuted,
+                  }}
+                >
+                  나중에 할게요
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

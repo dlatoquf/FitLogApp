@@ -12,6 +12,8 @@ import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.auth.repository.UserRepository;
+import com.fitlog.fitlog.schedule.service.ScheduleService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +28,22 @@ public class ProfileService {
     private final MemberRepository memberRepository;
     private final MemberGoalRepository memberGoalRepository;
     private final JwtService jwtService;
+    private final ScheduleService scheduleService;
 
     public ProfileService(
             UserRepository userRepository,
             TrainerRepository trainerRepository,
             MemberRepository memberRepository,
             MemberGoalRepository memberGoalRepository,
-            JwtService jwtService
+            JwtService jwtService,
+            @Lazy ScheduleService scheduleService
     ) {
         this.userRepository = userRepository;
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
         this.memberGoalRepository = memberGoalRepository;
         this.jwtService = jwtService;
+        this.scheduleService = scheduleService;
     }
 
     // ── 트레이너 프로필 설정 ─────────────────────────────────────────────
@@ -49,6 +54,7 @@ public class ProfileService {
         user.setRole(User.Role.TRAINER);
         userRepository.save(user);
 
+        boolean isNew = !trainerRepository.findByUser(user).isPresent();
         Trainer trainer = trainerRepository.findByUser(user).orElse(new Trainer());
         trainer.setUser(user);
         trainer.setGymName(req.getGymName());
@@ -61,7 +67,12 @@ public class ProfileService {
             trainer.setTrainerCode(UUID.randomUUID().toString().substring(0, 6).toUpperCase());
         }
 
-        trainerRepository.save(trainer);
+        Trainer saved = trainerRepository.save(trainer);
+
+        // 최초 가입 시 이번주 슬롯 자동 생성
+        if (isNew) {
+            scheduleService.generateCurrentWeekSlotsIfAbsent(saved);
+        }
     }
 
     // 트레이너 조회

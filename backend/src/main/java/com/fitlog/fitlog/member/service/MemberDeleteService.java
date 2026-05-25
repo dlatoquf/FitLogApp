@@ -3,19 +3,17 @@ package com.fitlog.fitlog.member.service;
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
-import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
-import com.fitlog.fitlog.diet.repository.DietFeedbackRepository;
-import com.fitlog.fitlog.diet.repository.DietLogRepository;
 import com.fitlog.fitlog.member.entity.Member;
-import com.fitlog.fitlog.member.repository.MemberGoalRepository;
 import com.fitlog.fitlog.member.repository.MemberRepository;
-import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
+import com.fitlog.fitlog.schedule.dto.ScheduleRequest;
+import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.schedule.repository.ScheduleRequestRepository;
-import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 public class MemberDeleteService {
@@ -23,42 +21,25 @@ public class MemberDeleteService {
     private final JwtService jwtService;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
-    private final BodyLogRepository bodyLogRepository;
-    private final DietLogRepository dietLogRepository;
-    private final DietFeedbackRepository dietFeedbackRepository;
-    private final WorkoutLogRepository workoutLogRepository;
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final ScheduleRepository scheduleRepository;
-    private final MemberGoalRepository memberGoalRepository;
-    private final PtContractRepository ptContractRepository;
     private final NotificationRepository notificationRepository;
 
     public MemberDeleteService(JwtService jwtService,
                                MemberRepository memberRepository,
                                UserRepository userRepository,
-                               BodyLogRepository bodyLogRepository,
-                               DietLogRepository dietLogRepository,
-                               DietFeedbackRepository dietFeedbackRepository,
-                               WorkoutLogRepository workoutLogRepository,
                                ScheduleRequestRepository scheduleRequestRepository,
                                ScheduleRepository scheduleRepository,
-                               MemberGoalRepository memberGoalRepository,
-                               PtContractRepository ptContractRepository,
                                NotificationRepository notificationRepository) {
         this.jwtService = jwtService;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
-        this.bodyLogRepository = bodyLogRepository;
-        this.dietLogRepository = dietLogRepository;
-        this.dietFeedbackRepository = dietFeedbackRepository;
-        this.workoutLogRepository = workoutLogRepository;
         this.scheduleRequestRepository = scheduleRequestRepository;
         this.scheduleRepository = scheduleRepository;
-        this.memberGoalRepository = memberGoalRepository;
-        this.ptContractRepository = ptContractRepository;
         this.notificationRepository = notificationRepository;
     }
 
+    // 소프트 딜리트: user.deletedAt만 설정하고 데이터는 보존 (7일 후 스케줄러가 완전 삭제)
     @Transactional
     public void deleteMemberAccount(String authorization) {
         String token = authorization.replace("Bearer ", "");
@@ -66,14 +47,40 @@ public class MemberDeleteService {
 
         Member member = memberRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("회원 정보가 없습니다."));
+
+        // 미래 수업 신청 취소 + 다른 신청자 없으면 슬롯 OPEN 복구
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.util.List<Schedule> futureSchedules =
+                scheduleRepository.findFutureSchedulesByMember(member, today);
+
+        for (Schedule schedule : futureSchedules) {
+            java.util.List<ScheduleRequest> myRequests =
+                    scheduleRequestRepository.findBySchedule(schedule).stream()
+                            .filter(r -> r.getMember().getId().equals(member.getId()))
+                            .toList();
+            scheduleRequestRepository.deleteAll(myRequests);
+
+            // 다른 신청자가 없고 REQUESTED 상태면 OPEN으로 복구
+            boolean othersExist = scheduleRequestRepository.findBySchedule(schedule).stream()
+                    .anyMatch(r -> !r.getMember().getId().equals(member.getId()));
+            if (!othersExist && "REQUESTED".equals(schedule.getStatusStr())) {
+                schedule.setStatus(Schedule.Status.OPEN);
+                scheduleRepository.save(schedule);
+            }
+        }
+
+        member.getUser().setDeletedAt(LocalDateTime.now());
+        userRepository.save(member.getUser());
+    }
+
+    // 스케줄러가 호출하는 계정 익명화 (7일 경과 후)
+    // 운동/식단/바디로그/PT 기록은 트레이너가 계속 조회할 수 있도록 유지
+    @Transactional
+    public void hardDeleteMember(Member member) {
         User user = member.getUser();
+        Long userId = user.getId();
 
-        // 1. 수업 신청 내역 삭제
-        scheduleRequestRepository.deleteAll(
-                scheduleRequestRepository.findByMember(member)
-        );
-
-        // 2. 미래 일정 삭제 (스케줄 요청 먼저 삭제 후 슬롯 삭제)
+        // 1. 미래 수업 신청 취소 및 슬롯 정리
         java.time.LocalDate today = java.time.LocalDate.now();
         java.util.List<com.fitlog.fitlog.schedule.entity.Schedule> futureSchedules =
                 scheduleRepository.findFutureSchedulesByMember(member, today);
@@ -84,47 +91,24 @@ public class MemberDeleteService {
             scheduleRequestRepository.deleteByScheduleIds(futureIds);
             scheduleRepository.deleteAll(futureSchedules);
         }
+        scheduleRequestRepository.deleteAll(scheduleRequestRepository.findByMember(member));
 
-        // 3. 과거 일정은 member 참조만 해제 (트레이너 기록 유지)
-        scheduleRepository.detachMemberFromPastSchedules(member, today);
-
-        // 3. 운동 로그 삭제
-        workoutLogRepository.deleteAll(
-                workoutLogRepository.findByMember(member)
-        );
-
-        // 4. 식단 로그 삭제
-        dietLogRepository.deleteAll(
-                dietLogRepository.findByMember(member)
-        );
-
-        // 5. 식단 피드백 삭제
-        dietFeedbackRepository.deleteAll(
-                dietFeedbackRepository.findByMemberOrderByCreatedAtDesc(member)
-        );
-
-        // 6. 체성분 로그 삭제
-        bodyLogRepository.deleteAll(
-                bodyLogRepository.findByMemberOrderByLogDateAsc(member)
-        );
-
-        // 7. 목표 삭제
-        memberGoalRepository.deleteAll(
-                memberGoalRepository.findByMember(member)
-        );
-
-        // 8. PT 계약 삭제
-        ptContractRepository.deleteAll(
-                ptContractRepository.findByMemberId(member.getId())
-        );
-
-        // 9. 알림 삭제
+        // 2. 알림 삭제 (개인 식별 정보이므로 제거)
         notificationRepository.deleteAllByUser(user);
 
-        // 10. 회원 삭제
-        memberRepository.delete(member);
+        // 3. User 익명화: 로그인 불가 처리 + 개인정보 제거
+        //    kakaoId = null → 카카오 로그인 불가
+        //    name = "탈퇴한 회원" → 트레이너 화면에 표시될 이름
+        //    email/fcmToken 제거
+        user.setKakaoId(null);
+        user.setEmail("deleted_" + userId + "@fitlog.deleted");
+        user.setName("탈퇴한 회원");
+        user.setFcmToken(null);
+        // deletedAt은 유지 (탈퇴 처리된 계정임을 표시)
+        userRepository.save(user);
 
-        // 11. 유저 삭제
-        userRepository.delete(user);
+        // 4. Member 레코드 및 모든 기록 유지
+        //    (운동 기록, 식단 기록, 바디로그, PT 계약, 목표 등)
+        //    → 트레이너가 계속 조회 가능
     }
 }

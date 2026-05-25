@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -111,12 +112,26 @@ public class ScheduleService {
         return slots.stream()
                 .map(s -> {
                     boolean myRequest = scheduleRequestRepository.existsByScheduleAndMember(s, member);
+                    String dbStatus = s.getStatusStr();
+
+                    // 개인화된 상태: 내 시점에서만 판단
+                    String displayStatus;
+                    if ("CONFIRMED".equals(dbStatus) || "COMPLETED".equals(dbStatus)) {
+                        // 확정된 슬롯 - 내 슬롯인지 여부
+                        boolean isMine = s.getMember() != null && s.getMember().getId().equals(member.getId());
+                        displayStatus = isMine ? "MINE" : "CONFIRMED";
+                    } else if (myRequest) {
+                        displayStatus = "REQUESTED"; // 내가 신청한 상태
+                    } else {
+                        displayStatus = "OPEN"; // 남이 신청했어도 나한텐 신청 가능
+                    }
+
                     Map<String, Object> map = new HashMap<>();
                     map.put("scheduleId", s.getId());
                     map.put("date", s.getDate());
                     map.put("startTime", s.getStartTime());
                     map.put("endTime", s.getEndTime());
-                    map.put("status", s.getStatusStr());
+                    map.put("status", displayStatus);
                     map.put("myRequest", myRequest);
                     return map;
                 })
@@ -136,22 +151,20 @@ public class ScheduleService {
         if (scheduleRequestRepository.existsByScheduleAndMember(schedule, member))
             throw new RuntimeException("이미 신청한 슬롯");
 
+        String dbStatus = schedule.getStatusStr();
+        if ("CONFIRMED".equals(dbStatus) || "COMPLETED".equals(dbStatus))
+            throw new RuntimeException("이미 확정된 슬롯입니다.");
+
         ScheduleRequest req = new ScheduleRequest();
         req.setSchedule(schedule);
         req.setMember(member);
         scheduleRequestRepository.save(req);
 
-        schedule.setStatus(Schedule.Status.REQUESTED);
-        scheduleRepository.save(schedule);
-
-        // 트레이너에게 수업 신청 알림 + FCM 푸시
-        notificationService.sendNotification(
-                schedule.getTrainer().getUser(),
-                "SCHEDULE_REQUEST",
-                member.getUser().getName() + "님이 수업을 신청했어요.",
-                "SCHEDULE",
-                scheduleId
-        );
+        // 첫 신청자일 때만 REQUESTED로 변경 (이미 REQUESTED면 유지)
+        if ("OPEN".equals(dbStatus)) {
+            schedule.setStatus(Schedule.Status.REQUESTED);
+            scheduleRepository.save(schedule);
+        }
     }
 
     // 수업 신청 취소 (회원용)
@@ -172,15 +185,6 @@ public class ScheduleService {
         boolean hasOtherRequests = !scheduleRequestRepository.findBySchedule(schedule).isEmpty();
         schedule.setStatus(hasOtherRequests ? Schedule.Status.REQUESTED : Schedule.Status.OPEN);
         scheduleRepository.save(schedule);
-
-        // 트레이너에게 수업 신청 취소 알림 + FCM 푸시
-        notificationService.sendNotification(
-                schedule.getTrainer().getUser(),
-                "SCHEDULE_CANCEL_REQ",
-                member.getUser().getName() + "님이 수업 신청을 취소했어요.",
-                "SCHEDULE",
-                scheduleId
-        );
     }
 
     // 신청 목록 조회 (트레이너용)
@@ -194,6 +198,7 @@ public class ScheduleService {
                     map.put("requestId", r.getId());
                     map.put("memberId", r.getMember().getId());
                     map.put("memberName", r.getMember().getUser().getName());
+                    map.put("ptRemaining", r.getMember().getPtRemaining());
                     map.put("status", r.getStatus().name());
                     return map;
                 })
@@ -455,6 +460,52 @@ public class ScheduleService {
         generateNextWeekSlots(trainer, null);
     }
 
+    // 트레이너 계정 최초 생성 시 이번주 슬롯 자동 생성
+    @Transactional
+    public void generateCurrentWeekSlotsIfAbsent(Trainer trainer) {
+        LocalDate monday = LocalDate.now().with(DayOfWeek.MONDAY);
+        LocalDate sunday = monday.plusDays(6);
+
+        boolean alreadyExists = scheduleRepository
+                .findIdsByTrainerAndDateBetween(trainer, monday, sunday)
+                .isEmpty();
+        if (!alreadyExists) return;
+
+        String workDays    = trainer.getWorkDays();
+        String startTimeStr = trainer.getStartTime();
+        String endTimeStr   = trainer.getEndTime();
+        if (workDays == null || startTimeStr == null || endTimeStr == null) return;
+
+        LocalTime startTime = LocalTime.parse(startTimeStr);
+        LocalTime endTime   = LocalTime.parse(endTimeStr);
+
+        Map<DayOfWeek, LocalTime[]> dayTimeMap = new LinkedHashMap<>();
+        for (String day : workDays.split(",")) {
+            DayOfWeek dow = parseDayOfWeek(day.trim());
+            if (dow != null) dayTimeMap.put(dow, new LocalTime[]{startTime, endTime});
+        }
+
+        Trainer managedTrainer = trainerRepository.getReferenceById(trainer.getId());
+        LocalDateTime now = LocalDateTime.now();
+        List<Schedule> slots = new ArrayList<>();
+        for (LocalDate date = monday; !date.isAfter(sunday); date = date.plusDays(1)) {
+            LocalTime[] range = dayTimeMap.get(date.getDayOfWeek());
+            if (range == null) continue;
+            LocalTime cur = range[0];
+            while (cur.isBefore(range[1])) {
+                Schedule s = new Schedule();
+                s.setTrainer(managedTrainer);
+                s.setDate(date);
+                s.setStartTime(cur);
+                s.setEndTime(cur.plusHours(1));
+                s.setOpenedAt(now);
+                slots.add(s);
+                cur = cur.plusHours(1);
+            }
+        }
+        scheduleRepository.saveAll(slots);
+    }
+
     @Transactional
     public void generateNextWeekSlots(Trainer trainer, List<Map<String, String>> customDayTimes) {
         LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
@@ -464,8 +515,11 @@ public class ScheduleService {
                 .findIdsByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
 
         if (!existingIds.isEmpty()) {
-            scheduleRequestRepository.detachScheduleIds(existingIds);
-            scheduleRequestRepository.deleteByScheduleIds(existingIds);
+            int batchSize = 500;
+            for (int i = 0; i < existingIds.size(); i += batchSize) {
+                List<Long> batch = existingIds.subList(i, Math.min(i + batchSize, existingIds.size()));
+                scheduleRequestRepository.deleteByScheduleIds(batch);
+            }
             scheduleRepository.deleteOpenSlotsByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
         }
 
@@ -497,6 +551,7 @@ public class ScheduleService {
         // @Modifying(clearAutomatically=true)가 PC를 클리어하므로, saveAll 전에 proxy로 재획득
         Trainer managedTrainer = trainerRepository.getReferenceById(trainer.getId());
 
+        LocalDateTime now = LocalDateTime.now();
         List<Schedule> slots = new ArrayList<>();
         for (LocalDate date = nextMonday; !date.isAfter(nextSunday); date = date.plusDays(1)) {
             DayOfWeek dow = date.getDayOfWeek();
@@ -504,12 +559,13 @@ public class ScheduleService {
             if (timeRanges == null) continue;
             for (LocalTime[] range : timeRanges) {
                 LocalTime cur = range[0];
-                while (cur.plusHours(1).compareTo(range[1]) <= 0) {
+                while (cur.isBefore(range[1])) {
                     Schedule s = new Schedule();
                     s.setTrainer(managedTrainer);
                     s.setDate(date);
                     s.setStartTime(cur);
                     s.setEndTime(cur.plusHours(1));
+                    s.setOpenedAt(now);
                     slots.add(s);
                     cur = cur.plusHours(1);
                 }

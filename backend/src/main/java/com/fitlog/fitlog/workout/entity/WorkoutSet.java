@@ -30,6 +30,9 @@ public class WorkoutSet {
     @Column(name = "rpe")
     private Integer rpe;
 
+    @Column(name = "memo")
+    private String memo;
+
     // Getters & Setters
     public Long getSetId() { return setId; }
     public WorkoutLog getWorkoutLog() { return workoutLog; }
@@ -42,4 +45,6 @@ public class WorkoutSet {
     public void setReps(Integer reps) { this.reps = reps; }
     public Integer getRpe() { return rpe; }
     public void setRpe(Integer rpe) { this.rpe = rpe; }
+    public String getMemo() { return memo; }
+    public void setMemo(String memo) { this.memo = memo; }
 }

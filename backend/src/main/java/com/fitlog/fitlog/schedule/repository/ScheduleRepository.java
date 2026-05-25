@@ -77,6 +77,19 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("to") LocalDate to
     );
 
+    // 슬롯 bulk INSERT (native SQL)
+    @Modifying
+    @Query(value = """
+        INSERT INTO schedule (trainer_id, date, start_time, end_time, status)
+        VALUES (:trainerId, :date, :startTime, :endTime, 'OPEN')
+    """, nativeQuery = true)
+    void insertSlot(
+            @Param("trainerId") Long trainerId,
+            @Param("date") java.sql.Date date,
+            @Param("startTime") java.sql.Time startTime,
+            @Param("endTime") java.sql.Time endTime
+    );
+
     // OPEN 슬롯 벌크 삭제
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -160,6 +173,27 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to
     );
+
+    // 이번 달 수업 수 (CONFIRMED + COMPLETED)
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to AND s.status IN ('CONFIRMED', 'COMPLETED')")
+    int countMonthSessions(@Param("trainer") Trainer trainer,
+                           @Param("from") java.time.LocalDate from,
+                           @Param("to") java.time.LocalDate to);
+
+    // 오늘 노쇼 수 (CONFIRMED인데 운동 로그 없는 회원 수)
+    @Query("""
+        SELECT COUNT(s) FROM Schedule s
+        WHERE s.trainer = :trainer
+        AND s.date = :today
+        AND s.status = 'CONFIRMED'
+        AND s.member IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM WorkoutLog w
+            WHERE w.member = s.member AND w.logDate = :today
+        )
+    """)
+    int countNoShows(@Param("trainer") Trainer trainer,
+                     @Param("today") java.time.LocalDate today);
 
     // 계정 삭제용 - 트레이너의 전체 스케줄
     List<Schedule> findByTrainer(Trainer trainer);

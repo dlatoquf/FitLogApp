@@ -23,6 +23,7 @@ import java.util.Set;
 public class FoodSearchService {
 
     private final FoodRepository foodRepository;
+    private final FatSecretService fatSecretService;
 
     @Value("${kfood.api-key:}")
     private String kfoodApiKey;
@@ -35,8 +36,9 @@ public class FoodSearchService {
             ))
             .build();
 
-    public FoodSearchService(FoodRepository foodRepository) {
+    public FoodSearchService(FoodRepository foodRepository, FatSecretService fatSecretService) {
         this.foodRepository = foodRepository;
+        this.fatSecretService = fatSecretService;
     }
 
     public record FoodSearchResult(
@@ -85,6 +87,28 @@ public class FoodSearchService {
                 internalResults.stream(),
                 kfoodResults.stream()
         ).collect(Collectors.toList());
+
+        // Step 3: 내부 DB + 식약처 결과가 부족하면 FatSecret fallback
+        if (combined.size() < 5) {
+            try {
+                List<FatSecretService.FoodSearchResult> fatSecretRaw = fatSecretService.searchFood(query);
+                List<FoodSearchResult> fatSecretResults = fatSecretRaw.stream()
+                        .map(f -> new FoodSearchResult(
+                                "fatsecret:" + f.foodId(),
+                                f.foodName(),
+                                f.calories(),
+                                f.carbs(),
+                                f.protein(),
+                                f.fat(),
+                                "fatsecret"
+                        ))
+                        .toList();
+                combined = Stream.concat(combined.stream(), fatSecretResults.stream())
+                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                System.out.println("FatSecret 검색 오류: " + e.getMessage());
+            }
+        }
 
         return sortResults(combined, query)
                 .stream()

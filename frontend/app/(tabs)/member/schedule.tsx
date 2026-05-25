@@ -55,29 +55,16 @@ export default function MemberScheduleScreen() {
     else setLoading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const weekStart = toDateKey(weekDates[0]);
-      const res = await fetch(`${API_URL}/api/schedule/calendar?weekStart=${weekStart}`, {
+      const res = await fetch(`${API_URL}/api/schedule/next-week-slots`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
       if (!res.ok) throw new Error("일정 조회 실패");
-      const data: Slot[] = await res.json();
-      setSlots(data);
-    } catch {
-      // 더미
-      const nextMonday = new Date();
-      const day = nextMonday.getDay();
-      const diff = day === 0 ? 1 : 8 - day;
-      nextMonday.setDate(nextMonday.getDate() + diff);
-      const mk = toDateKey(nextMonday);
-      const tue = new Date(nextMonday); tue.setDate(tue.getDate() + 1);
-      const tk = toDateKey(tue);
-      setSlots([
-        { id: 1, date: mk, startTime: "10:00:00", endTime: "11:00:00", status: "MINE" },
-        { id: 2, date: mk, startTime: "14:00:00", endTime: "15:00:00", status: "OPEN" },
-        { id: 3, date: mk, startTime: "17:00:00", endTime: "18:00:00", status: "OPEN" },
-        { id: 4, date: tk, startTime: "09:00:00", endTime: "10:00:00", status: "OPEN" },
-        { id: 5, date: tk, startTime: "11:00:00", endTime: "12:00:00", status: "REQUESTED" },
-      ]);
+      const data = await res.json();
+      // scheduleId → id 정규화
+      setSlots(data.map((s: any) => ({ ...s, id: s.scheduleId ?? s.id })));
+    } catch (e) {
+      console.log("수업 신청 조회 실패:", e);
+      setSlots([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -188,8 +175,7 @@ export default function MemberScheduleScreen() {
           <ActivityIndicator color={Colors.green} style={{ marginTop: 40 }} />
         ) : daySlots.length === 0 ? (
           <View style={{ alignItems: "center", paddingVertical: 48 }}>
-            <Text style={{ fontSize: 32, marginBottom: 12 }}>📭</Text>
-            <Text style={{ fontSize: 15, color: Colors.textMuted }}>이날은 신청 가능한 수업이 없어요</Text>
+            <Text style={{ fontSize: 15, color: Colors.textMuted }}>이날 스케줄이 없어요</Text>
           </View>
         ) : (
           daySlots.map(slot => {

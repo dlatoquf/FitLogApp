@@ -1,18 +1,28 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { ResizeMode, Video } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Keyboard,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
-import { API_URL } from "../../../constants/api";
+import { ANALYTICS_URL, API_URL } from "../../../constants/api";
+
+const SCREEN_W = Dimensions.get("window").width;
+const SCREEN_H = Dimensions.get("window").height;
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -32,14 +42,26 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+interface MediaItem {
+  id: number;
+  url: string;
+  publicId: string;
+  mediaType: "IMAGE" | "VIDEO";
+}
+
 interface WorkoutLog {
   workoutId?: number;
   date: string;
   workoutType: string;
+  conditionScore?: number;
+  painPoints?: string;
+  feedback?: string;
   exercises: {
     name: string;
+    memo?: string;
     sets: { setId?: number; weight: any; reps: any; rpe?: any }[];
   }[];
+  mediaList?: MediaItem[];
 }
 
 export default function WorkoutScreen() {
@@ -52,9 +74,260 @@ export default function WorkoutScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<number | null>(null);
-  const [exercises, setExercises] = useState([
-    { name: "", sets: [{ weight: "", reps: "" }] },
-  ]);
+  const [exercises, setExercises] = useState<
+    {
+      name: string;
+      sets: { weight: string; reps: string }[];
+      memo: string;
+    }[]
+  >([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+  const [personalBodyParts, setPersonalBodyParts] = useState<string[]>([]);
+  const [personalCondition, setPersonalCondition] = useState<number | null>(
+    null,
+  );
+
+  const [mediaGallery, setMediaGallery] = useState<MediaItem[]>([]);
+  const [mediaGalleryIndex, setMediaGalleryIndex] = useState(0);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [mediaSaving, setMediaSaving] = useState(false);
+
+  // ── 전체보기 모달 ──
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  // "date" = 날짜별, "exercise" = 운동별
+  const [historyTab, setHistoryTab] = useState<"date" | "exercise">("date");
+  // 월 요약
+  const [memberId, setMemberId] = useState<number | null>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryData, setSummaryData] = useState<{
+    monthly_workout_days: number;
+    top_2_workout_days: string[];
+  } | null>(null);
+  const [summaryLocked, setSummaryLocked] = useState(false);
+  const [summaryRadar, setSummaryRadar] = useState<{ target_body_part: string; part_percentage: number }[]>([]);
+  // 날짜별 - 입력한 날짜
+  const [historyDateInput, setHistoryDateInput] = useState("");
+  // 날짜별 - 해당 날짜 로그 결과
+  const [historyDateLogs, setHistoryDateLogs] = useState<WorkoutLog[]>([]);
+  const [historyDateLoading, setHistoryDateLoading] = useState(false);
+  // 날짜별 - PT/개인 필터 ("ALL" | "PT" | "PERSONAL")
+  const [historyDateFilter, setHistoryDateFilter] = useState<"ALL" | "PT" | "PERSONAL">("ALL");
+  // 운동별 - 전체 운동 이름 목록 (이름 + 기록 횟수)
+  const [historyExerciseList, setHistoryExerciseList] = useState<{ name: string; count: number }[]>([]);
+  // 운동별 - 검색어
+  const [historyExerciseSearch, setHistoryExerciseSearch] = useState("");
+  // 운동별 - 드롭다운 열림 여부
+  const [historyExDropOpen, setHistoryExDropOpen] = useState(false);
+  const [historyExSelectorH, setHistoryExSelectorH] = useState(46);
+  // 운동별 - 선택한 운동 이름
+  const [historySelectedExercise, setHistorySelectedExercise] = useState<string | null>(null);
+  // 운동별 - 선택 운동의 날짜별 기록
+  const [historyExerciseLogs, setHistoryExerciseLogs] = useState<
+    { date: string; sets: { weight: string; reps: string }[]; workoutType: string }[]
+  >([]);
+  const [historyAllLogs, setHistoryAllLogs] = useState<any[]>([]);
+  // 클로저 문제 방지용 ref
+  const historyAllLogsRef = useRef<any[]>([]);
+  // 최근 운동일 목록 (날짜별 탭 빠른 선택용)
+  const [historyRecentDates, setHistoryRecentDates] = useState<string[]>([]);
+
+  const saveMediaToDevice = async (url: string) => {
+    setMediaSaving(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("권한 필요", "갤러리 저장 권한이 필요해요.");
+        return;
+      }
+      const filename = url.split("/").pop()?.split("?")[0] ?? "fitlog_media";
+      const fileUri = FileSystem.documentDirectory + filename;
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert("저장 완료", "갤러리에 저장됐어요!");
+    } catch (e: any) {
+      Alert.alert("저장 실패", e?.message ?? String(e));
+    } finally {
+      setMediaSaving(false);
+    }
+  };
+
+  // raw API 응답 → WorkoutLog 형식으로 정규화
+  const normalizeLog = (l: any) => ({
+    workoutId: l.workoutId ?? l.workout_id ?? l.id,
+    date: String(l.date ?? l.logDate ?? l.log_date ?? "").slice(0, 10),
+    workoutType: l.workoutType ?? l.workout_type ?? "PERSONAL",
+    conditionScore: l.conditionScore ?? l.condition_score ?? null,
+    painPoints: l.painPoints ?? l.pain_points ?? null,
+    feedback: l.feedback ?? null,
+    exercises: l.exercises ?? l.sets ?? l.workoutSets ?? [],
+    mediaList: l.mediaList ?? [],
+  });
+
+  // ── 전체보기 모달 열기: 전체 로그 로드 + 운동 이름 목록 추출 ──
+  const openHistoryModal = async () => {
+    setShowHistoryModal(true);
+    setHistoryTab("date");
+    setHistoryDateInput("");
+    setHistoryDateLogs([]);
+    setHistoryDateFilter("ALL");
+    setHistoryExerciseSearch("");
+    setHistoryExDropOpen(false);
+    setHistorySelectedExercise(null);
+    setHistoryExerciseLogs([]);
+
+    try {
+      let rawLogs = allLogsCache.current;
+      const jwt = await AsyncStorage.getItem("jwt");
+
+      if (rawLogs.length === 0) {
+        const res = await fetch(
+          `${API_URL}/api/fitlog/me?from=2000-01-01&to=${toDateKey(new Date())}`,
+          { headers: { Authorization: `Bearer ${jwt}` } },
+        );
+        if (res.ok) {
+          rawLogs = await res.json();
+          allLogsCache.current = rawLogs;
+        }
+      }
+
+      // raw 데이터 정규화 후 state + ref 모두 업데이트
+      const normalized = rawLogs.map(normalizeLog);
+      historyAllLogsRef.current = normalized;
+      setHistoryAllLogs(normalized);
+
+      // 최근 운동일 최대 10개 (중복 제거, 최신순)
+      const allDates = [...normalized, ...workoutLogs]
+        .map((l: any) => l.date)
+        .filter(Boolean);
+      const uniqueDates = Array.from(new Set(allDates))
+        .sort((a, b) => b.localeCompare(a))
+        .slice(0, 10);
+      setHistoryRecentDates(uniqueDates);
+
+      // 운동 이름별 기록 횟수 집계 (날짜 중복 제거)
+      const allSources = [...normalized, ...workoutLogs];
+      // 이름 → 날짜 Set 맵
+      const nameCountMap = new Map<string, Set<string>>();
+      allSources.forEach((log: any) => {
+        (log.exercises ?? []).forEach((ex: any) => {
+          const n = String(ex.name ?? "").trim();
+          if (!n) return;
+          if (!nameCountMap.has(n)) nameCountMap.set(n, new Set());
+          nameCountMap.get(n)!.add(log.date);
+        });
+      });
+      // 횟수 많은 순으로 정렬
+      const exerciseList = Array.from(nameCountMap.entries())
+        .map(([name, dates]) => ({ name, count: dates.size }))
+        .sort((a, b) => b.count - a.count);
+      setHistoryExerciseList(exerciseList);
+    } catch (e) {
+      console.log("전체보기 로드 오류:", e);
+    }
+  };
+
+  const [trainerPlan, setTrainerPlan] = useState<string | null>(null);
+
+  // ── member 정보(id, trainerPlan) 캐시 fetch ──
+  const fetchMemberInfo = async () => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/member/home`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d?.member?.id) setMemberId(d.member.id);
+        if (d?.member?.trainerPlan) setTrainerPlan(d.member.trainerPlan);
+      }
+    } catch {}
+  };
+
+  // ── 월 요약 모달 열기 ──
+  const openSummaryModal = async () => {
+    setShowSummaryModal(true);
+    setSummaryLoading(true);
+    setSummaryData(null);
+    setSummaryLocked(false);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      let mid = memberId;
+      if (!mid) {
+        const meRes = await fetch(`${API_URL}/api/member/home`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          mid = meData?.member?.id ?? null;
+          if (mid) setMemberId(mid);
+          if (meData?.member?.trainerPlan) setTrainerPlan(meData.member.trainerPlan);
+        }
+      }
+      if (!mid) return;
+      const res = await fetch(`${ANALYTICS_URL}/api/analytics/workout-habit/${mid}`);
+      const json = await res.json();
+      console.log("[월요약] API 응답:", JSON.stringify(json));
+      if (json.status === "success") {
+        setSummaryData(json.data.metrics);
+        setSummaryRadar(json.data.charts.radar_chart_data ?? []);
+      } else {
+        setSummaryLocked(true);
+      }
+    } catch (e) {
+      console.log("[월요약] 에러:", e);
+      setSummaryLocked(true);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  // ── 날짜별 검색 (ref 사용 → 클로저 문제 없음) ──
+  const searchByDate = (dateStr: string) => {
+    if (!dateStr || dateStr.length < 10) return;
+    setHistoryDateLoading(true);
+    // ref의 정규화된 데이터 + 현재 주간 데이터 합치기
+    const allSources = [...historyAllLogsRef.current, ...workoutLogs];
+    const result = allSources.filter((l: any) => l.date === dateStr);
+    // workoutId 기준 중복 제거
+    const seen = new Set<any>();
+    const unique = result.filter((l: any) => {
+      const key = l.workoutId ?? l.date + l.workoutType;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    setHistoryDateLogs(unique as WorkoutLog[]);
+    setHistoryDateLoading(false);
+  };
+
+  // ── 운동별 기록 조회 (ref 사용) ──
+  const selectExerciseHistory = (name: string) => {
+    setHistorySelectedExercise(name);
+    const allSources = [...historyAllLogsRef.current, ...workoutLogs];
+    const logs: { date: string; sets: { weight: string; reps: string }[]; workoutType: string }[] = [];
+    allSources.forEach((l: any) => {
+      const exercises = l.exercises ?? [];
+      const match = exercises.find(
+        (ex: any) => String(ex.name ?? "").trim() === name,
+      );
+      if (match) {
+        logs.push({
+          date: l.date,
+          sets: match.sets ?? [],
+          workoutType: l.workoutType ?? "PERSONAL",
+        });
+      }
+    });
+    // 날짜 최신순, 중복 제거
+    const seen = new Set<string>();
+    const unique = logs.filter((l) => {
+      if (seen.has(l.date)) return false;
+      seen.add(l.date);
+      return true;
+    });
+    unique.sort((a, b) => b.date.localeCompare(a.date));
+    setHistoryExerciseLogs(unique);
+  };
 
   const prevWeekOffset = useRef(weekOffset);
 
@@ -108,7 +381,11 @@ export default function WorkoutScreen() {
           workoutId: l.workoutId ?? l.workout_id ?? l.id,
           date: String(l.date ?? l.logDate ?? l.log_date).slice(0, 10),
           workoutType: l.workoutType ?? l.workout_type,
+          conditionScore: l.conditionScore ?? null,
+          painPoints: l.painPoints ?? null,
+          feedback: l.feedback ?? null,
           exercises: l.exercises ?? l.sets ?? l.workoutSets ?? [],
+          mediaList: l.mediaList ?? [],
         }));
         setWorkoutLogs(normalized);
       } else {
@@ -123,7 +400,11 @@ export default function WorkoutScreen() {
   const [suggestions, setSuggestions] = useState<{
     [key: number]: { date: string; sets: any[] } | null;
   }>({});
+  const [nameSelected, setNameSelected] = useState<{ [key: number]: boolean }>(
+    {},
+  );
   const suggestionRequestRef = useRef<{ [key: number]: string }>({});
+  const allLogsCache = useRef<any[]>([]);
 
   const fetchSuggestion = async (exerciseName: string, idx: number) => {
     const normalizedName = exerciseName.trim().toLowerCase();
@@ -145,10 +426,8 @@ export default function WorkoutScreen() {
           .map((l: any) => ({
             ...l,
             date: String(l.date ?? l.logDate ?? l.log_date).slice(0, 10),
-            workoutType: l.workoutType ?? l.workout_type,
             exercises: l.exercises ?? l.sets ?? l.workoutSets ?? [],
           }))
-          .filter((l: any) => l.workoutType === "PERSONAL")
           // 오늘 입력 중인 기록은 이전 기록 후보에서 제외
           .filter((l: any) => l.date < selectedDate)
           .filter((l: any) =>
@@ -164,10 +443,11 @@ export default function WorkoutScreen() {
     };
 
     try {
-      // 먼저 현재 로드된 주간 운동로그에서 찾기
-      let found = findLatest(workoutLogs);
+      // 캐시 + 현재 주간 데이터 합쳐서 먼저 찾기
+      const combined = [...workoutLogs, ...allLogsCache.current];
+      let found = findLatest(combined);
 
-      // 주간 데이터에 없으면 전체 이력 조회
+      // 없으면 전체 이력 API 조회 후 캐시 저장
       if (found.length === 0) {
         const jwt = await AsyncStorage.getItem("jwt");
         const res = await fetch(
@@ -179,6 +459,7 @@ export default function WorkoutScreen() {
 
         if (res.ok) {
           const allLogs = await res.json();
+          allLogsCache.current = allLogs;
           found = findLatest(allLogs);
         }
       }
@@ -205,8 +486,10 @@ export default function WorkoutScreen() {
     setEditingWorkoutId(null);
 
     if (clear) {
-      setExercises([{ name: "", sets: [{ weight: "", reps: "" }] }]);
+      setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
       setSuggestions({});
+      setPersonalBodyParts([]);
+      setPersonalCondition(null);
     }
   };
 
@@ -215,12 +498,22 @@ export default function WorkoutScreen() {
     setExercises(
       (log.exercises ?? []).map((ex: any) => ({
         name: ex.name ?? "",
+        memo: ex.memo ?? "",
         sets: (ex.sets ?? []).map((s: any) => ({
           weight: s.weight != null ? String(s.weight) : "",
           reps: s.reps != null ? String(s.reps) : "",
         })),
       })),
     );
+    setPersonalBodyParts(
+      log.painPoints
+        ? log.painPoints
+            .split(",")
+            .map((p: string) => p.trim())
+            .filter(Boolean)
+        : [],
+    );
+    setPersonalCondition(log.conditionScore ?? null);
     setShowAddModal(true);
   };
 
@@ -239,8 +532,14 @@ export default function WorkoutScreen() {
 
       const payload = {
         date: selectedDate,
+        conditionScore: personalCondition ?? undefined,
+        painPoints:
+          personalBodyParts.length > 0
+            ? personalBodyParts.join(",")
+            : undefined,
         exercises: valid.map((ex) => ({
           name: ex.name,
+          memo: ex.memo?.trim() || undefined,
           sets: ex.sets
             .filter((s) => s.reps)
             .map((s, i) => ({
@@ -266,7 +565,7 @@ export default function WorkoutScreen() {
           message ||
             (editingWorkoutId
               ? "수정 실패: 백엔드에 PUT /api/fitlog/{id} API가 있는지 확인해주세요."
-              : "저장 실패")
+              : "저장 실패"),
         );
       }
 
@@ -276,7 +575,7 @@ export default function WorkoutScreen() {
         "완료",
         editingWorkoutId
           ? "개인 운동이 수정됐어요!"
-          : "개인 운동이 등록됐어요! 💪",
+          : "개인 운동이 등록됐어요!",
       );
     } catch (e: any) {
       Alert.alert("오류", e?.message);
@@ -289,7 +588,8 @@ export default function WorkoutScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchAll();
-    }, [weekOffset])
+      if (!memberId) fetchMemberInfo();
+    }, [weekOffset]),
   );
 
   // weekOffset 변경 시 날짜 리셋 + 재조회
@@ -330,7 +630,6 @@ export default function WorkoutScreen() {
   );
   const isToday = selectedDate === toDateKey(new Date());
 
-
   const renderWorkoutCard = (
     log: WorkoutLog,
     color: string,
@@ -338,6 +637,23 @@ export default function WorkoutScreen() {
     onEdit?: () => void,
   ) => {
     const exercises = log.exercises ?? [];
+    const mediaList = log.mediaList ?? [];
+    const anyLog = log as any;
+    // 컨디션 스코어 기준
+    // 4 = 최상 (최고의 컨디션, 모든 세트 완벽 소화)
+    // 3 = 좋음  (컨디션 좋고 운동이 잘 됨)
+    // 2 = 보통  (평범한 훈련, 큰 무리 없음)
+    // 1 = 나쁨  (몸이 무겁거나 컨디션이 좋지 않음)
+    const conditionLabel =
+      anyLog.conditionScore === 4
+        ? "최상"
+        : anyLog.conditionScore === 3
+          ? "좋음"
+          : anyLog.conditionScore === 2
+            ? "보통"
+            : anyLog.conditionScore === 1
+              ? "나쁨"
+              : null;
 
     return (
       <View
@@ -356,14 +672,18 @@ export default function WorkoutScreen() {
             flexDirection: "row",
             alignItems: "flex-start",
             justifyContent: "space-between",
-            marginBottom: 14,
+            marginBottom: anyLog.painPoints || conditionLabel ? 8 : 14,
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}>
+            <Text
+              style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}
+            >
               {title}
             </Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}>
+            <Text
+              style={{ fontSize: 12, color: Colors.textMuted, marginTop: 3 }}
+            >
               {log.date} · {exercises.length}개 운동
             </Text>
           </View>
@@ -387,6 +707,63 @@ export default function WorkoutScreen() {
           )}
         </View>
 
+        {/* 부위 + 컨디션 */}
+        {(anyLog.painPoints || conditionLabel) && (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 6,
+              marginBottom: 12,
+            }}
+          >
+            {anyLog.painPoints &&
+              anyLog.painPoints
+                .split(",")
+                .map((p: string) => p.trim())
+                .filter(Boolean)
+                .map((part: string) => (
+                  <View
+                    key={part}
+                    style={{
+                      backgroundColor: color + "18",
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderWidth: 1,
+                      borderColor: color + "44",
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "700", color }}>
+                      {part}
+                    </Text>
+                  </View>
+                ))}
+            {conditionLabel && (
+              <View
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 20,
+                  paddingHorizontal: 10,
+                  paddingVertical: 3,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                  }}
+                >
+                  컨디션 {conditionLabel}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {exercises.map((exercise: any, exIdx: number) => {
           const sets = exercise.sets ?? [];
 
@@ -408,7 +785,13 @@ export default function WorkoutScreen() {
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "900",
+                    color: Colors.text,
+                  }}
+                >
                   {exercise.name}
                 </Text>
                 <Text style={{ fontSize: 12, fontWeight: "900", color }}>
@@ -451,7 +834,11 @@ export default function WorkoutScreen() {
                     </Text>
                     <Text
                       numberOfLines={1}
-                      style={{ fontSize: 12, fontWeight: "800", color: Colors.text }}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "800",
+                        color: Colors.text,
+                      }}
                     >
                       {set.weight ? `${set.weight}kg × ` : ""}
                       {set.reps}회
@@ -459,9 +846,91 @@ export default function WorkoutScreen() {
                   </View>
                 ))}
               </View>
+              {exercise.memo ? (
+                <View
+                  style={{
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: Colors.textSub,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    메모: {exercise.memo}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           );
         })}
+
+        {anyLog.feedback ? (
+          <View
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: Colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: Colors.textSub,
+                marginBottom: 4,
+              }}
+            >
+              피드백
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>
+              {anyLog.feedback}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* 사진/영상 보기 버튼 */}
+        {mediaList.length > 0 && (
+          <View
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: Colors.border,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => {
+                setMediaGallery(mediaList);
+                setMediaGalleryIndex(0);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                paddingVertical: 10,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: color + "44",
+                backgroundColor: color + "0d",
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color }}>
+                사진 / 영상 보기
+              </Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                ({mediaList.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -647,9 +1116,7 @@ export default function WorkoutScreen() {
                   backgroundColor: Colors.green,
                 }}
               />
-              <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                PT
-              </Text>
+              <Text style={{ fontSize: 11, color: Colors.textMuted }}>PT</Text>
             </View>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
@@ -669,7 +1136,7 @@ export default function WorkoutScreen() {
           </View>
         </View>
 
-        {/* 선택 날짜 + 개인운동 추가 버튼 */}
+        {/* 선택 날짜 + 전체보기 + 개인운동 추가 버튼 */}
         <View
           style={{
             flexDirection: "row",
@@ -678,11 +1145,54 @@ export default function WorkoutScreen() {
             marginBottom: 12,
           }}
         >
-          <Text
-            style={{ fontSize: 15, fontWeight: "700", color: Colors.textSub }}
-          >
-            {selectedDate} 기록
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text
+              style={{ fontSize: 15, fontWeight: "700", color: Colors.textSub }}
+            >
+              {selectedDate} 기록
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (trainerPlan !== "PRO") {
+                  Alert.alert("PRO 전용 기능", "트레이너 PRO 멤버십이 필요한 기능이에요.");
+                  return;
+                }
+                openHistoryModal();
+              }}
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.blue + "44",
+                borderRadius: 8,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+              }}
+            >
+              <Text style={{ fontSize: 11, color: Colors.blue, fontWeight: "700" }}>
+                전체 운동 기록
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (trainerPlan !== "PRO") {
+                  Alert.alert("PRO 전용 기능", "트레이너 PRO 멤버십이 필요한 기능이에요.");
+                  return;
+                }
+                openSummaryModal();
+              }}
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.green + "55",
+                borderRadius: 8,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                backgroundColor: Colors.green + "11",
+              }}
+            >
+              <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>
+                {new Date().getMonth() + 1}월 요약
+              </Text>
+            </TouchableOpacity>
+          </View>
           {isToday && (
             <TouchableOpacity
               onPress={() => {
@@ -729,7 +1239,9 @@ export default function WorkoutScreen() {
                 marginBottom: 12,
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
                 <View
                   style={{
                     width: 4,
@@ -738,7 +1250,13 @@ export default function WorkoutScreen() {
                     borderRadius: 2,
                   }}
                 />
-                <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "900",
+                    color: Colors.text,
+                  }}
+                >
                   {editingWorkoutId ? "개인운동 수정" : "개인운동 등록"}
                 </Text>
               </View>
@@ -747,14 +1265,123 @@ export default function WorkoutScreen() {
               </Text>
             </View>
 
+            {/* 부위 선택 */}
+            <View style={{ marginBottom: 10 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 6,
+                }}
+              >
+                부위 (복수 선택)
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                {["가슴", "등", "어깨", "팔", "하체", "코어", "전신"].map(
+                  (part) => {
+                    const selected = personalBodyParts.includes(part);
+                    return (
+                      <TouchableOpacity
+                        key={part}
+                        onPress={() =>
+                          setPersonalBodyParts(
+                            selected
+                              ? personalBodyParts.filter((p) => p !== part)
+                              : [...personalBodyParts, part],
+                          )
+                        }
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 5,
+                          borderRadius: 20,
+                          backgroundColor: selected
+                            ? Colors.blue
+                            : Colors.bgSub,
+                          borderWidth: 1,
+                          borderColor: selected ? Colors.blue : Colors.border,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "700",
+                            color: selected ? "#fff" : Colors.textSub,
+                          }}
+                        >
+                          {part}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  },
+                )}
+              </View>
+            </View>
+
+            {/* 컨디션 선택 */}
+            <View style={{ marginBottom: 12 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 6,
+                }}
+              >
+                컨디션
+              </Text>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {/* 컨디션 선택 칩
+                    4 = 최상: 최고의 컨디션, 모든 세트 완벽 소화
+                    3 = 좋음: 컨디션 좋고 운동이 잘 됨
+                    2 = 보통: 평범한 훈련, 큰 무리 없음
+                    1 = 나쁨: 몸이 무겁거나 컨디션이 좋지 않음 */}
+                {[
+                  { label: "최상", value: 4 },
+                  { label: "좋음", value: 3 },
+                  { label: "보통", value: 2 },
+                  { label: "나쁨", value: 1 },
+                ].map(({ label, value }) => {
+                  const selected = personalCondition === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      onPress={() =>
+                        setPersonalCondition(selected ? null : value)
+                      }
+                      style={{
+                        flex: 1,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        backgroundColor: selected ? Colors.blue : Colors.bgSub,
+                        borderWidth: 1,
+                        borderColor: selected ? Colors.blue : Colors.border,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "700",
+                          color: selected ? "#fff" : Colors.textSub,
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {exercises.map((ex, ei) => (
               <View
                 key={`exercise-${ei}`}
                 style={{
                   backgroundColor: "#fff",
-                  borderRadius: 12,
-                  padding: 10,
-                  marginBottom: 10,
+                  borderRadius: 10,
+                  padding: 8,
+                  marginBottom: 6,
                   borderWidth: 1,
                   borderColor: Colors.border,
                 }}
@@ -775,8 +1402,13 @@ export default function WorkoutScreen() {
                       const u = [...exercises];
                       u[ei].name = v;
                       setExercises(u);
+                      setNameSelected((prev) => ({ ...prev, [ei]: false }));
                       fetchSuggestion(v, ei);
                     }}
+                    onSubmitEditing={() =>
+                      setNameSelected((prev) => ({ ...prev, [ei]: true }))
+                    }
+                    returnKeyType="done"
                     placeholder="운동명"
                     placeholderTextColor={Colors.textPlaceholder}
                     style={{
@@ -784,11 +1416,11 @@ export default function WorkoutScreen() {
                       backgroundColor: Colors.bgSub,
                       borderWidth: 1,
                       borderColor: Colors.border,
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
+                      borderRadius: 9,
+                      paddingHorizontal: 9,
                       paddingVertical: 0,
-                      height: 38,
-                      fontSize: 14,
+                      height: 32,
+                      fontSize: 13,
                       fontWeight: "800",
                       color: Colors.text,
                     }}
@@ -796,14 +1428,22 @@ export default function WorkoutScreen() {
 
                   {ex.name.trim().length > 0 &&
                     suggestions[ei] === null &&
-                    workoutLogs.some((log: any) =>
-                      (log.exercises ?? []).some((item: any) =>
-                        String(item.name ?? "")
-                          .replaceAll(" ", "")
-                          .toLowerCase()
-                          .includes(ex.name.replaceAll(" ", "").toLowerCase())
-                      )
-                    ) && (
+                    !nameSelected[ei] &&
+                    (() => {
+                      const allSources = [
+                        ...workoutLogs,
+                        ...allLogsCache.current,
+                      ];
+                      const q = ex.name.replaceAll(" ", "").toLowerCase();
+                      return allSources.some((log: any) =>
+                        (log.exercises ?? []).some((item: any) =>
+                          String(item.name ?? "")
+                            .replaceAll(" ", "")
+                            .toLowerCase()
+                            .includes(q),
+                        ),
+                      );
+                    })() && (
                       <View
                         style={{
                           position: "absolute",
@@ -820,17 +1460,22 @@ export default function WorkoutScreen() {
                       >
                         {Array.from(
                           new Set(
-                            workoutLogs.flatMap((log: any) =>
-                              (log.exercises ?? [])
-                                .map((item: any) => String(item.name ?? ""))
-                                .filter((name: string) =>
-                                  name
-                                    .replaceAll(" ", "")
-                                    .toLowerCase()
-                                    .includes(ex.name.replaceAll(" ", "").toLowerCase())
-                                )
-                            )
-                          )
+                            [...workoutLogs, ...allLogsCache.current].flatMap(
+                              (log: any) =>
+                                (log.exercises ?? [])
+                                  .map((item: any) => String(item.name ?? ""))
+                                  .filter((name: string) =>
+                                    name
+                                      .replaceAll(" ", "")
+                                      .toLowerCase()
+                                      .includes(
+                                        ex.name
+                                          .replaceAll(" ", "")
+                                          .toLowerCase(),
+                                      ),
+                                  ),
+                            ),
+                          ),
                         )
                           .slice(0, 4)
                           .map((name: string) => (
@@ -840,6 +1485,10 @@ export default function WorkoutScreen() {
                                 const u = [...exercises];
                                 u[ei].name = name;
                                 setExercises(u);
+                                setNameSelected((prev) => ({
+                                  ...prev,
+                                  [ei]: true,
+                                }));
                                 fetchSuggestion(name, ei);
                               }}
                               style={{
@@ -874,9 +1523,9 @@ export default function WorkoutScreen() {
                         });
                       }}
                       style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 10,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
                         backgroundColor: Colors.bgSub,
                         justifyContent: "center",
                         alignItems: "center",
@@ -884,7 +1533,9 @@ export default function WorkoutScreen() {
                         borderColor: Colors.border,
                       }}
                     >
-                      <Text style={{ fontSize: 20, color: Colors.textMuted }}>×</Text>
+                      <Text style={{ fontSize: 16, color: Colors.textMuted }}>
+                        ×
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -901,15 +1552,21 @@ export default function WorkoutScreen() {
                   >
                     <View
                       style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 9,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
                         backgroundColor: Colors.blue,
                         justifyContent: "center",
                         alignItems: "center",
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: "900", color: "#fff" }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "900",
+                          color: "#fff",
+                        }}
+                      >
                         {si + 1}
                       </Text>
                     </View>
@@ -917,14 +1574,14 @@ export default function WorkoutScreen() {
                     <View
                       style={{
                         flex: 1,
-                        height: 34,
+                        height: 30,
                         flexDirection: "row",
                         alignItems: "center",
                         backgroundColor: Colors.bgSub,
-                        borderRadius: 10,
+                        borderRadius: 8,
                         borderWidth: 1,
                         borderColor: Colors.border,
-                        paddingHorizontal: 10,
+                        paddingHorizontal: 8,
                       }}
                     >
                       <TextInput
@@ -939,26 +1596,28 @@ export default function WorkoutScreen() {
                         keyboardType="decimal-pad"
                         style={{
                           flex: 1,
-                          height: 34,
-                          fontSize: 14,
+                          height: 30,
+                          fontSize: 13,
                           color: Colors.text,
                           paddingVertical: 0,
                         }}
                       />
-                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>kg</Text>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                        kg
+                      </Text>
                     </View>
 
                     <View
                       style={{
                         flex: 1,
-                        height: 34,
+                        height: 30,
                         flexDirection: "row",
                         alignItems: "center",
                         backgroundColor: Colors.bgSub,
-                        borderRadius: 10,
+                        borderRadius: 8,
                         borderWidth: 1,
                         borderColor: Colors.border,
-                        paddingHorizontal: 10,
+                        paddingHorizontal: 8,
                       }}
                     >
                       <TextInput
@@ -973,13 +1632,15 @@ export default function WorkoutScreen() {
                         keyboardType="number-pad"
                         style={{
                           flex: 1,
-                          height: 34,
-                          fontSize: 14,
+                          height: 30,
+                          fontSize: 13,
                           color: Colors.text,
                           paddingVertical: 0,
                         }}
                       />
-                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>회</Text>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                        회
+                      </Text>
                     </View>
 
                     {ex.sets.length > 1 && (
@@ -990,13 +1651,15 @@ export default function WorkoutScreen() {
                           setExercises(u);
                         }}
                         style={{
-                          width: 28,
-                          height: 34,
+                          width: 24,
+                          height: 30,
                           justifyContent: "center",
                           alignItems: "center",
                         }}
                       >
-                        <Text style={{ fontSize: 18, color: Colors.textMuted }}>×</Text>
+                        <Text style={{ fontSize: 16, color: Colors.textMuted }}>
+                          ×
+                        </Text>
                       </TouchableOpacity>
                     )}
 
@@ -1008,15 +1671,21 @@ export default function WorkoutScreen() {
                           setExercises(u);
                         }}
                         style={{
-                          width: 36,
-                          height: 34,
-                          borderRadius: 10,
+                          width: 30,
+                          height: 30,
+                          borderRadius: 8,
                           backgroundColor: Colors.blue,
                           justifyContent: "center",
                           alignItems: "center",
                         }}
                       >
-                        <Text style={{ fontSize: 22, color: "#fff", fontWeight: "900" }}>
+                        <Text
+                          style={{
+                            fontSize: 20,
+                            color: "#fff",
+                            fontWeight: "900",
+                          }}
+                        >
                           +
                         </Text>
                       </TouchableOpacity>
@@ -1046,43 +1715,86 @@ export default function WorkoutScreen() {
                       이전 기록 {suggestions[ei]!.date} · 누르면 입력
                     </Text>
 
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                      {suggestions[ei]!.sets.map((prevSet: any, prevIdx: number) => (
-                        <TouchableOpacity
-                          key={`prev-${ei}-${prevIdx}`}
-                          onPress={() => {
-                            const u = [...exercises];
-                            while (u[ei].sets.length <= prevIdx) {
-                              u[ei].sets.push({ weight: "", reps: "" });
-                            }
-                            u[ei].sets[prevIdx].weight = prevSet.weight ? String(prevSet.weight) : "";
-                            u[ei].sets[prevIdx].reps = prevSet.reps ? String(prevSet.reps) : "";
-                            setExercises(u);
-                          }}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: "#fff",
-                            borderRadius: 999,
-                            paddingHorizontal: 9,
-                            paddingVertical: 5,
-                            borderWidth: 1,
-                            borderColor: Colors.blue + "33",
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, color: Colors.blue, fontWeight: "900" }}>
-                            {prevIdx + 1}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: Colors.text, fontWeight: "800" }}>
-                            {"  "}
-                            {prevSet.weight ? `${prevSet.weight}kg × ` : ""}
-                            {prevSet.reps}회
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                    <View
+                      style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}
+                    >
+                      {suggestions[ei]!.sets.map(
+                        (prevSet: any, prevIdx: number) => (
+                          <TouchableOpacity
+                            key={`prev-${ei}-${prevIdx}`}
+                            onPress={() => {
+                              const u = [...exercises];
+                              while (u[ei].sets.length <= prevIdx) {
+                                u[ei].sets.push({ weight: "", reps: "" });
+                              }
+                              u[ei].sets[prevIdx].weight = prevSet.weight
+                                ? String(prevSet.weight)
+                                : "";
+                              u[ei].sets[prevIdx].reps = prevSet.reps
+                                ? String(prevSet.reps)
+                                : "";
+                              setExercises(u);
+                            }}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: "#fff",
+                              borderRadius: 999,
+                              paddingHorizontal: 9,
+                              paddingVertical: 5,
+                              borderWidth: 1,
+                              borderColor: Colors.blue + "33",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: Colors.blue,
+                                fontWeight: "900",
+                              }}
+                            >
+                              {prevIdx + 1}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: Colors.text,
+                                fontWeight: "800",
+                              }}
+                            >
+                              {"  "}
+                              {prevSet.weight ? `${prevSet.weight}kg × ` : ""}
+                              {prevSet.reps}회
+                            </Text>
+                          </TouchableOpacity>
+                        ),
+                      )}
                     </View>
                   </View>
                 )}
+
+                {/* 운동별 메모 */}
+                <TextInput
+                  value={ex.memo}
+                  onChangeText={(v) => {
+                    const u = [...exercises];
+                    u[ei].memo = v;
+                    setExercises(u);
+                  }}
+                  placeholder="메모 (선택)"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  style={{
+                    marginTop: 6,
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 8,
+                    paddingHorizontal: 9,
+                    paddingVertical: 6,
+                    fontSize: 12,
+                    color: Colors.text,
+                  }}
+                />
               </View>
             ))}
 
@@ -1090,7 +1802,7 @@ export default function WorkoutScreen() {
               onPress={() =>
                 setExercises([
                   ...exercises,
-                  { name: "", sets: [{ weight: "", reps: "" }] },
+                  { name: "", sets: [{ weight: "", reps: "" }], memo: "" },
                 ])
               }
               style={{
@@ -1103,7 +1815,9 @@ export default function WorkoutScreen() {
                 marginBottom: 12,
               }}
             >
-              <Text style={{ fontSize: 13, color: Colors.blue, fontWeight: "900" }}>
+              <Text
+                style={{ fontSize: 13, color: Colors.blue, fontWeight: "900" }}
+              >
                 + 운동 추가
               </Text>
             </TouchableOpacity>
@@ -1133,20 +1847,31 @@ export default function WorkoutScreen() {
         {/* PT 기록 */}
         {dayPt.length > 0 && (
           <View style={{ marginBottom: 14 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green }} />
-              <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: Colors.green,
+                }}
+              />
+              <Text
+                style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}
+              >
                 PT 수업
               </Text>
             </View>
 
             {dayPt.map((log) =>
-              renderWorkoutCard(
-                log,
-                Colors.green,
-                "PT 수업 완료",
-                () => startEditPersonalLog(log)
-              )
+              renderWorkoutCard(log, Colors.green, "PT 수업 완료"),
             )}
           </View>
         )}
@@ -1154,20 +1879,33 @@ export default function WorkoutScreen() {
         {/* 개인 운동 기록 */}
         {dayFitLogs.length > 0 && (
           <View style={{ marginBottom: 14 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue }} />
-              <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: Colors.blue,
+                }}
+              />
+              <Text
+                style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}
+              >
                 개인 운동
               </Text>
             </View>
 
             {dayFitLogs.map((log) =>
-              renderWorkoutCard(
-                log,
-                Colors.blue,
-                "개인 운동 완료",
-                () => startEditPersonalLog(log)
-              )
+              renderWorkoutCard(log, Colors.blue, "개인 운동 완료", () =>
+                startEditPersonalLog(log),
+              ),
             )}
           </View>
         )}
@@ -1192,6 +1930,771 @@ export default function WorkoutScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ══════════════════════════════════
+          전체보기 모달 (날짜별 / 운동별)
+      ══════════════════════════════════ */}
+      <Modal visible={showHistoryModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View
+            style={{
+              flex: 1,
+              marginTop: 60,
+              backgroundColor: Colors.bg ?? "#f5f5f5",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: "hidden",
+            }}
+          >
+            {/* 헤더 */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                paddingBottom: 14,
+                backgroundColor: "#fff",
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text }}>
+                이전 운동 기록
+              </Text>
+              <TouchableOpacity onPress={() => setShowHistoryModal(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 20, color: Colors.textMuted, fontWeight: "700" }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 탭: 날짜별 / 운동별 */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: "#fff",
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              {(["date", "exercise"] as const).map((tab) => {
+                const isActive = historyTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => {
+                      setHistoryTab(tab);
+                      setHistorySelectedExercise(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      alignItems: "center",
+                      borderBottomWidth: 2,
+                      borderBottomColor: isActive ? Colors.blue : "transparent",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "800",
+                        color: isActive ? Colors.blue : Colors.textMuted,
+                      }}
+                    >
+                      {tab === "date" ? "날짜별" : "운동별"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ── 날짜별 탭 ── */}
+            {historyTab === "date" && (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 16 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* 날짜 입력 (숫자만 입력해도 자동 포맷) */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      value={historyDateInput}
+                      onChangeText={(text) => {
+                        const digits = text.replace(/\D/g, "").slice(0, 8);
+                        let formatted = digits;
+                        if (digits.length > 4) formatted = digits.slice(0, 4) + "-" + digits.slice(4);
+                        if (digits.length > 6) formatted = digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6);
+                        setHistoryDateInput(formatted);
+                        if (digits.length === 0) {
+                          setHistoryDateLogs([]);
+                          setHistoryDateFilter("ALL");
+                        }
+                        if (digits.length === 8) {
+                          searchByDate(digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6));
+                        }
+                      }}
+                      placeholder="날짜 입력  예) 20260325"
+                      placeholderTextColor={Colors.textPlaceholder}
+                      keyboardType="numeric"
+                      style={{
+                        backgroundColor: "#fff",
+                        borderWidth: 1,
+                        borderColor: historyDateLogs.length > 0 ? Colors.blue : Colors.border,
+                        borderRadius: 10,
+                        paddingHorizontal: 14,
+                        paddingRight: historyDateInput.length > 0 ? 40 : 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        color: Colors.text,
+                      }}
+                    />
+                    {historyDateInput.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setHistoryDateInput("");
+                          setHistoryDateLogs([]);
+                          setHistoryDateFilter("ALL");
+                          Keyboard.dismiss();
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{
+                          position: "absolute",
+                          right: 12,
+                          top: 0,
+                          bottom: 0,
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ fontSize: 14, color: Colors.textMuted }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => { Keyboard.dismiss(); searchByDate(historyDateInput); }}
+                    style={{
+                      backgroundColor: Colors.blue,
+                      borderRadius: 10,
+                      paddingHorizontal: 16,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "900", fontSize: 13 }}>
+                      조회
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 최근 운동일 빠른 선택 칩 */}
+                {historyRecentDates.length > 0 && historyDateLogs.length === 0 && (
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 6 }}>
+                      최근 운동일
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        {historyRecentDates.map((d) => (
+                          <TouchableOpacity
+                            key={d}
+                            onPress={() => {
+                              setHistoryDateInput(d);
+                              searchByDate(d);
+                            }}
+                            style={{
+                              backgroundColor: Colors.bgSub,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: Colors.textSub, fontWeight: "600" }}>
+                              {d}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* PT / 개인운동 필터 칩 */}
+                {historyDateLogs.length > 0 && (
+                  <View style={{ flexDirection: "row", gap: 6, marginBottom: 14 }}>
+                    {(["ALL", "PT", "PERSONAL"] as const).map((f) => {
+                      const label = f === "ALL" ? "전체" : f === "PT" ? "PT 수업" : "개인운동";
+                      const active = historyDateFilter === f;
+                      return (
+                        <TouchableOpacity
+                          key={f}
+                          onPress={() => setHistoryDateFilter(f)}
+                          style={{
+                            paddingHorizontal: 14,
+                            paddingVertical: 6,
+                            borderRadius: 999,
+                            backgroundColor: active ? Colors.blue : Colors.bgSub,
+                            borderWidth: 1,
+                            borderColor: active ? Colors.blue : Colors.border,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: "700",
+                              color: active ? "#fff" : Colors.textSub,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {historyDateLoading && (
+                  <ActivityIndicator color={Colors.blue} style={{ marginTop: 24 }} />
+                )}
+
+                {!historyDateLoading && historyDateInput.length === 10 && historyDateLogs.length === 0 && (
+                  <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                    <Text style={{ fontSize: 28, marginBottom: 8 }}>📭</Text>
+                    <Text style={{ fontSize: 14, color: Colors.textMuted }}>
+                      {historyDateInput} 에 운동 기록이 없어요
+                    </Text>
+                  </View>
+                )}
+
+                {historyDateLogs
+                  .filter((log) =>
+                    historyDateFilter === "ALL" ? true : log.workoutType === historyDateFilter,
+                  )
+                  .map((log) =>
+                    renderWorkoutCard(
+                      log,
+                      log.workoutType === "PT" ? Colors.green : Colors.blue,
+                      log.workoutType === "PT" ? "PT 수업" : "개인 운동",
+                    ),
+                  )}
+
+                {/* 필터 적용 후 결과 없을 때 */}
+                {!historyDateLoading &&
+                  historyDateFilter !== "ALL" &&
+                  historyDateLogs.length > 0 &&
+                  historyDateLogs.filter((l) => l.workoutType === historyDateFilter).length === 0 && (
+                  <View style={{ alignItems: "center", paddingVertical: 30 }}>
+                    <Text style={{ fontSize: 14, color: Colors.textMuted }}>
+                      {historyDateFilter === "PT" ? "PT 수업" : "개인운동"} 기록이 없어요
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+
+            {/* ── 운동별 탭 ── */}
+            {historyTab === "exercise" && (
+              <View style={{ flex: 1 }}>
+                {/* 운동 선택 전: 드롭다운 검색 + 리스트 */}
+                {!historySelectedExercise && (
+                  <View style={{ flex: 1 }}>
+                    {/* 바깥 터치 시 드롭다운 닫기 */}
+                    {historyExDropOpen && (
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => { Keyboard.dismiss(); setHistoryExDropOpen(false); setHistoryExerciseSearch(""); }}
+                        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+                      />
+                    )}
+
+                    {/* 드롭다운 트리거 + 플로팅 패널 */}
+                    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, zIndex: 10 }}>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => setHistoryExDropOpen((prev) => !prev)}
+                        onLayout={(e) => setHistoryExSelectorH(e.nativeEvent.layout.height)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#fff",
+                          borderWidth: 1,
+                          borderColor: historyExDropOpen ? Colors.blue : Colors.border,
+                          borderRadius: 10,
+                          paddingHorizontal: 14,
+                          paddingVertical: 11,
+                          gap: 8,
+                        }}
+                      >
+                        <Text style={{ fontSize: 14, color: Colors.textPlaceholder, flex: 1 }}>
+                          운동 이름으로 검색
+                        </Text>
+                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                          {historyExDropOpen ? "▲" : "▼"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 플로팅 드롭다운 */}
+                      {historyExDropOpen && (
+                        <View
+                          style={{
+                            position: "absolute",
+                            top: historyExSelectorH + 12,
+                            left: 16,
+                            right: 16,
+                            zIndex: 20,
+                            borderWidth: 1,
+                            borderColor: Colors.border,
+                            borderRadius: 12,
+                            backgroundColor: "#fff",
+                            overflow: "hidden",
+                            maxHeight: 320,
+                            shadowColor: "#000",
+                            shadowOpacity: 0.1,
+                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 4 },
+                            elevation: 8,
+                          }}
+                        >
+                          <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                            <TextInput
+                              value={historyExerciseSearch}
+                              onChangeText={setHistoryExerciseSearch}
+                              placeholder="운동명 검색"
+                              placeholderTextColor={Colors.textPlaceholder}
+                              autoFocus
+                              style={{
+                                backgroundColor: Colors.bgSub,
+                                borderRadius: 8,
+                                paddingHorizontal: 12,
+                                paddingVertical: 7,
+                                fontSize: 13,
+                                color: Colors.text,
+                              }}
+                            />
+                          </View>
+                          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+                            {(() => {
+                              const q = historyExerciseSearch.trim().toLowerCase();
+                              const filtered = q
+                                ? historyExerciseList.filter(({ name }) => name.toLowerCase().includes(q))
+                                : historyExerciseList;
+                              if (filtered.length === 0) {
+                                return (
+                                  <View style={{ alignItems: "center", paddingVertical: 20 }}>
+                                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                                      {q ? `"${historyExerciseSearch}" 결과 없음` : "아직 운동 기록이 없어요"}
+                                    </Text>
+                                  </View>
+                                );
+                              }
+                              return filtered.map(({ name, count }, idx) => (
+                                <TouchableOpacity
+                                  key={name}
+                                  onPress={() => {
+                                    Keyboard.dismiss();
+                                    setHistoryExDropOpen(false);
+                                    setHistoryExerciseSearch("");
+                                    selectExerciseHistory(name);
+                                  }}
+                                  style={{
+                                    flexDirection: "row",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 12,
+                                    backgroundColor: "#fff",
+                                    borderBottomWidth: idx < filtered.length - 1 ? 1 : 0,
+                                    borderBottomColor: Colors.border,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 14, fontWeight: "500", color: Colors.text }}>{name}</Text>
+                                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>총 {count}회</Text>
+                                </TouchableOpacity>
+                              ));
+                            })()}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* 운동 목록 (항상 표시) */}
+                    <ScrollView
+                      style={{ flex: 1 }}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {historyExerciseList.length === 0 ? (
+                        <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                          <Text style={{ fontSize: 14, color: Colors.textMuted }}>아직 운동 기록이 없어요</Text>
+                        </View>
+                      ) : (
+                        historyExerciseList.map(({ name, count }) => (
+                          <TouchableOpacity
+                            key={name}
+                            onPress={() => {
+                              Keyboard.dismiss();
+                              selectExerciseHistory(name);
+                            }}
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              paddingHorizontal: 20,
+                              paddingVertical: 14,
+                              backgroundColor: "#fff",
+                              borderBottomWidth: 1,
+                              borderBottomColor: Colors.border,
+                            }}
+                          >
+                            <View>
+                              <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>{name}</Text>
+                              <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>총 {count}회 기록</Text>
+                            </View>
+                            <Text style={{ fontSize: 20, color: Colors.textMuted, fontWeight: "300" }}>›</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* 운동 선택 후: 뒤로가기 + 날짜별 기록 */}
+                {historySelectedExercise && (
+                  <View style={{ flex: 1 }}>
+                    {/* 헤더: 뒤로가기 + 운동명 + 총 기록 수 */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: Colors.border,
+                        backgroundColor: "#fff",
+                        gap: 8,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          setHistorySelectedExercise(null);
+                          setHistoryExerciseLogs([]);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                      >
+                        <Text style={{ fontSize: 16, color: Colors.blue, fontWeight: "700" }}>‹</Text>
+                        <Text style={{ fontSize: 14, color: Colors.blue, fontWeight: "700" }}>
+                          {historySelectedExercise}
+                        </Text>
+                      </TouchableOpacity>
+                      <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                        전체 기록 {historyExerciseLogs.length}회
+                      </Text>
+                    </View>
+
+                    <ScrollView
+                      style={{ flex: 1 }}
+                      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 }}
+                    >
+                    {historyExerciseLogs.length === 0 && (
+                      <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                        <Text style={{ fontSize: 14, color: Colors.textMuted }}>기록이 없어요</Text>
+                      </View>
+                    )}
+                    {historyExerciseLogs.map((item, idx) => {
+                      const maxWeight = item.sets.reduce((max, s) => {
+                        const w = parseFloat(String(s.weight ?? "0")) || 0;
+                        return w > max ? w : max;
+                      }, 0);
+                      return (
+                        <View
+                          key={idx}
+                          style={{
+                            backgroundColor: "#fff", borderRadius: 12, padding: 14,
+                            marginBottom: 10, borderWidth: 1, borderColor: Colors.border,
+                          }}
+                        >
+                          {/* 날짜 + PT/개인 뱃지 + 최고 중량 */}
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "800", color: Colors.blue }}>{item.date}</Text>
+                              <View style={{
+                                backgroundColor: item.workoutType === "PT" ? Colors.green + "18" : Colors.blue + "12",
+                                borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+                                borderWidth: 1, borderColor: item.workoutType === "PT" ? Colors.green + "44" : Colors.blue + "33",
+                              }}>
+                                <Text style={{ fontSize: 10, fontWeight: "700", color: item.workoutType === "PT" ? Colors.green : Colors.blue }}>
+                                  {item.workoutType === "PT" ? "PT" : "개인"}
+                                </Text>
+                              </View>
+                            </View>
+                            {maxWeight > 0 && (
+                              <View style={{
+                                backgroundColor: Colors.blue + "12", borderRadius: 999,
+                                paddingHorizontal: 10, paddingVertical: 3,
+                                borderWidth: 1, borderColor: Colors.blue + "33",
+                              }}>
+                                <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.blue }}>최고 {maxWeight}kg</Text>
+                              </View>
+                            )}
+                          </View>
+                          {/* 세트 태그 */}
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            {item.sets.map((set, si) => (
+                              <View key={si} style={{
+                                backgroundColor: Colors.bgSub, borderRadius: 8,
+                                paddingHorizontal: 10, paddingVertical: 5,
+                                borderWidth: 1, borderColor: Colors.border,
+                              }}>
+                                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSub }}>
+                                  {si + 1}세트 {set.weight ? `${set.weight}kg × ` : ""}{set.reps}회
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      );
+                    })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+
+          </View>
+        </View>
+      </Modal>
+
+      {/* 월 요약 바텀 시트 */}
+      <Modal visible={showSummaryModal} transparent animationType="slide">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
+          activeOpacity={1}
+          onPress={() => setShowSummaryModal(false)}
+        />
+        <View style={{
+          backgroundColor: "#fff",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 40,
+          maxHeight: "70%",
+        }}>
+          {/* 핸들 + 헤더 */}
+          <View style={{ alignItems: "center", marginBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 12 }} />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text }}>
+              {new Date().getMonth() + 1}월 운동 요약
+            </Text>
+            <TouchableOpacity onPress={() => setShowSummaryModal(false)}>
+              <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {summaryLoading ? (
+            <ActivityIndicator color={Colors.green} style={{ marginTop: 40, marginBottom: 40 }} />
+          ) : summaryLocked ? (
+            <View style={{ alignItems: "center", paddingVertical: 40 }}>
+              <Text style={{ fontSize: 15, color: Colors.textMuted }}>트레이너 PRO 멤버십이 필요한 기능이에요.</Text>
+            </View>
+          ) : summaryData ? (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+                <View style={{
+                  flex: 1, backgroundColor: Colors.bgSub, borderRadius: 14,
+                  borderWidth: 1, borderColor: Colors.border, padding: 16, alignItems: "center",
+                }}>
+                  <Text style={{ fontSize: 32, fontWeight: "900", color: Colors.blue }}>
+                    {summaryData.monthly_workout_days}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>이번 달 운동한 날</Text>
+                </View>
+                <View style={{
+                  flex: 1, backgroundColor: Colors.bgSub, borderRadius: 14,
+                  borderWidth: 1, borderColor: Colors.border, padding: 16,
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
+                    {summaryData.top_2_workout_days.length > 0
+                      ? summaryData.top_2_workout_days.join("  ·  ")
+                      : "-"}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>자주 운동한 요일</Text>
+                </View>
+              </View>
+              {summaryRadar.length > 0 && (
+                <View style={{
+                  backgroundColor: Colors.bgSub, borderRadius: 14,
+                  borderWidth: 1, borderColor: Colors.border, padding: 16,
+                }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text, marginBottom: 14 }}>
+                    부위별 운동 비율
+                  </Text>
+                  {summaryRadar.map((item) => (
+                    <View key={item.target_body_part} style={{ marginBottom: 12 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={{ fontSize: 13, color: Colors.text }}>{item.target_body_part}</Text>
+                        <Text style={{ fontSize: 13, color: Colors.textMuted }}>{item.part_percentage}%</Text>
+                      </View>
+                      <View style={{ height: 6, backgroundColor: Colors.border, borderRadius: 3 }}>
+                        <View style={{
+                          height: 6, borderRadius: 3, backgroundColor: Colors.green,
+                          width: `${item.part_percentage}%`,
+                        }} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          ) : null}
+        </View>
+      </Modal>
+
+      {/* 갤러리 뷰어 모달 */}
+      <Modal visible={mediaGallery.length > 0} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          {/* 헤더 */}
+          <View
+            style={{
+              position: "absolute",
+              top: 52,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 20,
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: "700",
+                opacity: 0.8,
+              }}
+            >
+              {mediaGalleryIndex + 1} / {mediaGallery.length}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setMediaGallery([])}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
+                ✕
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 스와이프 영역 */}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+              setMediaGalleryIndex(idx);
+            }}
+            style={{ flex: 1 }}
+          >
+            {mediaGallery.map((media, idx) => (
+              <View
+                key={idx}
+                style={{
+                  width: SCREEN_W,
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                {media.mediaType === "IMAGE" ? (
+                  <ScrollView
+                    style={{ width: SCREEN_W, height: SCREEN_H }}
+                    contentContainerStyle={{
+                      flex: 1,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                    maximumZoomScale={4}
+                    minimumZoomScale={1}
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                    centerContent
+                  >
+                    <Image
+                      source={{ uri: media.url }}
+                      style={{ width: SCREEN_W, height: SCREEN_H }}
+                      resizeMode="contain"
+                    />
+                  </ScrollView>
+                ) : (
+                  <Video
+                    source={{ uri: media.url }}
+                    style={{ width: SCREEN_W, height: SCREEN_H * 0.7 }}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    shouldPlay={idx === mediaGalleryIndex}
+                  />
+                )}
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* 인디케이터 dots */}
+          {mediaGallery.length > 1 && (
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 6,
+                paddingVertical: 12,
+              }}
+            >
+              {mediaGallery.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor:
+                      i === mediaGalleryIndex
+                        ? "#fff"
+                        : "rgba(255,255,255,0.3)",
+                  }}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* 저장 버튼 */}
+          <TouchableOpacity
+            onPress={() =>
+              saveMediaToDevice(mediaGallery[mediaGalleryIndex]?.url)
+            }
+            disabled={mediaSaving}
+            style={{
+              marginHorizontal: 20,
+              marginBottom: 40,
+              paddingVertical: 14,
+              borderRadius: 12,
+              backgroundColor: mediaSaving
+                ? "rgba(255,255,255,0.1)"
+                : "rgba(255,255,255,0.18)",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
+              {mediaSaving ? "저장 중..." : "갤러리에 저장"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </>
   );
 }

@@ -7,28 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05444221BD23127F16F316AC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DBA48AB94A6B50AA506CE309 /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		18558883E2AE2611BA387034 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA5F7938B32FF408BC5506D /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		72676C900D66408EB8CAEEF9 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A23191D8FA6C4BFAA78FA59B /* GoogleService-Info.plist */; };
+		8BBADA25E732BC578386B717 /* libPods-FitLog.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C7F2FDB44275C44F65C38C81 /* libPods-FitLog.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		F08F216B9998465D8991FE86 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3886D8932CEE47CCB713D682 /* GoogleService-Info.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F3A84CFEDABE1AEB22EEE621 /* libPods-FitLog.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D99736BAC964A5FD6DB5DD1 /* libPods-FitLog.a */; };
-		FC2A73E68038ECFAA2D54AAE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D6577A7458D5A88114284AFC /* PrivacyInfo.xcprivacy */; };
+		FE093046A122AF70828187D7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE7B5A19A89ABD8DA0BDD475 /* ExpoModulesProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* FitLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FitLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = FitLog/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = FitLog/Info.plist; sourceTree = "<group>"; };
-		6D99736BAC964A5FD6DB5DD1 /* libPods-FitLog.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FitLog.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		9023112C85929627F9E54DED /* Pods-FitLog.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FitLog.debug.xcconfig"; path = "Target Support Files/Pods-FitLog/Pods-FitLog.debug.xcconfig"; sourceTree = "<group>"; };
-		996150B578CAB2E04105DD8E /* Pods-FitLog.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FitLog.release.xcconfig"; path = "Target Support Files/Pods-FitLog/Pods-FitLog.release.xcconfig"; sourceTree = "<group>"; };
-		A23191D8FA6C4BFAA78FA59B /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "FitLog/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		236531AAFB3ED72C2D206317 /* Pods-FitLog.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FitLog.release.xcconfig"; path = "Target Support Files/Pods-FitLog/Pods-FitLog.release.xcconfig"; sourceTree = "<group>"; };
+		3886D8932CEE47CCB713D682 /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "FitLog/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = FitLog/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D6577A7458D5A88114284AFC /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = FitLog/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		EAA5F7938B32FF408BC5506D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-FitLog/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		BE7B5A19A89ABD8DA0BDD475 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-FitLog/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		C7F2FDB44275C44F65C38C81 /* libPods-FitLog.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FitLog.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C920052F089753F1E01E6803 /* Pods-FitLog.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FitLog.debug.xcconfig"; path = "Target Support Files/Pods-FitLog/Pods-FitLog.debug.xcconfig"; sourceTree = "<group>"; };
+		DBA48AB94A6B50AA506CE309 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = FitLog/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = FitLog/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* FitLog-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "FitLog-Bridging-Header.h"; path = "FitLog/FitLog-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -39,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F3A84CFEDABE1AEB22EEE621 /* libPods-FitLog.a in Frameworks */,
+				8BBADA25E732BC578386B717 /* libPods-FitLog.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,8 +55,8 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				A23191D8FA6C4BFAA78FA59B /* GoogleService-Info.plist */,
-				D6577A7458D5A88114284AFC /* PrivacyInfo.xcprivacy */,
+				3886D8932CEE47CCB713D682 /* GoogleService-Info.plist */,
+				DBA48AB94A6B50AA506CE309 /* PrivacyInfo.xcprivacy */,
 			);
 			name = FitLog;
 			sourceTree = "<group>";
@@ -65,17 +65,9 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				6D99736BAC964A5FD6DB5DD1 /* libPods-FitLog.a */,
+				C7F2FDB44275C44F65C38C81 /* libPods-FitLog.a */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		8200A6C78457873A0170A324 /* FitLog */ = {
-			isa = PBXGroup;
-			children = (
-				EAA5F7938B32FF408BC5506D /* ExpoModulesProvider.swift */,
-			);
-			name = FitLog;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -92,8 +84,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				A7FE7E95DDD7BB4594017953 /* Pods */,
-				FCFBC22985E4FA1BBF1C8920 /* ExpoModulesProviders */,
+				AD49F3D0B0DC7290B7384802 /* Pods */,
+				C9344CB3AE3FAB65A3CE017A /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -108,11 +100,11 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A7FE7E95DDD7BB4594017953 /* Pods */ = {
+		AD49F3D0B0DC7290B7384802 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				9023112C85929627F9E54DED /* Pods-FitLog.debug.xcconfig */,
-				996150B578CAB2E04105DD8E /* Pods-FitLog.release.xcconfig */,
+				C920052F089753F1E01E6803 /* Pods-FitLog.debug.xcconfig */,
+				236531AAFB3ED72C2D206317 /* Pods-FitLog.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -127,10 +119,18 @@
 			path = FitLog/Supporting;
 			sourceTree = "<group>";
 		};
-		FCFBC22985E4FA1BBF1C8920 /* ExpoModulesProviders */ = {
+		BD58E1B743DDA4C56E765DFE /* FitLog */ = {
 			isa = PBXGroup;
 			children = (
-				8200A6C78457873A0170A324 /* FitLog */,
+				BE7B5A19A89ABD8DA0BDD475 /* ExpoModulesProvider.swift */,
+			);
+			name = FitLog;
+			sourceTree = "<group>";
+		};
+		C9344CB3AE3FAB65A3CE017A /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				BD58E1B743DDA4C56E765DFE /* FitLog */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
@@ -143,14 +143,14 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "FitLog" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				5BAAB72FFBE4AC8920E3275D /* [Expo] Configure project */,
+				9814B4BD2E7BD52A16A77D9D /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				604DCB9F03B0C99763222BEC /* [CP] Embed Pods Frameworks */,
-				64ADE1370958EF7BFB58D380 /* [CP-User] [RNFB] Core Configuration */,
+				D726C2124FB2D3BD77634C31 /* [CP] Embed Pods Frameworks */,
+				4EC57E68201771605BC20818 /* [CP-User] [RNFB] Core Configuration */,
 			);
 			buildRules = (
 			);
@@ -202,8 +202,8 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				72676C900D66408EB8CAEEF9 /* GoogleService-Info.plist in Resources */,
-				FC2A73E68038ECFAA2D54AAE /* PrivacyInfo.xcprivacy in Resources */,
+				F08F216B9998465D8991FE86 /* GoogleService-Info.plist in Resources */,
+				05444221BD23127F16F316AC /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,53 +249,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		5BAAB72FFBE4AC8920E3275D /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/FitLog/FitLog.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-FitLog/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-FitLog/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-FitLog/expo-configure-project.sh\"\n";
-		};
-		604DCB9F03B0C99763222BEC /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		64ADE1370958EF7BFB58D380 /* [CP-User] [RNFB] Core Configuration */ = {
+		4EC57E68201771605BC20818 /* [CP-User] [RNFB] Core Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -316,9 +270,11 @@
 			inputPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-resources.sh",
 				"${PODS_CONFIGURATION_BUILD_DIR}/Alamofire/Alamofire.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoMediaLibrary/ExpoMediaLibrary_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoSystemUI/ExpoSystemUI_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore_Privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCoreExtension/FirebaseCoreExtension_Privacy.bundle",
@@ -343,9 +299,11 @@
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Alamofire.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoMediaLibrary_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoSystemUI_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/FirebaseCore_Privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/FirebaseCoreExtension_Privacy.bundle",
@@ -372,6 +330,52 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		9814B4BD2E7BD52A16A77D9D /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/FitLog/FitLog.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-FitLog/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-FitLog/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-FitLog/expo-configure-project.sh\"\n";
+		};
+		D726C2124FB2D3BD77634C31 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-FitLog/Pods-FitLog-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -380,7 +384,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				18558883E2AE2611BA387034 /* ExpoModulesProvider.swift in Sources */,
+				FE093046A122AF70828187D7 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -389,7 +393,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9023112C85929627F9E54DED /* Pods-FitLog.debug.xcconfig */;
+			baseConfigurationReference = C920052F089753F1E01E6803 /* Pods-FitLog.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -428,7 +432,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 996150B578CAB2E04105DD8E /* Pods-FitLog.release.xcconfig */;
+			baseConfigurationReference = 236531AAFB3ED72C2D206317 /* Pods-FitLog.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

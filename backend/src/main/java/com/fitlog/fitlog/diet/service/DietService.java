@@ -11,8 +11,7 @@ import com.fitlog.fitlog.diet.repository.DietFeedbackRepository;
 import com.fitlog.fitlog.diet.repository.DietLogRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
-import com.fitlog.fitlog.notification.entity.Notification;
-import com.fitlog.fitlog.notification.repository.NotificationRepository;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.stereotype.Service;
@@ -31,7 +30,7 @@ public class DietService {
     private final MemberRepository memberRepository;
     private final TrainerRepository trainerRepository;
     private final JwtService jwtService;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
 
     public DietService(
             DietLogRepository dietLogRepository,
@@ -39,14 +38,14 @@ public class DietService {
             MemberRepository memberRepository,
             TrainerRepository trainerRepository,
             JwtService jwtService,
-            NotificationRepository notificationRepository
+            NotificationService notificationService
     ) {
         this.dietLogRepository = dietLogRepository;
         this.dietFeedbackRepository = dietFeedbackRepository;
         this.memberRepository = memberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
-        this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -59,16 +58,15 @@ public class DietService {
 
         dietLogRepository.save(log);
 
-        // 식단 등록 알림: 회원 -> 트레이너
+        // 식단 등록 알림: 회원 -> 트레이너 (FCM 푸시 포함)
         if (member.getTrainer() != null && member.getTrainer().getUser() != null) {
-            Notification notification = new Notification();
-            notification.setUser(member.getTrainer().getUser());
-            notification.setType("DIET_LOG");
-            notification.setContent(member.getUser().getName() + " 회원이 식단을 등록했어요.");
-            notification.setTargetType("MEMBER");
-            notification.setTargetId(member.getId());
-
-            notificationRepository.save(notification);
+            notificationService.sendNotification(
+                    member.getTrainer().getUser(),
+                    "DIET_LOG",
+                    member.getUser().getName() + " 회원이 식단을 등록했어요.",
+                    "MEMBER",
+                    member.getId()
+            );
         }
     }
 
@@ -239,14 +237,14 @@ public class DietService {
 
         DietFeedback savedFeedback = dietFeedbackRepository.save(feedback);
 
-        Notification notification = new Notification();
-        notification.setUser(member.getUser());
-        notification.setType("FEEDBACK");
-        notification.setContent("트레이너가 " + request.getTargetDate() + " 식단 피드백을 남겼어요!");
-        notification.setTargetType("FEEDBACK");
-        notification.setTargetId(savedFeedback.getId());
-
-        notificationRepository.save(notification);
+        // 피드백 알림: 트레이너 -> 회원 (FCM 푸시 포함)
+        notificationService.sendNotification(
+                member.getUser(),
+                "FEEDBACK",
+                "트레이너가 " + request.getTargetDate() + " 식단 피드백을 남겼어요!",
+                "FEEDBACK",
+                savedFeedback.getId()
+        );
     }
 
     @Transactional(readOnly = true)

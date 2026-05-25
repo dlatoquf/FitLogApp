@@ -19,13 +19,14 @@ public class FatSecretService {
     private String clientSecret;
 
     private String accessToken = null;
+    private long tokenExpiresAt = 0; // epoch millis
 
     private final WebClient authClient = WebClient.create("https://oauth.fatsecret.com");
     private final WebClient apiClient = WebClient.create("https://platform.fatsecret.com");
 
     // ── OAuth2 토큰 발급 ────────────────────────────────────────────────────
     private String getAccessToken() {
-        if (accessToken != null) return accessToken;
+        if (accessToken != null && System.currentTimeMillis() < tokenExpiresAt) return accessToken;
 
         Map<?, ?> response = authClient.post()
                 .uri("/connect/token")
@@ -43,6 +44,10 @@ public class FatSecretService {
         }
 
         accessToken = (String) response.get("access_token");
+        // FatSecret 토큰 유효기간 86400초(24h), 안전하게 1시간 전에 갱신
+        Object expiresIn = response.get("expires_in");
+        long expirySec = expiresIn != null ? ((Number) expiresIn).longValue() : 86400L;
+        tokenExpiresAt = System.currentTimeMillis() + (expirySec - 3600) * 1000L;
         return accessToken;
     }
 

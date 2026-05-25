@@ -33,7 +33,13 @@
           "kakaokompassauth",
           "kakaolink",
           "storykompassauth"
-        ]
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "NSPhotoLibraryUsageDescription": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요.",
+        "NSPhotoLibraryAddUsageDescription": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요."
       }
     },
     "android": {
@@ -54,6 +60,22 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "운동 기록에 사진/영상을 첨부하기 위해 갤러리 접근이 필요해요.",
+          "cameraPermission": "운동 기록에 사진/영상을 촬영하기 위해 카메라 접근이 필요해요.",
+          "microphonePermission": "영상 녹화를 위해 마이크 접근이 필요해요."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요.",
+          "savePhotosPermission": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
       [
         "@react-native-seoul/kakao-login",
         {

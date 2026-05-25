@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   Text,
   View,
@@ -60,10 +61,13 @@ export default function LoginScreen() {
         const data: { jwt: string; isNewUser: boolean; role: string | null } =
           await res.json();
 
-        // role 최신화
-        if (data.role) {
-          await AsyncStorage.setItem("role", data.role);
+        // role 없음 → 아직 회원가입 미완료지만 뒤로가기로 온 경우일 수 있으므로 로그인 화면 유지
+        if (!data.role) {
+          setCheckingToken(false);
+          return;
         }
+
+        await AsyncStorage.setItem("role", data.role);
 
         // 자동 로그인 성공 → 홈으로 이동
         navigateByRole(data.role);
@@ -108,7 +112,15 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       // 1. 카카오 SDK 로그인
-      const kakaoResult = await loginWithKakaoAccount();
+      console.log("[카카오] loginWithKakaoAccount 호출 시작");
+      let kakaoResult: any;
+      try {
+        kakaoResult = await loginWithKakaoAccount();
+        console.log("[카카오] SDK 결과:", JSON.stringify(kakaoResult));
+      } catch (kakaoErr: any) {
+        console.log("[카카오] SDK 에러:", kakaoErr?.message, kakaoErr?.code, JSON.stringify(kakaoErr));
+        throw new Error(`카카오 SDK 오류: ${kakaoErr?.message ?? kakaoErr}`);
+      }
 
       const accessToken =
         kakaoResult?.accessToken ??
@@ -119,14 +131,24 @@ export default function LoginScreen() {
         throw new Error("카카오 accessToken을 가져오지 못했어요.");
       }
 
+      console.log("[카카오] accessToken 획득, 서버 요청 시작:", API_URL);
+
       // 2. 서버에 카카오 토큰 전송
-      const res = await fetch(`${API_URL}/api/auth/kakao`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${API_URL}/api/auth/kakao`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken }),
+        });
+        console.log("[서버] 응답 status:", res.status);
+      } catch (fetchErr: any) {
+        console.log("[서버] fetch 에러:", fetchErr?.message, JSON.stringify(fetchErr));
+        throw new Error(`서버 연결 실패: ${fetchErr?.message ?? fetchErr}`);
+      }
 
       const text = await res.text();
+      console.log("[서버] 응답 body:", text.slice(0, 200));
       let data: { jwt: string; isNewUser: boolean; role: string | null };
       try {
         data = JSON.parse(text);
@@ -188,19 +210,16 @@ export default function LoginScreen() {
       >
         {/* 로고 */}
         <View style={{ alignItems: "center", marginBottom: 32 }}>
-          <View
+          <Image
+            source={require("../../assets/images/logo.png")}
             style={{
-              width: 80,
-              height: 80,
-              backgroundColor: Colors.green,
+              width: 100,
+              height: 100,
               borderRadius: 22,
-              justifyContent: "center",
-              alignItems: "center",
               marginBottom: 14,
             }}
-          >
-            <Text style={{ fontSize: 36, fontWeight: "900", color: "#fff" }}>F</Text>
-          </View>
+            resizeMode="contain"
+          />
           <Text style={{ fontSize: 40, fontWeight: "900", color: Colors.text }}>
             <Text style={{ color: Colors.green }}>Fit</Text>Log
           </Text>

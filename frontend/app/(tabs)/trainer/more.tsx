@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Purchases from "react-native-purchases";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -38,6 +39,7 @@ export default function TrainerMoreScreen() {
   const [notifPush, setNotifPush] = useState(true);
   const [notifSchedule, setNotifSchedule] = useState(true);
   const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [paymentVisible, setPaymentVisible] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -51,11 +53,21 @@ export default function TrainerMoreScreen() {
         if (Purchases && typeof Purchases.getCustomerInfo === "function") {
           const info = await Purchases.getCustomerInfo();
           const isPro = typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
-          setPlan(isPro ? "PRO" : "FREE");
+          if (isPro) setPlan("PRO");
         }
       } catch (e) {
         console.log("RevenueCat 상태 확인 실패:", e);
       }
+
+      // 백엔드 plan도 확인 (RevenueCat 미인식 시 대비)
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+        const homeRes = await fetch(`${API_URL}/api/trainer/home`, { headers: { Authorization: `Bearer ${jwt}` } });
+        if (homeRes.ok) {
+          const homeData = await homeRes.json();
+          if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
+        }
+      } catch {}
 
       try {
         const data = await apiGet<TrainerProfile>(ENDPOINTS.profile.trainer);
@@ -164,69 +176,29 @@ export default function TrainerMoreScreen() {
           padding: 16,
           marginBottom: 14,
           borderWidth: 1,
-          borderColor: plan === "PRO" ? Colors.green + "44" : Colors.border,
+          borderColor: plan !== "FREE" ? Colors.green + "44" : Colors.border,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
         }}
       >
         <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "900",
-              color: plan === "PRO" ? Colors.green : Colors.text,
-              marginBottom: 4,
-            }}
-          >
+          <Text style={{ fontSize: 13, fontWeight: "900", color: plan === "PRO" ? Colors.green : Colors.text, marginBottom: 4 }}>
             {plan === "PRO" ? "PRO 플랜" : "FREE 플랜"}
           </Text>
           <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>
             {plan === "PRO"
-              ? "회원 무제한 · 모든 기능 이용 중"
+              ? "회원 무제한 · 사진/영상 · 데이터 분석 · 운동 기록"
               : "무료 플랜은 회원 3명까지 가능해요"}
           </Text>
         </View>
 
         {plan === "FREE" && (
           <TouchableOpacity
-            onPress={async () => {
-              try {
-                if (!Purchases || typeof Purchases.getOfferings !== "function") {
-                  Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
-                  return;
-                }
-
-                const offerings = await Purchases.getOfferings();
-                const pkg =
-                  offerings.current?.availablePackages.find(
-                    (p: any) => p.packageType === "MONTHLY"
-                  ) ?? offerings.current?.availablePackages[0];
-
-                if (!pkg) {
-                  Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
-                  return;
-                }
-
-                await Purchases.purchasePackage(pkg);
-                setPlan("PRO");
-                Alert.alert("구독 완료", "PRO 플랜이 활성화됐어요.");
-              } catch (e: any) {
-                if (!e.userCancelled) {
-                  Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
-                }
-              }
-            }}
-            style={{
-              backgroundColor: Colors.green,
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: 10,
-            }}
+            onPress={() => setPaymentVisible(true)}
+            style={{ backgroundColor: Colors.green, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
           >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>
-              업그레이드
-            </Text>
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>업그레이드</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -354,6 +326,64 @@ export default function TrainerMoreScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* 업그레이드 바텀시트 */}
+      <Modal visible={paymentVisible} transparent animationType="slide" onRequestClose={() => setPaymentVisible(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setPaymentVisible(false)}
+        >
+          <GestureDetector gesture={Gesture.Pan().onEnd((e) => {
+            if (e.translationY > 80) setPaymentVisible(false);
+          })}>
+            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: Platform.OS === "ios" ? 44 : 28 }}>
+              <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+
+              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+                PRO 플랜으로 업그레이드
+              </Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 20 }}>
+                더 많은 회원을 관리하고 모든 기능을 사용해보세요.
+              </Text>
+
+              {/* PRO 단일 카드 */}
+              <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+                    <Text style={{ fontSize: 26, fontWeight: "900", color: Colors.green }}>7,900</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>원/월</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>
+                  ✓ 회원 무제한{"\n"}✓ 사진/영상 첨부{"\n"}✓ 운동 기록 전체 조회{"\n"}✓ 데이터 분석
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      if (!Purchases || typeof Purchases.getOfferings !== "function") { Alert.alert("오류", "결제 모듈을 불러오지 못했어요."); return; }
+                      const offerings = await Purchases.getOfferings();
+                      const pkg = offerings.current?.availablePackages.find((p: any) => p.identifier === "pro_monthly") ?? offerings.current?.availablePackages[0];
+                      if (!pkg) { Alert.alert("오류", "구독 상품을 불러오지 못했어요."); return; }
+                      await Purchases.purchasePackage(pkg);
+                      setPlan("PRO"); setPaymentVisible(false);
+                      Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                    } catch (e: any) { if (!e.userCancelled) Alert.alert("결제 실패", e.message ?? "다시 시도해주세요."); }
+                  }}
+                  style={{ marginTop: 16, backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>시작하기</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity onPress={() => setPaymentVisible(false)}>
+                <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
+        </TouchableOpacity>
       </Modal>
     </ScrollView>
   );

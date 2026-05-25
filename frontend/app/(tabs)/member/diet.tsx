@@ -707,11 +707,10 @@ export default function MemberDietScreen() {
             <View
               style={{
                 flexDirection: "row",
-                justifyContent: "space-between",
-                marginBottom: 12,
+                justifyContent: "flex-end",
+                marginBottom: 4,
               }}
             >
-              <Text style={{ fontSize: 11, color: Colors.textMuted }}>0</Text>
               <Text
                 style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}
               >
@@ -729,66 +728,48 @@ export default function MemberDietScreen() {
               }}
             >
               {[
-                {
-                  label: "탄수화물",
-                  val: dietData?.totalCarbs ?? 0,
-                  goal: goalCarbs,
-                },
-                {
-                  label: "단백질",
-                  val: dietData?.totalProtein ?? 0,
-                  goal: goalProtein,
-                },
+                { label: "탄수화물", val: dietData?.totalCarbs ?? 0, goal: goalCarbs },
+                { label: "단백질", val: dietData?.totalProtein ?? 0, goal: goalProtein },
                 { label: "지방", val: dietData?.totalFat ?? 0, goal: goalFat },
               ].map(({ label, val, goal }) => {
-                const isOverGoal = goal > 0 && val > goal;
-                const valueColor = isOverGoal ? Colors.red : Colors.text;
-
+                const hasGoal = goal > 0;
+                const diff = hasGoal ? Math.round(val - goal) : null;
+                const isOver = diff !== null && diff > 0;
                 return (
-                  <View key={label} style={{ alignItems: "center" }}>
+                  <View key={label} style={{ alignItems: "center", gap: 1 }}>
+                    {/* 차이값 */}
                     <Text
                       style={{
-                        fontSize: 18,
-                        fontWeight: "900",
-                        color: valueColor,
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: isOver ? Colors.red : Colors.green,
+                        minHeight: 14,
+                        lineHeight: 14,
                       }}
                     >
-                      {Math.round(val)}
-                      <Text style={{ fontSize: 11, color: valueColor }}>g</Text>
+                      {diff !== null ? (isOver ? `+${diff}g` : `${diff}g`) : ""}
                     </Text>
+                    {/* 실제g / 목표g */}
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          fontWeight: "900",
+                          color: isOver ? Colors.red : Colors.text,
+                        }}
+                      >
+                        {Math.round(val)}g
+                      </Text>
+                      {hasGoal && (
+                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                          /{Math.round(goal)}g
+                        </Text>
+                      )}
+                    </View>
+                    {/* 레이블 */}
                     <Text style={{ fontSize: 10, color: Colors.textMuted }}>
                       {label}
                     </Text>
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: isOverGoal ? Colors.red : Colors.textPlaceholder,
-                      }}
-                    >
-                      / {goal}g
-                    </Text>
-
-                    <View
-                      style={{
-                        width: 50,
-                        height: 4,
-                        backgroundColor: Colors.border,
-                        borderRadius: 99,
-                        marginTop: 4,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width:
-                            `${goal > 0 ? Math.min((val / goal) * 100, 100) : 0}%` as any,
-                          height: 4,
-                          borderRadius: 99,
-                          backgroundColor: isOverGoal
-                            ? Colors.red
-                            : Colors.green,
-                        }}
-                      />
-                    </View>
                   </View>
                 );
               })}

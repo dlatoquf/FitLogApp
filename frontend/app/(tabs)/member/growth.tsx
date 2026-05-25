@@ -429,7 +429,6 @@ export default function MemberGrowthScreen() {
 
       {bodyLogs.length === 0 ? (
         <View style={{ alignItems: "center", paddingVertical: 40 }}>
-          <Text style={{ fontSize: 36, marginBottom: 12 }}>📊</Text>
           <Text style={{ fontSize: 14, color: Colors.textMuted }}>
             등록된 바디로그가 없어요
           </Text>

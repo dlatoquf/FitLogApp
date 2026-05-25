@@ -1,6 +1,7 @@
 package com.fitlog.fitlog.auth.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -23,9 +24,12 @@ public class User {
     @Column(name = "role")
     private Role role;
 
-    // FCM 푸시 알림 토큰 (앱 실행 시 저장됨)
     @Column(name = "fcm_token")
     private String fcmToken;
+
+    // null이면 정상 계정, 값이 있으면 소프트 딜리트된 계정 (7일 후 완전 삭제)
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     public enum Role {
         TRAINER, MEMBER
@@ -37,10 +41,12 @@ public class User {
     public String getName() { return name; }
     public Role getRole() { return role; }
     public String getFcmToken() { return fcmToken; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
 
     public void setKakaoId(Long kakaoId) { this.kakaoId = kakaoId; }
     public void setEmail(String email) { this.email = email; }
     public void setName(String name) { this.name = name; }
     public void setRole(Role role) { this.role = role; }
     public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 }

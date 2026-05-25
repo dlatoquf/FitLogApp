@@ -33,6 +33,9 @@ public class PtContract {
     @Column(name = "end_date")
     private String endDate;
 
+    @Column(name = "amount")
+    private Long amount;
+
     @Column(name = "memo")
     private String memo;
 
@@ -49,6 +52,7 @@ public class PtContract {
     public int getRemainSessions() { return remainSessions; }
     public String getStartDate() { return startDate; }
     public String getEndDate() { return endDate; }
+    public Long getAmount() { return amount; }
     public String getMemo() { return memo; }
     public String getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
@@ -59,6 +63,7 @@ public class PtContract {
     public void setRemainSessions(int remainSessions) { this.remainSessions = remainSessions; }
     public void setStartDate(String startDate) { this.startDate = startDate; }
     public void setEndDate(String endDate) { this.endDate = endDate; }
+    public void setAmount(Long amount) { this.amount = amount; }
     public void setMemo(String memo) { this.memo = memo; }
     public void setStatus(String status) { this.status = status; }
 }

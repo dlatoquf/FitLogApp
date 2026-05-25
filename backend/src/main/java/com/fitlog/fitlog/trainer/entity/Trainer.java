@@ -43,6 +43,12 @@ public class Trainer {
     @Column(name = "plan")
     private String plan = "FREE";
 
+    @Column(name = "goal_sessions")
+    private Integer goalSessions;
+
+    @Column(name = "goal_revenue")
+    private Long goalRevenue;
+
     public Long getId() { return id; }
     public User getUser() { return user; }
     public String getGymName() { return gymName; }
@@ -52,6 +58,8 @@ public class Trainer {
     public String getTrainerCode() { return trainerCode; }
     public String getPlan() { return plan; }
     public List<Member> getMembers() { return members; }
+    public Integer getGoalSessions() { return goalSessions; }
+    public Long getGoalRevenue() { return goalRevenue; }
 
     public void setUser(User user) { this.user = user; }
     public void setGymName(String gymName) { this.gymName = gymName; }
@@ -61,4 +69,6 @@ public class Trainer {
     public void setTrainerCode(String trainerCode) { this.trainerCode = trainerCode; }
     public void setPlan(String plan) { this.plan = plan; }
     public void setMembers(List<Member> members) { this.members = members; }
+    public void setGoalSessions(Integer goalSessions) { this.goalSessions = goalSessions; }
+    public void setGoalRevenue(Long goalRevenue) { this.goalRevenue = goalRevenue; }
 }

@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
-import { API_URL } from "../../../constants/api";
+import { ANALYTICS_URL, API_URL } from "../../../constants/api";
 import { getWeekDates, toDateKey } from "../../../hooks/useApi";
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -42,6 +42,7 @@ interface MemberHomeData {
     id: number;
     name: string;
     trainerName?: string;
+    trainerPlan?: string;
     ptExpDate?: string;
     goal?: string;
     weight?: number;
@@ -116,6 +117,9 @@ export default function MemberHomeScreen() {
   const [slotsLoading, setSlotsLoading]         = useState(false);
   const [requesting, setRequesting]             = useState<number | null>(null);
   const [notifications, setNotifications]       = useState<Noti[]>([]);
+  const [summaryData, setSummaryData]           = useState<{ monthly_workout_days: number; top_2_workout_days: string[] } | null>(null);
+  const [summaryRadar, setSummaryRadar]         = useState<{ target_body_part: string; part_percentage: number }[]>([]);
+  const [weekSummary, setWeekSummary]           = useState<{ workout_days: number; avg_calories: number; avg_protein: number; goal_calories: number; goal_protein: number } | null>(null);
   const [selectedDate, setSelectedDate]         = useState(() => {
     const d = new Date();
     const day = d.getDay();
@@ -141,7 +145,41 @@ export default function MemberHomeScreen() {
         fetch(`${API_URL}/api/notifications`, { headers }),
       ]);
       if (!homeRes.ok) throw new Error();
-      setData(await homeRes.json());
+      const homeData = await homeRes.json();
+      setData(homeData);
+
+      // PRO일 때만 분석 fetch
+      if (homeData?.member?.id && homeData?.member?.trainerPlan === "PRO") {
+        const memberId = homeData.member.id;
+        try {
+          const [workoutRes, dietRes, goalsRes] = await Promise.all([
+            fetch(`${ANALYTICS_URL}/api/analytics/workout-habit/${memberId}`),
+            fetch(`${ANALYTICS_URL}/api/analytics/diet-pattern/${memberId}`),
+            fetch(`${API_URL}/api/member/goals/member/${memberId}`, { headers }),
+          ]);
+          const workoutJson = await workoutRes.json();
+          if (workoutJson.status === "success") {
+            setSummaryData(workoutJson.data.metrics);
+            setSummaryRadar(workoutJson.data.charts.radar_chart_data ?? []);
+          }
+          let goalProtein = 0;
+          if (goalsRes.ok) {
+            const goalsData = await goalsRes.json();
+            goalProtein = Number(goalsData?.targetProtein ?? goalsData?.goalProtein ?? goalsData?.protein ?? 0);
+          }
+          const dietJson = await dietRes.json();
+          if (dietJson.status === "success") {
+            const m = dietJson.data.metrics;
+            setWeekSummary({
+              workout_days: m.workout_days ?? 0,
+              avg_calories: m.avg_calories ?? 0,
+              avg_protein: m.avg_protein ?? 0,
+              goal_calories: homeData.goalCalories ?? 0,
+              goal_protein: goalProtein,
+            });
+          }
+        } catch {}
+      }
       if (weekRes.ok) setThisWeek(await weekRes.json());
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
@@ -408,6 +446,70 @@ export default function MemberHomeScreen() {
             </View>
             <Text style={{ fontSize: 16, color: Colors.blue }}>›</Text>
           </TouchableOpacity>
+        )}
+
+        {/* 이번 주 요약 카드 (PRO) */}
+        {weekSummary && (
+          <View style={{
+            backgroundColor: Colors.bgSub, borderRadius: 14,
+            borderWidth: 1, borderColor: Colors.border,
+            paddingTop: 12, paddingHorizontal: 10, paddingBottom: 10,
+            marginBottom: 12,
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, paddingHorizontal: 2 }}>
+              이번 주 요약
+            </Text>
+            <View style={{ flexDirection: "row", gap: 4 }}>
+              {/* 운동한 날 */}
+              <View style={{
+                flex: 1, backgroundColor: "#fff", borderRadius: 10,
+                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
+                alignItems: "center",
+              }}>
+                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>운동한 날</Text>
+                <Text style={{ fontSize: 20, fontWeight: "900", color: Colors.blue }}>
+                  {weekSummary.workout_days}
+                  <Text style={{ fontSize: 12, fontWeight: "400", color: Colors.textMuted }}>/7일</Text>
+                </Text>
+              </View>
+              {/* 평균 칼로리 */}
+              <View style={{
+                flex: 1, backgroundColor: "#fff", borderRadius: 10,
+                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
+                alignItems: "center",
+              }}>
+                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>평균 칼로리</Text>
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.gold }}>
+                    {Math.round(weekSummary.avg_calories).toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                    {weekSummary.goal_calories > 0
+                      ? `/${weekSummary.goal_calories.toLocaleString()}kcal`
+                      : "kcal"}
+                  </Text>
+                </View>
+              </View>
+              {/* 평균 단백질 */}
+              <View style={{
+                flex: 1, backgroundColor: "#fff", borderRadius: 10,
+                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
+                alignItems: "center",
+              }}>
+                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>평균 단백질</Text>
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>
+                    {Math.round(weekSummary.avg_protein)}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                    {weekSummary.goal_protein > 0
+                      ? `/${Math.round(weekSummary.goal_protein)}g`
+                      : "g"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
         )}
 
       </ScrollView>

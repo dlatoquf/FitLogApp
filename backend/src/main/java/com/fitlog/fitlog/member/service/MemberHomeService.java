@@ -200,6 +200,7 @@ public class MemberHomeService {
             map.put("trainerName", member.getTrainer().getUser().getName());
             map.put("trainerCode", member.getTrainer().getTrainerCode());
             map.put("gymName", member.getTrainer().getGymName());
+            map.put("trainerPlan", member.getTrainer().getPlan());
         }
         return map;
     }

@@ -2,14 +2,25 @@
  * FitLog API 설정
  * 개발 환경에 맞게 API_URL을 수정하세요.
  */
+
+// Cloudinary 설정
+export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
+export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
+export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 /*자취방 */
-/*export const API_URL = "http://192.168.0.182:8080";*/
+export const API_URL = "http://192.168.0.106:8080";
+export const ANALYTICS_URL = "http://192.168.0.106:8001";
+/*카페 */
+/*export const API_URL = "http://192.168.45.99:8080";*/
 /*오ㅃㅏ집 */
 /*export const API_URL = "http://192.168.219.155:8080";*/
 /*본가*/
-/*export const API_URL = "http://192.168.219.114:8080";*/
-export const API_URL = "https://fitlogapp-production.up.railway.app";
-
+/*export const API_URL = "http://192.168.219.129:8080";*/
+/*export const ANALYTICS_URL = "http://192.168.219.129:8001";*/
+/*운영 서버*/
+/*export const API_URL = "https://fitlog-api.duckdns.org";*/
+/*개발 - 맥 로컬 (Android 에뮬레이터)*/
+/*export const API_URL = "http://10.0.2.2:8080";*/
 
 export const ENDPOINTS = {
   // 인증
@@ -50,7 +61,8 @@ export const ENDPOINTS = {
     log: "/api/diet/log",
     logDelete: (id: number) => `/api/diet/log/${id}`,
     feedback: "/api/diet/feedback",
-    feedbackByMember: (memberId: number) => `/api/diet/feedback/member/${memberId}`,
+    feedbackByMember: (memberId: number) =>
+      `/api/diet/feedback/member/${memberId}`,
     myFeedbacks: "/api/diet/feedback",
   },
   // FitLog

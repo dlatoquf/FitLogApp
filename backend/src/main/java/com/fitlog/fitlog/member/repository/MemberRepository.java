@@ -41,12 +41,26 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
         JOIN FETCH m.user
         WHERE m.trainer.id = :trainerId
           AND m.status = 'ACTIVE'
+          AND m.user.deletedAt IS NULL
         ORDER BY m.id DESC
     """)
     List<Member> findActiveMembersByTrainerIdWithUser(@Param("trainerId") Long trainerId);
 
-    @Query("SELECT m.id FROM Member m WHERE m.trainer.id = :trainerId AND m.status = 'ACTIVE'")
+    @Query("SELECT m.id FROM Member m WHERE m.trainer.id = :trainerId AND m.status = 'ACTIVE' AND m.user.deletedAt IS NULL")
     List<Long> findActiveMemberIdsByTrainerId(@Param("trainerId") Long trainerId);
+
+    // 소프트 딜리트되어 7일 이내인 회원 목록 (복구 가능)
+    @Query("""
+        SELECT m FROM Member m JOIN FETCH m.user
+        WHERE m.trainer.id = :trainerId
+          AND m.user.deletedAt IS NOT NULL
+          AND m.user.deletedAt >= :since
+        ORDER BY m.user.deletedAt DESC
+    """)
+    List<Member> findSoftDeletedMembersByTrainerId(
+        @Param("trainerId") Long trainerId,
+        @Param("since") java.time.LocalDateTime since
+    );
 
     @Query("""
         SELECT m

@@ -15,11 +15,7 @@ import com.fitlog.fitlog.trainer.service.TrainerDeleteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -182,6 +178,53 @@ public class TrainerController {
             @RequestHeader("Authorization") String authorization) {
         trainerDeleteService.deleteTrainerAccount(authorization);
         return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
+    }
+
+    // GET /api/trainer/deleted-members — 7일 이내 삭제된 회원 목록 조회
+    @GetMapping("/trainer/deleted-members")
+    public ResponseEntity<List<Map<String, Object>>> getDeletedMembers(
+            @RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays(7);
+        List<Member> deletedMembers = memberRepository.findSoftDeletedMembersByTrainerId(trainer.getId(), since);
+
+        List<Map<String, Object>> result = deletedMembers.stream().map(m -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("memberId", m.getId());
+            map.put("name", m.getUser().getName());
+            map.put("deletedAt", m.getUser().getDeletedAt().toString());
+            // 복구 가능 기한 (삭제일 + 7일)
+            map.put("restoreDeadline", m.getUser().getDeletedAt().plusDays(7).toString());
+            return map;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
+    }
+
+    // POST /api/trainer/members/{memberId}/restore — 삭제된 회원 복구
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/trainer/members/{memberId}/restore")
+    public ResponseEntity<Map<String, Object>> restoreMember(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long memberId) {
+        Trainer trainer = getTrainer(authorization);
+
+        Member member = memberRepository.findByIdAndTrainerIdWithUser(memberId, trainer.getId())
+                .orElseThrow(() -> new RuntimeException("해당 회원을 찾을 수 없습니다."));
+
+        if (member.getUser().getDeletedAt() == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "삭제되지 않은 회원입니다."));
+        }
+
+        java.time.LocalDateTime deadline = member.getUser().getDeletedAt().plusDays(7);
+        if (java.time.LocalDateTime.now().isAfter(deadline)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "복구 가능 기간(7일)이 지났습니다."));
+        }
+
+        member.getUser().setDeletedAt(null);
+        userRepository.save(member.getUser());
+
+        return ResponseEntity.ok(Map.of("success", true, "message", member.getUser().getName() + " 회원이 복구됐어요."));
     }
 
     private Trainer getTrainer(String authorization) {

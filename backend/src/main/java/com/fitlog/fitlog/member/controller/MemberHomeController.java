@@ -6,7 +6,11 @@ import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.member.service.MemberDeleteService;
 import com.fitlog.fitlog.member.service.MemberHomeService;
+import com.fitlog.fitlog.trainer.entity.ManualMember;
+import com.fitlog.fitlog.trainer.entity.MemberMemo;
 import com.fitlog.fitlog.trainer.entity.Trainer;
+import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
+import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +29,25 @@ public class MemberHomeController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final MemberDeleteService memberDeleteService;
+    private final ManualMemberRepository manualMemberRepository;
+    private final MemberMemoRepository memberMemoRepository;
 
     public MemberHomeController(MemberHomeService memberHomeService,
                                 MemberRepository memberRepository,
                                 TrainerRepository trainerRepository,
                                 JwtService jwtService,
                                 UserRepository userRepository,
-                                MemberDeleteService memberDeleteService) {
+                                MemberDeleteService memberDeleteService,
+                                ManualMemberRepository manualMemberRepository,
+                                MemberMemoRepository memberMemoRepository) {
         this.memberHomeService = memberHomeService;
         this.memberRepository = memberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.memberDeleteService = memberDeleteService;
+        this.manualMemberRepository = manualMemberRepository;
+        this.memberMemoRepository = memberMemoRepository;
     }
 
     @GetMapping("/home")
@@ -170,10 +180,44 @@ public class MemberHomeController {
         member.setTrainer(trainer);
         memberRepository.save(member);
 
+        // ── 미연동 회원 자동 병합: 같은 트레이너 + 같은 이름이면 PT 데이터 이전 ──
+        String memberName = member.getUser().getName();
+        List<ManualMember> manualMatches = manualMemberRepository.findByTrainer(trainer)
+                .stream()
+                .filter(mm -> mm.getName().trim().equalsIgnoreCase(memberName.trim()))
+                .toList();
+
+        boolean merged = false;
+        if (manualMatches.size() == 1) {
+            ManualMember mm = manualMatches.get(0);
+
+            // 1. PT 데이터 이전 (미연동에만 있고 연동엔 없을 때)
+            if (mm.getPtTotal() != null && mm.getPtTotal() > 0
+                    && (member.getPtTotal() == null || member.getPtTotal() == 0)) {
+                member.setPtTotal(mm.getPtTotal());
+                member.setPtRemaining(mm.getPtRemaining());
+                memberRepository.save(member);
+            }
+
+            // 2. 메모 이전: manual_member_id → member_id 로 교체 후 저장
+            //    이렇게 해야 manualMember 삭제 시 CASCADE로 메모가 날아가지 않음
+            List<MemberMemo> memos = memberMemoRepository.findByManualMemberOrderByCreatedAtDesc(mm);
+            for (MemberMemo memo : memos) {
+                memo.setMember(member);       // 연동 회원으로 교체
+                memo.setManualMember(null);   // 미연동 참조 제거
+                memberMemoRepository.save(memo);
+            }
+
+            // 3. 미연동 회원 삭제 (이 시점엔 메모 참조가 없으므로 CASCADE 영향 없음)
+            manualMemberRepository.delete(mm);
+            merged = true;
+        }
+
         return ResponseEntity.ok(Map.of(
                 "message",     "트레이너 연결 완료!",
                 "trainerName", trainer.getUser().getName(),
-                "gymName",     trainer.getGymName() != null ? trainer.getGymName() : ""
+                "gymName",     trainer.getGymName() != null ? trainer.getGymName() : "",
+                "merged",      merged   // 프론트에서 "기존 정보가 이전됐어요" 안내용
         ));
     }
 }

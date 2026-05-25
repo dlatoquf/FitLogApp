@@ -1,1 +1,29 @@
-{"project_info":{"project_number":"1","project_id":"temp","storage_bucket":"temp"},"client":[{"client_info":{"mobilesdk_app_id":"1:1:android:1","android_client_info":{"package_name":"com.anonymous.FitLogApp"}},"oauth_client":[],"api_key":[],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+{
+  "project_info": {
+    "project_number": "419852916314",
+    "project_id": "fitlogapp-e972c",
+    "storage_bucket": "fitlogapp-e972c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:419852916314:android:70558c63fad09214876a63",
+        "android_client_info": {
+          "package_name": "com.anonymous.FitLogApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGGzHU1YU87WiYVZClJ4bKuNQzidL8beo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

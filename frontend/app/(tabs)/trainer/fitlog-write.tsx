@@ -373,7 +373,7 @@ export default function FitLogWriteScreen() {
             color: Colors.text,
             textAlignVertical: "top",
             minHeight: 80,
-            marginBottom: 24,
+            marginBottom: 20,
           }}
         />
 

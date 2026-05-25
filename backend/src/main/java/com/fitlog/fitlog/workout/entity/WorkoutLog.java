@@ -40,11 +40,17 @@ public class WorkoutLog {
     @Column(name = "schedule_id")
     private Long scheduleId;
 
+    @Column(name = "feedback", columnDefinition = "TEXT")
+    private String feedback;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "workoutLog", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<WorkoutSet> sets = new ArrayList<>();
+
+    @OneToMany(mappedBy = "workoutLog", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<WorkoutMedia> mediaList = new ArrayList<>();
 
     // Getters & Setters
     public Long getWorkoutId() { return workoutId; }
@@ -63,6 +69,10 @@ public class WorkoutLog {
     public Long getScheduleId() { return scheduleId; }
     public void setScheduleId(Long scheduleId) { this.scheduleId = scheduleId; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public String getFeedback() { return feedback; }
+    public void setFeedback(String feedback) { this.feedback = feedback; }
     public List<WorkoutSet> getSets() { return sets; }
     public void setSets(List<WorkoutSet> sets) { this.sets = sets; }
+    public List<WorkoutMedia> getMediaList() { return mediaList; }
+    public void setMediaList(List<WorkoutMedia> mediaList) { this.mediaList = mediaList; }
 }

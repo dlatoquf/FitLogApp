@@ -40,6 +40,10 @@ public class AuthService {
                     return userRepository.save(newUser);
                 });
 
+        if (user.getDeletedAt() != null) {
+            throw new RuntimeException("삭제된 계정입니다. 7일 이내에 트레이너에게 복구를 요청하세요.");
+        }
+
         System.out.println("유저 role: " + user.getRole());
 
         boolean isNewUser = user.getRole() == null;

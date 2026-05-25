@@ -3,6 +3,13 @@
 # dependencies
 node_modules/
 
+# Gradle / Spring Boot build outputs
+.gradle/
+build/
+bin/
+out/
+*.class
+
 # Expo
 .expo/
 dist/

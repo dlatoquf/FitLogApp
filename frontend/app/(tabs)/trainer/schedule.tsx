@@ -60,6 +60,11 @@ export default function TrainerScheduleScreen() {
   const [addingSlot, setAddingSlot]     = useState<any | null>(null);
   const [addingMember, setAddingMember] = useState(false);
 
+  // 수동 스케줄 추가 모달 (날짜 무관, 시간 직접 선택)
+  const [manualModal, setManualModal]   = useState(false);
+  const [manualTime, setManualTime]     = useState("09:00");
+  const [addingManual, setAddingManual] = useState(false);
+
   const thisWeekDates = getWeekDates(0);
   const nextWeekDates = getWeekDates(1);
   const weekDates     = tab === "THIS" ? thisWeekDates : nextWeekDates;
@@ -250,6 +255,33 @@ export default function TrainerScheduleScreen() {
     finally { setAddingMember(false); }
   };
 
+  const addManualSchedule = async (memberId: number, memberName: string) => {
+    setAddingManual(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({
+          date: dateKey,
+          startTime: manualTime,
+          memberId,
+        }),
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || "추가 실패");
+      }
+      setManualModal(false);
+      fetchCalendar(false, tab);
+      Alert.alert("완료 ✓", `${memberName}님 수업이 추가됐어요!`);
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    } finally {
+      setAddingManual(false);
+    }
+  };
+
   const buildDefaultDayTimesFromProfile = (targetProfile: any): DayTime[] => {
     const workDayList = (targetProfile?.workDays || "월,화,수,목,금")
       .split(",")
@@ -416,12 +448,12 @@ export default function TrainerScheduleScreen() {
     setSelectedDate(t === "THIS" ? new Date() : nextWeekDates[0]);
   };
 
-  // 도트
+  // 도트 (날짜별로 확정/대기 각 1개씩만)
   const dotDates: { [key: string]: string[] } = {};
   slots.forEach(s => {
     if (!dotDates[s.date]) dotDates[s.date] = [];
     if (s.status === "CONFIRMED" && !dotDates[s.date].includes(Colors.green)) dotDates[s.date].push(Colors.green);
-    if (s.status === "REQUESTED" && !dotDates[s.date].includes("#F59E0B")) dotDates[s.date].push(Colors.gold);
+    if (s.status === "REQUESTED" && !dotDates[s.date].includes(Colors.gold)) dotDates[s.date].push(Colors.gold);
   });
 
   return (
@@ -501,7 +533,7 @@ export default function TrainerScheduleScreen() {
             <Text style={{ fontSize: 11, color: Colors.textMuted }}>확정</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#F59E0B" }} />
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gold }} />
             <Text style={{ fontSize: 11, color: Colors.textMuted }}>대기 중</Text>
           </View>
         </View>
@@ -517,15 +549,22 @@ export default function TrainerScheduleScreen() {
         ) : (
           (() => {
             // 이번 주는 가상 슬롯까지 표시, 다음 주는 DB에 실제 오픈된 슬롯만 표시
-            const displaySlots = [
-              ...daySlots,
-              ...(tab === "THIS" ? generateVirtualSlots() : []),
-            ].sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const displaySlots = [...daySlots]
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
             if (displaySlots.length === 0) return (
-              <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <Text style={{ fontSize: 32, marginBottom: 12 }}>📭</Text>
-                <Text style={{ fontSize: 14, color: Colors.textMuted }}>이날 슬롯이 없어요</Text>
+              <View style={{ alignItems: "center", paddingVertical: 40, gap: 16 }}>
+                <Text style={{ fontSize: 14, color: Colors.textMuted }}>이날 스케줄이 없어요</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (members.length === 0) await fetchMembers();
+                    setManualTime("09:00");
+                    setManualModal(true);
+                  }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.green, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>+ 스케줄 추가</Text>
+                </TouchableOpacity>
               </View>
             );
 
@@ -660,6 +699,24 @@ export default function TrainerScheduleScreen() {
             });
           })()
         )}
+
+        {/* 슬롯 있을 때도 하단에 추가 버튼 */}
+        {!loading && daySlots.length > 0 && (
+          <TouchableOpacity
+            onPress={async () => {
+              if (members.length === 0) await fetchMembers();
+              setManualTime("09:00");
+              setManualModal(true);
+            }}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+              marginTop: 10, paddingVertical: 12,
+              borderRadius: 12, borderWidth: 1.5, borderColor: Colors.green, borderStyle: "dashed",
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>+ 스케줄 추가</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* 신청자 확정 모달 */}
@@ -761,6 +818,77 @@ export default function TrainerScheduleScreen() {
           </View>
         </View>
       </Modal>
+      {/* 수동 스케줄 추가 모달 */}
+      <Modal visible={manualModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: "85%" }}>
+            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+            <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+              {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 스케줄 추가
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>
+              시간을 선택하고 회원을 탭하면 바로 확정돼요
+            </Text>
+
+            {/* 시간 선택 */}
+            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>시작 시간</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {TIME_OPTIONS.filter(t => t !== "24:00").map(t => (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => setManualTime(t)}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                      backgroundColor: manualTime === t ? Colors.green : Colors.bgSub,
+                      borderWidth: 1,
+                      borderColor: manualTime === t ? Colors.green : Colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: manualTime === t ? "#fff" : Colors.text }}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* 회원 선택 */}
+            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>회원 선택</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {members.map((m: any) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => addManualSchedule(m.id, m.user.name)}
+                    disabled={addingManual}
+                    style={{
+                      width: "30%",
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 12, padding: 12,
+                      alignItems: "center", gap: 6,
+                      borderWidth: 1, borderColor: Colors.border,
+                      opacity: addingManual ? 0.5 : 1,
+                    }}
+                  >
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center" }}>
+                      <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>{m.user.name[0]}</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text, textAlign: "center" }}>{m.user.name}</Text>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>잔여 {m.ptRemaining}회</Text>
+                    <View style={{ backgroundColor: Colors.green, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{addingManual ? "..." : "추가"}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity onPress={() => setManualModal(false)} style={{ marginTop: 16, alignItems: "center", padding: 14 }}>
+              <Text style={{ fontSize: 14, color: Colors.textMuted }}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* 다음 주 오픈 모달 */}
       <Modal visible={openModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
