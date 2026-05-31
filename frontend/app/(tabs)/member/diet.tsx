@@ -1,11 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -13,1729 +18,456 @@ import {
   View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
-import { API_URL, ENDPOINTS } from "../../../constants/api";
-import { apiDelete, apiGet, toDateKey } from "../../../hooks/useApi";
-import {
-  DietFeedback,
-  DietResponse,
-  FoodSearchResult,
-  MealType,
-} from "../../../types";
+import { API_URL, CLOUDINARY_UPLOAD_URL, CLOUDINARY_UPLOAD_PRESET } from "../../../constants/api";
 
-const MEAL_TYPES: { key: MealType; label: string }[] = [
-  { key: "BREAKFAST", label: "아침" },
-  { key: "LUNCH", label: "점심" },
-  { key: "DINNER", label: "저녁" },
-  { key: "SNACK", label: "간식" },
-];
+// ─── 타입 ─────────────────────────────────────────────────────────────────────
+interface DayFeedback {
+  id: number;
+  trainerName: string;
+  content: string;
+  createdAt: string;
+}
+interface DietPhoto {
+  id: number;
+  date: string;
+  photoUrl: string;
+  cloudinaryPublicId?: string;
+  label?: string;
+  createdAt: string;
+}
 
-const DEFAULT_GOALS = {
-  kcal: 1800,
-  carbs: 225,
-  protein: 90,
-  fat: 60,
+// ─── 날짜 유틸 (로컬 타임존 기준) ────────────────────────────────────────────
+const toDateKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
+
+const getWeekDates = (offset: number): Date[] => {
+  const today = new Date();
+  const day = today.getDay();
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - ((day + 6) % 7) + offset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d;
+  });
 };
 
-const emptyDietData = (date: string): DietResponse => ({
-  date,
-  totalCalories: 0,
-  totalCarbs: 0,
-  totalProtein: 0,
-  totalFat: 0,
-  meals: [
-    { mealType: "BREAKFAST", foods: [] },
-    { mealType: "LUNCH", foods: [] },
-    { mealType: "DINNER", foods: [] },
-    { mealType: "SNACK", foods: [] },
-  ],
-});
-
-type GoalPurpose = "DIET" | "MAINTAIN" | "BULK";
-
-type AddFoodForm = {
-  foodName: string;
-  baseAmount: string;
-  amount: string;
-  unit: "g" | "개";
-  calories: string;
-  carbs: string;
-  protein: string;
-  fat: string;
-  fatSecretFoodId?: string;
-};
-
-const emptyAddFoodForm: AddFoodForm = {
-  foodName: "",
-  baseAmount: "100",
-  amount: "100",
-  unit: "g",
-  calories: "",
-  carbs: "",
-  protein: "",
-  fat: "",
-};
-
+// ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function MemberDietScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [dietData, setDietData] = useState<DietResponse | null>(null);
-  const [feedbacks, setFeedbacks] = useState<DietFeedback[]>([]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [photos, setPhotos] = useState<DietPhoto[]>([]);
+  const [dayFeedback, setDayFeedback] = useState<DayFeedback | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [photoAspectRatios, setPhotoAspectRatios] = useState<{ [id: number]: number }>({});
 
-  const [addMealType, setAddMealType] = useState<MealType>("BREAKFAST");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [adding, setAdding] = useState(false);
-
-  const [addForm, setAddForm] = useState<AddFoodForm>(emptyAddFoodForm);
-  const [editingFoodId, setEditingFoodId] = useState<number | null>(null);
-
-  const [bodyWeight, setBodyWeight] = useState<number | null>(null);
-  const [goalPurpose, setGoalPurpose] = useState<GoalPurpose>("MAINTAIN");
-
-  const [goalKcal, setGoalKcal] = useState(DEFAULT_GOALS.kcal);
-  const [goalCarbs, setGoalCarbs] = useState(DEFAULT_GOALS.carbs);
-  const [goalProtein, setGoalProtein] = useState(DEFAULT_GOALS.protein);
-  const [goalFat, setGoalFat] = useState(DEFAULT_GOALS.fat);
-
-  const [goalForm, setGoalForm] = useState({
-    kcal: String(DEFAULT_GOALS.kcal),
-    carbs: String(DEFAULT_GOALS.carbs),
-    protein: String(DEFAULT_GOALS.protein),
-    fat: String(DEFAULT_GOALS.fat),
-  });
-
-  // React 개발모드 StrictMode / dateKey effect 중복 호출 방지
-  const didFetchInitial = useRef(false);
-  const prevDateKey = useRef<string | null>(null);
+  const [addModal, setAddModal] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
+  const [pickedImageUris, setPickedImageUris] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const dateKey = toDateKey(selectedDate);
-  const isToday = dateKey === toDateKey(new Date());
+  const todayKey = toDateKey(new Date());
+  const weekDates = getWeekDates(weekOffset);
 
-  const safeNumber = (v: string) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const fmt = (n: number) => Math.round((n ?? 0) * 10) / 10;
-
-  const calcAdjustedFood = () => {
-    const baseAmount = safeNumber(addForm.baseAmount) || 1;
-    const amount = safeNumber(addForm.amount) || 0;
-    const ratio = amount / baseAmount;
-
-    return {
-      foodName: addForm.foodName.trim(),
-      calories: Math.round(safeNumber(addForm.calories) * ratio * 10) / 10,
-      carbs: Math.round(safeNumber(addForm.carbs) * ratio * 10) / 10,
-      protein: Math.round(safeNumber(addForm.protein) * ratio * 10) / 10,
-      fat: Math.round(safeNumber(addForm.fat) * ratio * 10) / 10,
-    };
-  };
-
-  const fetchMemberInfo = async () => {
+  // ── 데이터 조회 ──────────────────────────────────────────────────────────────
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/member/me`, {
+      const res = await fetch(`${API_URL}/api/diet/photos?date=${dateKey}`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
-      if (!res.ok) return;
-      const data = await res.json();
-      const weight = Number(data?.weight);
-      if (Number.isFinite(weight) && weight > 0) {
-        setBodyWeight(weight);
+      if (res.ok) {
+        const data = await res.json();
+        setPhotos(data.photos ?? []);
+        setDayFeedback(data.feedback ?? null);
+      } else {
+        setPhotos([]); setDayFeedback(null);
       }
-    } catch {}
-  };
-
-  const fetchGoals = async () => {
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/member/goals`, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (!res.ok) throw new Error("목표값 조회 실패");
-
-      const data = await res.json();
-
-      const kcal = Number(data.targetCalories ?? DEFAULT_GOALS.kcal);
-      const carbs = Number(data.targetCarbs ?? DEFAULT_GOALS.carbs);
-      const protein = Number(data.targetProtein ?? DEFAULT_GOALS.protein);
-      const fat = Number(data.targetFat ?? DEFAULT_GOALS.fat);
-      const purpose = (
-        data.purpose === "BULKUP" ? "BULK" : (data.purpose ?? "MAINTAIN")
-      ) as GoalPurpose;
-
-      setGoalKcal(kcal);
-      setGoalCarbs(carbs);
-      setGoalProtein(protein);
-      setGoalFat(fat);
-      setGoalPurpose(purpose);
-
-      setGoalForm({
-        kcal: String(kcal),
-        carbs: String(carbs),
-        protein: String(protein),
-        fat: String(fat),
-      });
     } catch {
-      setGoalKcal(DEFAULT_GOALS.kcal);
-      setGoalCarbs(DEFAULT_GOALS.carbs);
-      setGoalProtein(DEFAULT_GOALS.protein);
-      setGoalFat(DEFAULT_GOALS.fat);
-      setGoalForm({
-        kcal: String(DEFAULT_GOALS.kcal),
-        carbs: String(DEFAULT_GOALS.carbs),
-        protein: String(DEFAULT_GOALS.protein),
-        fat: String(DEFAULT_GOALS.fat),
-      });
-    }
-  };
-
-  const calculateGoalsByWeight = (
-    weight: number,
-    purpose: GoalPurpose = goalPurpose,
-  ) => {
-    const maintenanceKcal = Math.round(weight * 33);
-
-    let kcal = maintenanceKcal;
-    if (purpose === "DIET") kcal = maintenanceKcal - 400;
-    if (purpose === "BULK") kcal = maintenanceKcal + 400;
-
-    const protein = Math.round(weight * 2.2);
-    const fat = Math.round(weight * 1.0);
-
-    const proteinKcal = protein * 4;
-    const fatKcal = fat * 9;
-    const remainKcal = Math.max(kcal - proteinKcal - fatKcal, 0);
-    const carbs = Math.round(remainKcal / 4);
-
-    return { kcal, carbs, protein, fat };
-  };
-
-  const applyAutoGoals = (purpose: GoalPurpose) => {
-    if (!bodyWeight) {
-      Alert.alert(
-        "체중 없음",
-        "회원 정보에 체중이 없어서 자동 계산을 할 수 없어요.",
-      );
-      return;
-    }
-
-    setGoalPurpose(purpose);
-    const next = calculateGoalsByWeight(bodyWeight, purpose);
-
-    setGoalForm({
-      kcal: String(next.kcal),
-      carbs: String(next.carbs),
-      protein: String(next.protein),
-      fat: String(next.fat),
-    });
-  };
-
-  const saveGoals = async () => {
-    const kcal = Number(goalForm.kcal);
-    const carbs = Number(goalForm.carbs);
-    const protein = Number(goalForm.protein);
-    const fat = Number(goalForm.fat);
-
-    if (!kcal || !carbs || !protein || !fat) {
-      Alert.alert("확인", "목표 값을 모두 숫자로 입력해주세요.");
-      return;
-    }
-
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/member/goals`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({
-          purpose: goalPurpose === "BULK" ? "BULKUP" : goalPurpose,
-          targetCalories: kcal,
-          targetCarbs: carbs,
-          targetProtein: protein,
-          targetFat: fat,
-        }),
-      });
-
-      if (!res.ok) throw new Error("목표값 저장 실패");
-
-      const saved = await res.json();
-
-      setGoalKcal(Number(saved.targetCalories));
-      setGoalCarbs(Number(saved.targetCarbs));
-      setGoalProtein(Number(saved.targetProtein));
-      setGoalFat(Number(saved.targetFat));
-      setGoalPurpose(
-        (saved.purpose === "BULKUP"
-          ? "BULK"
-          : (saved.purpose ?? goalPurpose)) as GoalPurpose,
-      );
-
-      setShowGoalModal(false);
-      Alert.alert("완료", "목표 영양 설정이 저장됐어요.");
-    } catch (e: any) {
-      Alert.alert("오류", e.message ?? "목표값을 저장하지 못했어요.");
-    }
-  };
-
-  const fetchDiet = async () => {
-    setLoading(true);
-    try {
-      const data = await apiGet<DietResponse>(
-        `${ENDPOINTS.diet.me}?date=${dateKey}`,
-      );
-      setDietData(data);
-    } catch {
-      setDietData(emptyDietData(dateKey));
+      setPhotos([]); setDayFeedback(null);
     } finally {
-      setLoading(false);
+      setLoading(false); setRefreshing(false);
     }
-  };
+  }, [dateKey]);
 
-  const fetchFeedbacks = async () => {
-    try {
-      const data = await apiGet<DietFeedback[]>(ENDPOINTS.diet.myFeedbacks);
-      console.log("피드백 조회 성공:", data);
-      setFeedbacks(data);
-    } catch (e) {
-      console.log("피드백 조회 실패:", e);
-      setFeedbacks([]);
-    }
-  };
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
-  const searchFood = async (keyword: string) => {
-    if (!keyword.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const data = await apiGet<FoodSearchResult[]>(
-        `${ENDPOINTS.diet.search}?query=${encodeURIComponent(keyword)}`
+  // ── 사진 비율 자동 계산 ─────────────────────────────────────────────────────
+  useEffect(() => {
+    photos.forEach((photo) => {
+      if (photoAspectRatios[photo.id] !== undefined) return;
+      Image.getSize(
+        photo.photoUrl,
+        (w, h) => {
+          if (h > 0) {
+            setPhotoAspectRatios((prev) => ({ ...prev, [photo.id]: w / h }));
+          }
+        },
+        () => {
+          setPhotoAspectRatios((prev) => ({ ...prev, [photo.id]: 4 / 3 }));
+        },
       );
-      console.log("검색 결과", data);
-      setSearchResults(data);
-    } catch {
-      setSearchResults([]);
-      setAddForm((prev) => ({
-        ...prev,
-        foodName: keyword,
-      }));
-
-    } finally {
-      setSearching(false);
-    }
-  };
-    useEffect(() => {
-      if (!showAddModal) return;
-      const timer = setTimeout(() => {
-        if (searchQuery.trim()) {
-          searchFood(searchQuery);
-        } else {
-          setSearchResults([]);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }, [searchQuery]);
-
-  const cacheFood = async (food: FoodSearchResult) => {
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      await fetch(`${API_URL}/api/diet/search/cache`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({
-          foodId: food.foodId,
-          foodName: food.foodName,
-          source: food.source,
-          calories: food.calories,
-          carbs: food.carbs,
-          protein: food.protein,
-          fat: food.fat,
-        }),
-      });
-    } catch {}
-  };
-
-  const selectSearchFood = (food: FoodSearchResult) => {
-    setAddForm({
-      foodName: food.foodName,
-      baseAmount: "100",
-      amount: "100",
-      unit: "g",
-      calories: String(fmt(food.calories)),
-      carbs: String(fmt(food.carbs)),
-      protein: String(fmt(food.protein)),
-      fat: String(fmt(food.fat)),
-      fatSecretFoodId: food.foodId,
     });
-    setSearchQuery(food.foodName);
-    setSearchResults([]);
+  }, [photos]);
 
-    // 내부 DB 아닌 경우 캐싱
-    if (!food.foodId?.startsWith("internal:")) {
-      cacheFood(food);
-    }
+  // ── 이미지 선택 ──────────────────────────────────────────────────────────────
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") { Alert.alert("권한 필요", "사진 접근 권한이 필요해요."); return; }
+    Alert.alert("사진 선택", "어떻게 추가할까요?", [
+      {
+        text: "카메라로 촬영",
+        onPress: async () => {
+          const cam = await ImagePicker.requestCameraPermissionsAsync();
+          if (cam.status !== "granted") return;
+          const r = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.8,
+          });
+          if (!r.canceled) setPickedImageUris((prev) => [...prev, r.assets[0].uri]);
+        },
+      },
+      {
+        text: "갤러리에서 선택",
+        onPress: async () => {
+          const r = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.8,
+            allowsMultipleSelection: true,
+          });
+          if (!r.canceled) setPickedImageUris(r.assets.map((a) => a.uri));
+        },
+      },
+      { text: "취소", style: "cancel" },
+    ]);
   };
 
-  const saveFood = async () => {
-    const adjusted = calcAdjustedFood();
+  // ── Cloudinary 업로드 ────────────────────────────────────────────────────────
+  const uploadToCloudinary = async (uri: string) => {
+    // 업로드 전 압축 (최대 1200px, 품질 75%)
+    let uploadUri = uri;
+    try {
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      uploadUri = result.uri;
+    } catch { /* 압축 실패 시 원본 사용 */ }
 
-    if (!adjusted.foodName) {
-      Alert.alert("확인", "음식 이름을 입력해주세요.");
-      return;
-    }
+    const fd = new FormData();
+    fd.append("file", { uri: uploadUri, type: "image/jpeg", name: "diet.jpg" } as any);
+    fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: fd });
+    if (!res.ok) throw new Error("이미지 업로드 실패");
+    const d = await res.json();
+    return { url: d.secure_url as string, publicId: d.public_id as string };
+  };
 
-    if (!safeNumber(addForm.amount)) {
-      Alert.alert("확인", "섭취량을 입력해주세요.");
-      return;
-    }
-
-    setAdding(true);
-
+  // ── 사진 추가 (여러 장) ──────────────────────────────────────────────────────
+  const addPhoto = async () => {
+    if (pickedImageUris.length === 0) { Alert.alert("사진을 먼저 선택해주세요."); return; }
+    setUploading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-
-      const isEditMode = editingFoodId !== null;
-
-      const url = isEditMode
-        ? `${API_URL}/api/diet/log/${editingFoodId}`
-        : `${API_URL}${ENDPOINTS.diet.log}`;
-
-      const res = await fetch(url, {
-        method: isEditMode ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({
-          fatSecretFoodId: addForm.fatSecretFoodId,
-          foodName: adjusted.foodName,
-          calories: adjusted.calories,
-          carbs: adjusted.carbs,
-          protein: adjusted.protein,
-          fat: adjusted.fat,
-          mealType: addMealType,
-          date: dateKey,
-        }),
-      });
-
-      if (!res.ok) {
-        const message = await res.text();
-        throw new Error(
-          message || (isEditMode ? "식단 수정 실패" : "식단 저장 실패"),
-        );
+      for (const uri of pickedImageUris) {
+        const { url, publicId } = await uploadToCloudinary(uri);
+        const res = await fetch(`${API_URL}/api/diet/photos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify({
+            date: dateKey,
+            photoUrl: url,
+            cloudinaryPublicId: publicId,
+            label: labelInput.trim() || null,
+          }),
+        });
+        if (!res.ok) throw new Error("저장 실패");
       }
-
-      // 서버 응답 body가 비어 있어도 json 파싱하지 않음
-      setShowAddModal(false);
-      setSearchQuery("");
-      setSearchResults([]);
-      setAddForm(emptyAddFoodForm);
-      setEditingFoodId(null);
-
-      await fetchDiet();
-
-      Alert.alert(
-        "완료",
-        isEditMode ? "식단이 수정됐어요!" : "식단에 추가됐어요!",
-      );
+      setAddModal(false);
+      setPickedImageUris([]);
+      setLabelInput("");
+      fetchData();
     } catch (e: any) {
-      Alert.alert("오류", e.message ?? "식단 저장 중 오류가 발생했어요.");
+      Alert.alert("오류", e.message);
     } finally {
-      setAdding(false);
+      setUploading(false);
     }
   };
 
-  const openEditFood = (food: any, mealType: MealType) => {
-    setEditingFoodId(food.id);
-    setAddMealType(mealType);
-    setSearchQuery(food.foodName ?? "");
-    setSearchResults([]);
-    setAddForm({
-      foodName: food.foodName ?? "",
-      baseAmount: "100",
-      amount: "100",
-      unit: "g",
-      calories: String(food.calories ?? 0),
-      carbs: String(food.carbs ?? 0),
-      protein: String(food.protein ?? 0),
-      fat: String(food.fat ?? 0),
-      fatSecretFoodId: food.fatSecretFoodId,
-    });
-    setShowAddModal(true);
-  };
-
-  const deleteFood = async (foodId: number) => {
-    Alert.alert("삭제", "이 식품을 삭제할까요?", [
+  // ── 사진 삭제 ────────────────────────────────────────────────────────────────
+  const deletePhoto = (id: number) => {
+    Alert.alert("삭제", "이 사진을 삭제할까요?", [
       { text: "취소", style: "cancel" },
       {
-        text: "삭제",
-        style: "destructive",
+        text: "삭제", style: "destructive",
         onPress: async () => {
-          try {
-            await apiDelete(ENDPOINTS.diet.logDelete(foodId));
-            fetchDiet();
-          } catch (e: any) {
-            Alert.alert("오류", e.message);
-          }
+          const jwt = await AsyncStorage.getItem("jwt");
+          await fetch(`${API_URL}/api/diet/photos/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${jwt}` },
+          });
+          fetchData();
         },
       },
     ]);
   };
 
-  useEffect(() => {
-    if (didFetchInitial.current) return;
-
-    didFetchInitial.current = true;
-    prevDateKey.current = dateKey;
-
-    fetchMemberInfo();
-    fetchGoals();
-    fetchDiet();
-    fetchFeedbacks();
-  }, []);
-
-  useEffect(() => {
-    if (!didFetchInitial.current) return;
-    if (prevDateKey.current === dateKey) return;
-
-    prevDateKey.current = dateKey;
-    fetchDiet();
-  }, [dateKey]);
-
-  const total = dietData?.totalCalories ?? 0;
-  const dietPct = goalKcal > 0 ? Math.round((total / goalKcal) * 100) : 0;
-  const adjustedFood = calcAdjustedFood();
-  const selectedDateFeedbacks = feedbacks.filter(
-    (fb) => String(fb.targetDate).slice(0, 10) === dateKey,
-  );
-
-  const changeDate = (delta: number) => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + delta);
-    setSelectedDate(d);
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView
-        contentContainerStyle={{
-          padding: 20,
-          paddingTop: 56,
-          paddingBottom: 32,
-        }}
+        contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} tintColor={Colors.green} />}
       >
-        {/* 날짜 선택 */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => changeDate(-1)}
-            style={{ padding: 8 }}
-          >
-            <Text style={{ fontSize: 22, color: Colors.green }}>‹</Text>
-          </TouchableOpacity>
-          <View style={{ alignItems: "center" }}>
-            <Text
-              style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}
-            >
-              {dateKey}
+        {/* 헤더 */}
+        <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>식단로그</Text>
+        <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 14 }}>트레이너가 피드백을 남겨드려요</Text>
+
+        {/* ── 주간 캘린더 ──────────────────────────────────────────────────── */}
+        <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 12, marginBottom: 14 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <TouchableOpacity onPress={() => setWeekOffset((w) => w - 1)} style={{ padding: 6 }}>
+              <Text style={{ fontSize: 18, color: Colors.textSub }}>‹</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textMuted }}>
+              {weekDates[0].getMonth() + 1}/{weekDates[0].getDate()} – {weekDates[6].getMonth() + 1}/{weekDates[6].getDate()}
             </Text>
-            {isToday && (
-              <Text
-                style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}
-              >
-                오늘
-              </Text>
-            )}
+            <TouchableOpacity
+              onPress={() => setWeekOffset((w) => w + 1)}
+              disabled={weekOffset >= 0}
+              style={{ padding: 6, opacity: weekOffset >= 0 ? 0.3 : 1 }}
+            >
+              <Text style={{ fontSize: 18, color: Colors.textSub }}>›</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => changeDate(1)}
-            disabled={isToday}
-            style={{ padding: 8, opacity: isToday ? 0.3 : 1 }}
-          >
-            <Text style={{ fontSize: 22, color: Colors.green }}>›</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            {weekDates.map((d, i) => {
+              const key = toDateKey(d);
+              const isSelected = key === dateKey;
+              const isToday = key === todayKey;
+              const isFuture = key > todayKey;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => { if (!isFuture) setSelectedDate(d); }}
+                  disabled={isFuture}
+                  style={{ alignItems: "center", gap: 4, flex: 1, opacity: isFuture ? 0.3 : 1 }}
+                >
+                  <Text style={{ fontSize: 10, color: Colors.textMuted, fontWeight: "600" }}>{WEEK_DAYS[i]}</Text>
+                  <View style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    backgroundColor: isSelected ? Colors.green : isToday ? Colors.greenLight : "transparent",
+                    justifyContent: "center", alignItems: "center",
+                    borderWidth: isToday && !isSelected ? 1 : 0, borderColor: Colors.green,
+                  }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : isToday ? Colors.green : Colors.text }}>
+                      {d.getDate()}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        {/* 
-          3차 개발 예정: FatSecret 앱 계정 연동 버튼
-          - 음식 검색 API는 현재 사용
-          - 아래 버튼은 FatSecret 계정/앱 자동 연동 기능이므로 보류
-        */}
-        {/* 
-        <TouchableOpacity>
-          <Text>FatSecret 연동하기</Text>
+        {/* ── 식단 추가 버튼 ───────────────────────────────────────────────── */}
+        <TouchableOpacity
+          onPress={() => { setPickedImageUris([]); setLabelInput(""); setAddModal(true); }}
+          style={{
+            flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+            backgroundColor: Colors.greenLight, borderRadius: 10,
+            borderWidth: 1, borderColor: Colors.green + "55", borderStyle: "dashed",
+            paddingVertical: 8, marginBottom: 14,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: Colors.green, fontWeight: "800" }}>+</Text>
+          <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green }}>식단 사진 추가</Text>
         </TouchableOpacity>
-        */}
 
-        {/* 칼로리 요약 */}
+        {/* ── 사진 목록 (2열 그리드) ───────────────────────────────────────── */}
         {loading ? (
-          <ActivityIndicator color={Colors.green} style={{ marginTop: 20 }} />
+          <View style={{ alignItems: "center", paddingVertical: 32 }}>
+            <ActivityIndicator color={Colors.green} />
+          </View>
+        ) : photos.length === 0 ? (
+          <View style={{ alignItems: "center", paddingVertical: 32 }}>
+            <Text style={{ fontSize: 32, marginBottom: 10 }}>🍽️</Text>
+            <Text style={{ fontSize: 14, color: Colors.textMuted }}>이 날 식단 사진이 없어요</Text>
+          </View>
         ) : (
-          <View
-            style={{
-              backgroundColor: Colors.bgSub,
-              borderRadius: 14,
-              padding: 16,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: Colors.border,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                marginBottom: 8,
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: Colors.textMuted,
-                    marginBottom: 2,
-                  }}
-                >
-                  오늘 칼로리
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 32,
-                    fontWeight: "900",
-                    color: total > goalKcal ? Colors.red : Colors.green,
-                  }}
-                >
-                  {Math.round(total).toLocaleString()}
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: Colors.textMuted,
-                      fontWeight: "400",
-                    }}
-                  >
-                    {" "}
-                    kcal
-                  </Text>
-                </Text>
-              </View>
-
-              <View style={{ alignItems: "flex-end" }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setGoalForm({
-                      kcal: String(goalKcal),
-                      carbs: String(goalCarbs),
-                      protein: String(goalProtein),
-                      fat: String(goalFat),
-                    });
-                    setShowGoalModal(true);
-                  }}
-                  style={{
-                    backgroundColor: "#fff",
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    marginBottom: 6,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: Colors.textSub,
-                      fontWeight: "700",
-                    }}
-                  >
-                    수정
-                  </Text>
-                </TouchableOpacity>
-
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: total > goalKcal ? Colors.red : Colors.green,
-                    fontWeight: "700",
-                  }}
-                >
-                  {total > goalKcal
-                    ? `${Math.round(total - goalKcal)} 초과`
-                    : `${Math.round(goalKcal - total)} 남음`}
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={{
-                backgroundColor: Colors.border,
-                borderRadius: 99,
-                height: 10,
-                marginBottom: 14,
-                overflow: "hidden",
-              }}
-            >
-              <View
-                style={{
-                  width: `${Math.min(dietPct, 100)}%` as any,
-                  height: 10,
-                  borderRadius: 99,
-                  backgroundColor: dietPct > 100 ? Colors.red : Colors.green,
-                }}
-              />
-            </View>
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                marginBottom: 4,
-              }}
-            >
-              <Text
-                style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}
-              >
-                목표 {goalKcal.toLocaleString()}kcal
-              </Text>
-            </View>
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-around",
-                paddingTop: 12,
-                borderTopWidth: 1,
-                borderTopColor: Colors.border,
-              }}
-            >
-              {[
-                { label: "탄수화물", val: dietData?.totalCarbs ?? 0, goal: goalCarbs },
-                { label: "단백질", val: dietData?.totalProtein ?? 0, goal: goalProtein },
-                { label: "지방", val: dietData?.totalFat ?? 0, goal: goalFat },
-              ].map(({ label, val, goal }) => {
-                const hasGoal = goal > 0;
-                const diff = hasGoal ? Math.round(val - goal) : null;
-                const isOver = diff !== null && diff > 0;
+          <>
+            <View style={{ gap: 10, marginBottom: 10 }}>
+              {photos.map((photo) => {
+                const ratio = photoAspectRatios[photo.id] ?? 4 / 3;
                 return (
-                  <View key={label} style={{ alignItems: "center", gap: 1 }}>
-                    {/* 차이값 */}
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "700",
-                        color: isOver ? Colors.red : Colors.green,
-                        minHeight: 14,
-                        lineHeight: 14,
-                      }}
-                    >
-                      {diff !== null ? (isOver ? `+${diff}g` : `${diff}g`) : ""}
-                    </Text>
-                    {/* 실제g / 목표g */}
-                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: "900",
-                          color: isOver ? Colors.red : Colors.text,
-                        }}
-                      >
-                        {Math.round(val)}g
-                      </Text>
-                      {hasGoal && (
-                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                          /{Math.round(goal)}g
-                        </Text>
-                      )}
-                    </View>
-                    {/* 레이블 */}
-                    <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                      {label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* 식사별 기록 */}
-        {MEAL_TYPES.map(({ key, label }) => {
-          const mealGroup = dietData?.meals.find((m) => m.mealType === key);
-          const foods = mealGroup?.foods ?? [];
-          const mealCal = foods.reduce((s, f) => s + f.calories, 0);
-
-          return (
-            <View key={key} style={{ marginBottom: 14 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 8,
-                }}
-              >
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "700",
-                      color: Colors.text,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                  {mealCal > 0 && (
-                    <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                      {Math.round(mealCal)} kcal
-                    </Text>
-                  )}
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    setAddMealType(key);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    setAddForm(emptyAddFoodForm);
-                    setEditingFoodId(null);
-                    setShowAddModal(true);
-                  }}
-                  style={{
-                    backgroundColor: Colors.greenLight,
-                    borderWidth: 1,
-                    borderColor: Colors.green + "44",
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.green,
-                      fontWeight: "700",
-                    }}
-                  >
-                    + 추가
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {foods.length === 0 ? (
-                <View
-                  style={{
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 10,
-                    padding: 12,
-                    alignItems: "center",
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderStyle: "dashed",
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: Colors.textPlaceholder }}>
-                    기록된 식품이 없어요
-                  </Text>
-                </View>
-              ) : (
-                foods.map((food) => (
-                  <TouchableOpacity
-                    key={food.id}
-                    onLongPress={() => deleteFood(food.id)}
-                    style={{
-                      backgroundColor: Colors.bgSub,
-                      borderRadius: 10,
-                      padding: 12,
-                      marginBottom: 4,
-                      borderLeftWidth: 3,
-                      borderLeftColor: Colors.green,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight: "600",
-                          color: Colors.text,
-                        }}
-                      >
-                        {food.foodName}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: Colors.text,
-                          marginTop: 2,
-                        }}
-                      >
-                        탄 {fmt(food.carbs)}g · 단 {fmt(food.protein)}g · 지 {fmt(food.fat)}g
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: "flex-end", gap: 6 }}>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight: "700",
-                          color: Colors.green,
-                        }}
-                      >
-                        {food.calories}kcal
-                      </Text>
-                      <View style={{ flexDirection: "row", gap: 6 }}>
-                        <TouchableOpacity
-                          onPress={() => openEditFood(food, key)}
-                          style={{
-                            backgroundColor: "#fff",
-                            borderWidth: 1,
-                            borderColor: Colors.border,
-                            borderRadius: 6,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              color: Colors.textSub,
-                              fontWeight: "700",
-                            }}
-                          >
-                            수정
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={() => deleteFood(food.id)}
-                          style={{
-                            backgroundColor: Colors.red + "11",
-                            borderWidth: 1,
-                            borderColor: Colors.red + "44",
-                            borderRadius: 6,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              color: Colors.red,
-                              fontWeight: "700",
-                            }}
-                          >
-                            삭제
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          );
-        })}
-
-        {/* 트레이너 피드백 */}
-        {selectedDateFeedbacks.length > 0 && (
-          <View style={{ marginTop: 8 }}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <View
-                style={{
-                  width: 3,
-                  height: 16,
-                  backgroundColor: Colors.blue,
-                  borderRadius: 2,
-                }}
-              />
-              <Text
-                style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}
-              >
-                트레이너 피드백
-              </Text>
-            </View>
-
-            {selectedDateFeedbacks.map((fb) => (
-              <View
-                key={fb.id}
-                style={{
-                  backgroundColor: Colors.blueBg,
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 8,
-                  borderLeftWidth: 3,
-                  borderLeftColor: Colors.blue,
-                  borderWidth: 1,
-                  borderColor: Colors.blue + "44",
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 6,
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                    {fb.targetDate}
-                  </Text>
-                </View>
-                <Text
-                  style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
-                >
-                  {fb.comment}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* 목표값 수정 모달 */}
-      <Modal visible={showGoalModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "flex-end",
-          }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: 24,
-              paddingBottom: 40,
-              maxHeight: "88%",
-            }}
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View
-                style={{
-                  width: 40,
-                  height: 4,
-                  backgroundColor: Colors.border,
-                  borderRadius: 99,
-                  alignSelf: "center",
-                  marginBottom: 16,
-                }}
-              />
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: "800",
-                  color: Colors.text,
-                  marginBottom: 6,
-                }}
-              >
-                목표값 수정
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  marginBottom: 16,
-                }}
-              >
-                체중 기반으로 자동 계산하거나 직접 수정할 수 있어요.
-              </Text>
-
-              <View
-                style={{
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  padding: 12,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  marginBottom: 14,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "800",
-                    color: Colors.text,
-                    marginBottom: 8,
-                  }}
-                >
-                  목적에 맞게 칼로리 설정
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: Colors.textSub,
-                    lineHeight: 20,
-                  }}
-                >
-                  🔻 다이어트 → 유지 칼로리 -300~500kcal{"\n"}
-                  🔺 벌크업 → 유지 칼로리 +300~500kcal{"\n"}
-                  ⚖️ 건강 유지 → 유지 칼로리 그대로
-                </Text>
-
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "800",
-                    color: Colors.text,
-                    marginTop: 14,
-                    marginBottom: 8,
-                  }}
-                >
-                  탄·단·지(g) 계산
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: Colors.textSub,
-                    lineHeight: 20,
-                  }}
-                >
-                  BW = 체중(kg){"\n"}
-                  🍗 단백질 = BW × 1.6~2.6g{"\n"}
-                  🥑 지방 = BW × 0.5~1.0g{"\n"}
-                  🍚 탄수화물 = 목표 칼로리 - 단백질 kcal - 지방 kcal의 남은 값
-                </Text>
-              </View>
-
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  marginBottom: 8,
-                }}
-              >
-                현재 체중: {bodyWeight ? `${bodyWeight}kg` : "미입력"}
-              </Text>
-
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-                {[
-                  { key: "DIET", label: "다이어트" },
-                  { key: "MAINTAIN", label: "유지" },
-                  { key: "BULK", label: "벌크업" },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    onPress={() => applyAutoGoals(item.key as GoalPurpose)}
-                    style={{
-                      flex: 1,
-                      backgroundColor:
-                        goalPurpose === item.key ? Colors.green : Colors.bgSub,
-                      borderWidth: 1,
-                      borderColor:
-                        goalPurpose === item.key ? Colors.green : Colors.border,
-                      borderRadius: 10,
-                      paddingVertical: 10,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "800",
-                        color:
-                          goalPurpose === item.key ? "#fff" : Colors.textSub,
-                      }}
-                    >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {[
-                { label: "총칼로리", key: "kcal", unit: "kcal" },
-                { label: "탄수화물", key: "carbs", unit: "g" },
-                { label: "단백질", key: "protein", unit: "g" },
-                { label: "지방", key: "fat", unit: "g" },
-              ].map((item) => (
-                <View key={item.key} style={{ marginBottom: 12 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textSub,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {item.label}
-                  </Text>
                   <View
+                    key={photo.id}
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
+                      width: "100%",
                       backgroundColor: Colors.bgSub,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      borderRadius: 10,
-                      paddingHorizontal: 12,
-                    }}
-                  >
-                    <TextInput
-                      value={
-                        goalForm[
-                          item.key as "kcal" | "carbs" | "protein" | "fat"
-                        ]
-                      }
-                      onChangeText={(v) =>
-                        setGoalForm((prev) => ({
-                          ...prev,
-                          [item.key as "kcal" | "carbs" | "protein" | "fat"]:
-                            v.replace(/[^0-9]/g, ""),
-                        }))
-                      }
-                      keyboardType="number-pad"
-                      placeholder="0"
-                      placeholderTextColor={Colors.textPlaceholder}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 12,
-                        fontSize: 16,
-                        fontWeight: "700",
-                        color: Colors.text,
-                      }}
-                    />
-                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-                      {item.unit}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-                <TouchableOpacity
-                  onPress={() => setShowGoalModal(false)}
-                  style={{
-                    flex: 1,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: 12,
-                    padding: 14,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: Colors.textSub }}>
-                    취소
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={saveGoals}
-                  style={{
-                    flex: 2,
-                    backgroundColor: Colors.green,
-                    borderRadius: 12,
-                    padding: 14,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}
-                  >
-                    저장
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* 음식 추가 모달 */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "flex-end",
-          }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: 24,
-              paddingBottom: 40,
-              maxHeight: "88%",
-            }}
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View
-                style={{
-                  width: 40,
-                  height: 4,
-                  backgroundColor: Colors.border,
-                  borderRadius: 99,
-                  alignSelf: "center",
-                  marginBottom: 16,
-                }}
-              />
-
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontWeight: "800",
-                  color: Colors.text,
-                  marginBottom: 4,
-                }}
-              >
-                {MEAL_TYPES.find((m) => m.key === addMealType)?.label}{" "}
-                {editingFoodId ? "수정" : "추가"}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  marginBottom: 16,
-                }}
-              >
-                음식 검색 후 g/개수를 수정하거나 직접 입력할 수 있어요.
-              </Text>
-
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={(text) => {
-                    setSearchQuery(text);
-                  }}
-                  onSubmitEditing={() => searchFood(searchQuery)}
-                  returnKeyType="search"
-                  placeholder="음식 이름 검색..."
-                  placeholderTextColor={Colors.textPlaceholder}
-                  style={{
-                    flex: 1,
-                    backgroundColor: Colors.bgSub,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: 10,
-                    padding: 12,
-                    fontSize: 14,
-                    color: Colors.text,
-                  }}
-                />
-                <TouchableOpacity
-                  onPress={() => searchFood(searchQuery)}
-                  disabled={searching}
-                  style={{
-                    backgroundColor: Colors.green,
-                    borderRadius: 10,
-                    paddingHorizontal: 16,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    opacity: searching ? 0.6 : 1,
-                  }}
-                >
-                  {searching ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-                      검색
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {searchResults.length > 0 && (
-                <View>
-                  {searchResults.map((item, index) => (
-                      <TouchableOpacity
-                      key={`${item.foodId}-${index}`}
-                      onPress={() => selectSearchFood(item)}
-                      style={{
-                        backgroundColor: Colors.bgSub,
-                        borderRadius: 10,
-                        padding: 12,
-                        marginBottom: 6,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "600",
-                            color: Colors.text,
-                          }}
-                        >
-                          {item.foodName}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            color: Colors.textMuted,
-                            marginTop: 2,
-                          }}
-                        >
-                          탄 {fmt(item.carbs)}g · 단 {fmt(item.protein)}g · 지 {fmt(item.fat)}g
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: "800",
-                          color: Colors.gold,
-                        }}
-                      >
-                        {fmt(item.calories)}kcal
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              <Text
-                style={{ fontSize: 12, color: Colors.textSub, marginBottom: 6 }}
-              >
-                음식명
-              </Text>
-              <TextInput
-                value={addForm.foodName}
-                onChangeText={(v) =>
-                  setAddForm((prev) => ({ ...prev, foodName: v }))
-                }
-                placeholder="예: 닭가슴살"
-                placeholderTextColor={Colors.textPlaceholder}
-                style={{
-                  backgroundColor: Colors.bgSub,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  borderRadius: 10,
-                  padding: 12,
-                  fontSize: 14,
-                  color: Colors.text,
-                  marginBottom: 12,
-                }}
-              />
-
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textSub,
-                      marginBottom: 6,
-                    }}
-                  >
-                    기준량
-                  </Text>
-                  <TextInput
-                    value={addForm.baseAmount}
-                    onChangeText={(v) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        baseAmount: v.replace(/[^0-9.]/g, ""),
-                      }))
-                    }
-                    keyboardType="decimal-pad"
-                    placeholder="100"
-                    placeholderTextColor={Colors.textPlaceholder}
-                    style={{
-                      backgroundColor: Colors.bgSub,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      borderRadius: 10,
-                      padding: 12,
-                      fontSize: 14,
-                      color: Colors.text,
-                    }}
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textSub,
-                      marginBottom: 6,
-                    }}
-                  >
-                    섭취량
-                  </Text>
-                  <TextInput
-                    value={addForm.amount}
-                    onChangeText={(v) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        amount: v.replace(/[^0-9.]/g, ""),
-                      }))
-                    }
-                    keyboardType="decimal-pad"
-                    placeholder="100"
-                    placeholderTextColor={Colors.textPlaceholder}
-                    style={{
-                      backgroundColor: Colors.bgSub,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      borderRadius: 10,
-                      padding: 12,
-                      fontSize: 14,
-                      color: Colors.text,
-                    }}
-                  />
-                </View>
-
-                <View style={{ width: 82 }}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textSub,
-                      marginBottom: 6,
-                    }}
-                  >
-                    단위
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      backgroundColor: Colors.bgSub,
-                      borderRadius: 10,
+                      borderRadius: 12,
                       borderWidth: 1,
                       borderColor: Colors.border,
                       overflow: "hidden",
                     }}
                   >
-                    {(["g", "개"] as const).map((unit) => (
+                    <View style={{ position: "relative", aspectRatio: ratio }}>
+                      <Image
+                        source={{ uri: photo.photoUrl }}
+                        style={{ width: "100%", height: "100%" }}
+                        resizeMode="contain"
+                      />
                       <TouchableOpacity
-                        key={unit}
-                        onPress={() =>
-                          setAddForm((prev) => ({ ...prev, unit }))
-                        }
+                        onPress={() => deletePhoto(photo.id)}
                         style={{
-                          flex: 1,
-                          paddingVertical: 12,
-                          alignItems: "center",
-                          backgroundColor:
-                            addForm.unit === unit
-                              ? Colors.green
-                              : "transparent",
+                          position: "absolute", top: 8, right: 8,
+                          backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 14,
+                          width: 26, height: 26, justifyContent: "center", alignItems: "center",
                         }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: "700",
-                            color:
-                              addForm.unit === unit ? "#fff" : Colors.textSub,
-                          }}
-                        >
-                          {unit}
-                        </Text>
+                        <Text style={{ color: "#fff", fontSize: 11 }}>✕</Text>
                       </TouchableOpacity>
-                    ))}
+                      {photo.label ? (
+                        <View style={{
+                          position: "absolute", bottom: 8, left: 8,
+                          backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 6,
+                          paddingHorizontal: 8, paddingVertical: 3,
+                        }}>
+                          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{photo.label}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              </View>
+                );
+              })}
+            </View>
 
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  marginBottom: 8,
-                }}
-              >
-                아래 영양정보는 기준량 기준으로 입력하세요. 섭취량에 맞춰 자동
-                계산돼요.
-              </Text>
-
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-                {[
-                  { key: "calories", label: "칼로리" },
-                  { key: "carbs", label: "탄수" },
-                ].map((item) => (
-                  <View key={item.key} style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: Colors.textSub,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {item.label}
-                    </Text>
-                    <TextInput
-                      value={addForm[item.key as keyof AddFoodForm] as string}
-                      onChangeText={(v) =>
-                        setAddForm((prev) => ({
-                          ...prev,
-                          [item.key]: v.replace(/[^0-9.]/g, ""),
-                        }))
-                      }
-                      keyboardType="decimal-pad"
-                      placeholder="0"
-                      placeholderTextColor={Colors.textPlaceholder}
-                      style={{
-                        backgroundColor: Colors.bgSub,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        borderRadius: 10,
-                        padding: 12,
-                        fontSize: 14,
-                        color: Colors.text,
-                      }}
-                    />
-                  </View>
-                ))}
-              </View>
-
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
-                {[
-                  { key: "protein", label: "단백질" },
-                  { key: "fat", label: "지방" },
-                ].map((item) => (
-                  <View key={item.key} style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: Colors.textSub,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {item.label}
-                    </Text>
-                    <TextInput
-                      value={addForm[item.key as keyof AddFoodForm] as string}
-                      onChangeText={(v) =>
-                        setAddForm((prev) => ({
-                          ...prev,
-                          [item.key]: v.replace(/[^0-9.]/g, ""),
-                        }))
-                      }
-                      keyboardType="decimal-pad"
-                      placeholder="0"
-                      placeholderTextColor={Colors.textPlaceholder}
-                      style={{
-                        backgroundColor: Colors.bgSub,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        borderRadius: 10,
-                        padding: 12,
-                        fontSize: 14,
-                        color: Colors.text,
-                      }}
-                    />
-                  </View>
-                ))}
-              </View>
-
-              <View
-                style={{
-                  backgroundColor: Colors.greenLight,
-                  borderWidth: 1,
-                  borderColor: Colors.green + "44",
-                  borderRadius: 12,
-                  padding: 12,
-                  marginBottom: 14,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "800",
-                    color: Colors.green,
-                    marginBottom: 6,
-                  }}
-                >
-                  계산된 섭취량
-                </Text>
-                <Text style={{ fontSize: 12, color: Colors.textSub }}>
-                  {addForm.amount || 0}
-                  {addForm.unit} 기준 · {adjustedFood.calories}kcal · 탄{" "}
-                  {adjustedFood.carbs}g · 단 {adjustedFood.protein}g · 지{" "}
-                  {adjustedFood.fat}g
-                </Text>
-              </View>
-
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowAddModal(false);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    setAddForm(emptyAddFoodForm);
-                    setEditingFoodId(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: 12,
-                    padding: 14,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: Colors.textSub }}>
-                    닫기
+            {/* ── 하루 피드백 (사진 목록 아래 1회만) ─────────────────────── */}
+            <View style={{
+              backgroundColor: Colors.greenLight, borderRadius: 10,
+              borderWidth: 1, borderColor: Colors.green + "33",
+              padding: 10, marginBottom: 4,
+            }}>
+              {dayFeedback ? (
+                <>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>
+                    {dayFeedback.trainerName} 트레이너
                   </Text>
+                  <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }}>{dayFeedback.content}</Text>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 3 }}>{dayFeedback.createdAt.slice(0, 10)}</Text>
+                </>
+              ) : (
+                <Text style={{ fontSize: 12, color: Colors.textMuted, textAlign: "center" }}>트레이너의 피드백을 기다리는 중...</Text>
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      {/* ── 식단 추가 모달 ────────────────────────────────────────────────────── */}
+      <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => setAddModal(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setAddModal(false)}
+        >
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <TouchableOpacity activeOpacity={1}>
+              <View style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 22, borderTopRightRadius: 22,
+                padding: 22, paddingBottom: Platform.OS === "ios" ? 40 : 22,
+              }}>
+                <View style={{ width: 36, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 14 }} />
+                <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 2 }}>식단 사진 추가</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 14 }}>
+                  갤러리에서 여러 장을 한 번에 선택할 수 있어요
+                </Text>
+
+                {/* 사진 선택 영역 */}
+                <TouchableOpacity
+                  onPress={pickImage}
+                  style={{
+                    height: 130,
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: pickedImageUris.length > 0 ? Colors.green + "88" : Colors.border,
+                    borderStyle: pickedImageUris.length > 0 ? "solid" : "dashed",
+                    justifyContent: "center", alignItems: "center",
+                    marginBottom: 12, overflow: "hidden",
+                  }}
+                >
+                  {pickedImageUris.length === 0 ? (
+                    <View style={{ alignItems: "center", gap: 6 }}>
+                      <Text style={{ fontSize: 26 }}>📷</Text>
+                      <Text style={{ fontSize: 12, color: Colors.textMuted }}>사진 선택 (여러 장 가능)</Text>
+                    </View>
+                  ) : pickedImageUris.length === 1 ? (
+                    <Image source={{ uri: pickedImageUris[0] }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ width: "100%", height: "100%" }}>
+                      <Image source={{ uri: pickedImageUris[0] }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                      <View style={{
+                        position: "absolute", bottom: 8, right: 8,
+                        backgroundColor: Colors.green, borderRadius: 12,
+                        paddingHorizontal: 10, paddingVertical: 4,
+                      }}>
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{pickedImageUris.length}장 선택됨</Text>
+                      </View>
+                    </View>
+                  )}
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={saveFood}
-                  disabled={adding}
+                {/* 선택된 사진이 있을 때 다시 선택 링크 */}
+                {pickedImageUris.length > 0 && (
+                  <TouchableOpacity onPress={pickImage} style={{ alignItems: "center", marginBottom: 10, marginTop: -4 }}>
+                    <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "600" }}>다시 선택하기</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* 라벨 */}
+                <TextInput
+                  value={labelInput}
+                  onChangeText={setLabelInput}
+                  placeholder="메모 (예: 아침 식사, 점심 도시락...)"
+                  placeholderTextColor={Colors.textMuted}
                   style={{
-                    flex: 2,
-                    backgroundColor: Colors.green,
-                    borderRadius: 12,
-                    padding: 14,
-                    alignItems: "center",
-                    opacity: adding ? 0.6 : 1,
+                    backgroundColor: Colors.bgSub, borderRadius: 10,
+                    borderWidth: 1, borderColor: Colors.border,
+                    paddingHorizontal: 12, paddingVertical: 10,
+                    fontSize: 13, color: Colors.text, marginBottom: 14,
+                  }}
+                />
+
+                <TouchableOpacity
+                  onPress={addPhoto}
+                  disabled={uploading || pickedImageUris.length === 0}
+                  style={{
+                    backgroundColor: Colors.green, borderRadius: 10,
+                    paddingVertical: 13, alignItems: "center",
+                    opacity: (uploading || pickedImageUris.length === 0) ? 0.5 : 1,
                   }}
                 >
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}
-                  >
-                    {adding
-                      ? editingFoodId
-                        ? "수정 중..."
-                        : "추가 중..."
-                      : editingFoodId
-                        ? "수정하기"
-                        : "추가하기"}
-                  </Text>
+                  {uploading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>
+                      {pickedImageUris.length > 1 ? `${pickedImageUris.length}장 추가하기` : "추가하기"}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

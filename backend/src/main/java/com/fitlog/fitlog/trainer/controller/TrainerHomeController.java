@@ -8,6 +8,7 @@ import com.fitlog.fitlog.trainer.service.TrainerHomeService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -34,6 +35,15 @@ public class TrainerHomeController {
         return ResponseEntity.ok(trainerHomeService.getHome(authorization));
     }
 
+    // GET /api/trainer/revenue?month=2026-04  — 특정 월 매출 조회
+    @GetMapping("/revenue")
+    public ResponseEntity<Map<String, Object>> getRevenue(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String month
+    ) {
+        return ResponseEntity.ok(trainerHomeService.getMonthRevenue(authorization, month));
+    }
+
     // PUT /api/trainer/goals  — 목표 수업수 / 목표 매출 저장 및 수정
     @PutMapping("/goals")
     public ResponseEntity<Map<String, Object>> updateGoals(
@@ -46,19 +56,23 @@ public class TrainerHomeController {
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
 
-        if (body.containsKey("goalSessions") && body.get("goalSessions") != null) {
-            trainer.setGoalSessions(((Number) body.get("goalSessions")).intValue());
+        // null을 명시적으로 보내면 목표 삭제, 값이 있으면 업데이트
+        if (body.containsKey("goalSessions")) {
+            Object val = body.get("goalSessions");
+            trainer.setGoalSessions(val != null ? ((Number) val).intValue() : null);
         }
-        if (body.containsKey("goalRevenue") && body.get("goalRevenue") != null) {
-            trainer.setGoalRevenue(((Number) body.get("goalRevenue")).longValue());
+        if (body.containsKey("goalRevenue")) {
+            Object val = body.get("goalRevenue");
+            trainer.setGoalRevenue(val != null ? ((Number) val).longValue() : null);
         }
 
         trainerRepository.save(trainer);
 
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "goalSessions", trainer.getGoalSessions(),
-                "goalRevenue", trainer.getGoalRevenue()
-        ));
+        // Map.of()는 null 값 불가 → HashMap 사용
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("goalSessions", trainer.getGoalSessions());
+        result.put("goalRevenue", trainer.getGoalRevenue());
+        return ResponseEntity.ok(result);
     }
 }

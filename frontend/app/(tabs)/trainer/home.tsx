@@ -1,8 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import KakaoShare from "@react-native-kakao/share";
-import { router } from "expo-router";
-import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
+import { router } from "expo-router";
+import * as Sharing from "expo-sharing";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,11 +26,15 @@ import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 
 interface TodayPt {
+  scheduleId?: number;
   memberId: number;
   memberName: string;
   time: string;
   ptRemaining: number;
   completed?: boolean;
+  isManual?: boolean;
+  sessionType?: string; // "PT" | "OT"
+  isNoShow?: boolean;   // 명시적 NO_SHOW 처리됨
 }
 
 interface HomeData {
@@ -42,14 +49,40 @@ interface HomeData {
   goalRevenue: number | null;
   monthSessions: number;
   monthRevenue: number;
-  monthRevenueDetails: { memberName: string; sessions: number; amount: number; memo?: string }[];
+  monthRevenueDetails: {
+    memberName: string;
+    sessions: number;
+    amount: number;
+    memo?: string;
+    date?: string;
+    contractId?: number;
+    manualMemberId?: number;
+  }[];
   noShowCount: number;
+  trialEndDate?: string | null; // 무료 체험 중일 때만 "YYYY-MM-DD", 정식 PRO면 null
 }
 
 interface Member {
   id: number;
   user: { name: string };
   ptRemaining: number;
+  connected?: boolean;
+}
+
+interface ManualMemberItem {
+  id: number;
+  name: string;
+  ptRemaining: number | null;
+}
+
+interface CombinedPayMember {
+  id: number;
+  name: string;
+  ptRemaining: number;
+  isManual: boolean;
+  isDisconnected: boolean;
+  originalLinked: Member | null;
+  originalManual: ManualMemberItem | null;
 }
 
 interface Noti {
@@ -82,29 +115,297 @@ export default function TrainerHomeScreen() {
   const [goalRevenueInput, setGoalRevenueInput] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
 
+  // 메모 확인/수정 팝업 (contractId가 null이면 읽기 전용)
+  const [memoPopup, setMemoPopup] = useState<{
+    contractId: number | null;
+    memo: string;
+  } | null>(null);
+  const [memoEditText, setMemoEditText] = useState("");
+  const [savingMemo, setSavingMemo] = useState(false);
+
+  // 결제 수정 모달
+  const [editModal, setEditModal] = useState(false);
+  const [editContractId, setEditContractId] = useState<number | null>(null);
+  const [editManualMemberId, setEditManualMemberId] = useState<number | null>(
+    null,
+  );
+  const [editSessionsInput, setEditSessionsInput] = useState("");
+  const [editAmountInput, setEditAmountInput] = useState("");
+  const [editMemoInput, setEditMemoInput] = useState("");
+  const [editOriginalSessions, setEditOriginalSessions] = useState(0);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditModal = (d: {
+    contractId?: number;
+    manualMemberId?: number;
+    sessions: number;
+    amount: number;
+    memo?: string;
+  }) => {
+    if (!d.contractId && !d.manualMemberId) return;
+    setEditContractId(d.contractId ?? null);
+    setEditManualMemberId(d.manualMemberId ?? null);
+    setEditOriginalSessions(d.sessions);
+    setEditSessionsInput(String(d.sessions));
+    setEditAmountInput(d.amount.toLocaleString());
+    setEditMemoInput(d.memo ?? "");
+    setEditModal(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editContractId && !editManualMemberId) return;
+    setSavingEdit(true);
+    const body = {
+      sessions: parseInt(editSessionsInput) || editOriginalSessions,
+      amount: parseInt(editAmountInput.replace(/,/g, "")),
+      memo: editMemoInput.trim() || null,
+    };
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const url = editContractId
+        ? `${API_URL}/api/trainer/members/contracts/${editContractId}`
+        : `${API_URL}/api/trainer/manual-members/${editManualMemberId}`;
+      const method = editContractId ? "PUT" : "PUT";
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("수정 실패");
+      setEditModal(false);
+      fetchHome();
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // 결제 추가 모달
   const [payAddModal, setPayAddModal] = useState(false);
   const [payMembers, setPayMembers] = useState<Member[]>([]);
+  const [payManualMembers, setPayManualMembers] = useState<ManualMemberItem[]>(
+    [],
+  );
+  const [payCombinedMembers, setPayCombinedMembers] = useState<CombinedPayMember[]>([]);
   const [payMembersLoading, setPayMembersLoading] = useState(false);
-  const [paySelectedMember, setPaySelectedMember] = useState<Member | null>(null);
+  const [paySelectedMember, setPaySelectedMember] = useState<Member | null>(
+    null,
+  );
+  const [paySelectedManualMember, setPaySelectedManualMember] =
+    useState<ManualMemberItem | null>(null);
   const [paySessionsInput, setPaySessionsInput] = useState("");
   const [payAmountInput, setPayAmountInput] = useState("");
   const [payMemoInput, setPayMemoInput] = useState("");
   const [addingPay, setAddingPay] = useState(false);
+  const [payContractDateInput, setPayContractDateInput] = useState("");
+
+  // 신규 회원 모드
+  const [payMemberType, setPayMemberType] = useState<"existing" | "new">(
+    "existing",
+  );
+  const [payNewName, setPayNewName] = useState("");
+  const [payNewPhone, setPayNewPhone] = useState("");
+
+  // 월별 매출 네비게이션
+  const [revenueMonthOffset, setRevenueMonthOffset] = useState(0); // 0 = 이번 달
+  const [selectedMonthRevenue, setSelectedMonthRevenue] = useState<{
+    monthRevenue: number;
+    monthRevenueDetails: any[];
+  } | null>(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
+
+  // ── 월 레이블 / 키 헬퍼 ────────────────────────────────────────────────────
+  const getMonthLabel = (offset: number): string => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+  };
+  const getMonthKey = (offset: number): string => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const getTodayStr = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // ── 특정 월 매출 조회 ────────────────────────────────────────────────────
+  const fetchMonthRevenue = async (offset: number) => {
+    setLoadingRevenue(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const month = getMonthKey(offset);
+      const res = await fetch(`${API_URL}/api/trainer/revenue?month=${month}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setSelectedMonthRevenue({
+          monthRevenue: d.monthRevenue,
+          monthRevenueDetails: d.monthRevenueDetails ?? [],
+        });
+      }
+    } catch {
+    } finally {
+      setLoadingRevenue(false);
+    }
+  };
+
+  // ── PDF 생성 & 공유 ──────────────────────────────────────────────────────
+  const generatePdf = async () => {
+    const monthLabel = getMonthLabel(revenueMonthOffset);
+    const revenue =
+      revenueMonthOffset === 0
+        ? (data?.monthRevenue ?? 0)
+        : (selectedMonthRevenue?.monthRevenue ?? 0);
+    const details: any[] =
+      revenueMonthOffset === 0
+        ? (data?.monthRevenueDetails ?? [])
+        : (selectedMonthRevenue?.monthRevenueDetails ?? []);
+
+    const totalSessions = details.reduce(
+      (sum, d) => sum + (d.sessions ?? 0),
+      0,
+    );
+
+    const rows = details
+      .map(
+        (d, i) => `
+        <tr style="background:${i % 2 === 0 ? "#ffffff" : "#f8faf8"};">
+          <td style="padding:10px 12px;border-bottom:1px solid #e8e8e8;color:#555;font-size:13px;">${d.date ?? "-"}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e8e8e8;font-weight:600;font-size:13px;">${d.memberName}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e8e8e8;text-align:center;font-size:13px;">${d.sessions}회</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e8e8e8;text-align:right;font-weight:700;color:#2E7D32;font-size:13px;">${Number(d.amount).toLocaleString()}원</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e8e8e8;color:#888;font-size:12px;">${d.memo ?? "-"}</td>
+        </tr>
+      `,
+      )
+      .join("");
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; background: #fff; color: #111; padding: 40px 48px; }
+    .header { border-bottom: 3px solid #2E7D32; padding-bottom: 20px; margin-bottom: 28px; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-end; }
+    .title { font-size: 22px; font-weight: 800; color: #111; }
+    .subtitle { font-size: 13px; color: #888; margin-top: 4px; }
+    .badge { background: #2E7D32; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .summary { display: flex; gap: 16px; margin-bottom: 28px; }
+    .summary-card { flex: 1; background: #f6fbf7; border: 1.5px solid #c8e6c9; border-radius: 12px; padding: 18px 20px; }
+    .summary-label { font-size: 11px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .summary-value { font-size: 24px; font-weight: 800; color: #2E7D32; }
+    .summary-value.dark { color: #111; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: #2E7D32; }
+    thead th { padding: 11px 12px; color: #fff; font-weight: 700; font-size: 12px; text-align: left; }
+    thead th.center { text-align: center; }
+    thead th.right { text-align: right; }
+    tfoot tr { background: #f0f7f0; }
+    tfoot td { padding: 11px 12px; font-weight: 800; font-size: 13px; border-top: 2px solid #2E7D32; }
+    tfoot td.right { text-align: right; color: #2E7D32; }
+    tfoot td.center { text-align: center; }
+    .empty { text-align: center; padding: 48px; color: #bbb; font-size: 14px; }
+    .footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .footer-brand { font-size: 13px; font-weight: 800; color: #2E7D32; }
+    .footer-date { font-size: 11px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="title">${monthLabel} 매출 리포트</div>
+        <div class="subtitle">${data?.trainerName ?? ""} 트레이너</div>
+      </div>
+      <div class="badge">FitLog</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card">
+      <div class="summary-label">이달 총 매출</div>
+      <div class="summary-value">${Number(revenue).toLocaleString()}원</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">결제 건수</div>
+      <div class="summary-value dark">${details.length}건</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">총 수업 수</div>
+      <div class="summary-value dark">${totalSessions}회</div>
+    </div>
+  </div>
+
+  ${
+    rows.length > 0
+      ? `
+  <table>
+    <thead>
+      <tr>
+        <th style="width:70px;">날짜</th>
+        <th>회원명</th>
+        <th class="center" style="width:60px;">수업</th>
+        <th class="right" style="width:110px;">결제금액</th>
+        <th style="width:140px;">메모</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" style="font-weight:800;">합계</td>
+        <td class="center">${totalSessions}회</td>
+        <td class="right">${Number(revenue).toLocaleString()}원</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  `
+      : `<div class="empty">이 달 결제 내역이 없어요</div>`
+  }
+
+  <div class="footer">
+    <div class="footer-brand">FitLog</div>
+    <div class="footer-date">생성일: ${new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}</div>
+  </div>
+</body>
+</html>`;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const fileName = `FitLog_${data?.trainerName ?? "트레이너"}_${monthLabel}_매출리포트.pdf`;
+      const destUri = (FileSystem.cacheDirectory ?? "") + fileName;
+      await FileSystem.moveAsync({ from: uri, to: destUri });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(destUri, {
+          mimeType: "application/pdf",
+          dialogTitle: `${monthLabel} 매출 리포트`,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("알림", "이 기기에서는 공유를 지원하지 않아요.");
+      }
+    } catch (e: any) {
+      Alert.alert("오류", e.message ?? "PDF 생성 실패");
+    }
+  };
 
   // ── 초대 버튼 핸들러 ──────────────────────────────────────────────────────
   const handleInvitePress = () => {
-    const limit = 3; // FREE 플랜 3명까지 가능
     const plan = (data?.plan ?? "FREE").toUpperCase();
-
-    // PRO는 회원 수 제한 없이 바로 초대 가능
-    if (plan === "PRO") {
-      setInviteVisible(true);
-      return;
-    }
-
-    // FREE만 제한 도달 시 업그레이드 바텀시트 오픈
-    if ((data?.totalMembers ?? 0) >= limit) {
+    // FREE 플랜 5명 제한
+    if (plan === "FREE" && (data?.totalMembers ?? 0) >= 5) {
       setPaymentVisible(true);
     } else {
       setInviteVisible(true);
@@ -114,9 +415,22 @@ export default function TrainerHomeScreen() {
   const inviteDragGesture = Gesture.Pan()
     .runOnJS(true)
     .onEnd((e) => {
-      if (e.translationY > 60) {
-        setInviteVisible(false);
-      }
+      if (e.translationY > 60) setInviteVisible(false);
+    });
+  const payAddDragGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationY > 60) setPayAddModal(false);
+    });
+  const editDragGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationY > 60) setEditModal(false);
+    });
+  const goalDragGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onEnd((e) => {
+      if (e.translationY > 60) setGoalModal(false);
     });
 
   const fetchHome = async (isRefresh = false) => {
@@ -135,16 +449,37 @@ export default function TrainerHomeScreen() {
 
       // 결제 추가용 회원 목록 미리 로드
       try {
-        const membersRes = await fetch(`${API_URL}/api/trainer/members`, { headers });
-        if (membersRes.ok) setPayMembers(await membersRes.json());
+        const membersRes = await fetch(`${API_URL}/api/trainer/members`, {
+          headers,
+        });
+        if (membersRes.ok) {
+          const members = await membersRes.json();
+
+          console.log("[결제추가 fetchHome 회원목록 원본]", members);
+
+          members.sort((a: any, b: any) => {
+            const aDisconnected = a.connected === false ? 1 : 0;
+            const bDisconnected = b.connected === false ? 1 : 0;
+
+            if (aDisconnected !== bDisconnected) {
+              return aDisconnected - bDisconnected;
+            }
+
+            return (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0);
+          });
+
+          console.log("[결제추가 fetchHome 회원목록 정렬후]", members);
+          setPayMembers(members);
+        }
       } catch {}
 
       // RevenueCat 초기화 + 트레이너 userId 연결
       try {
         if (Purchases && typeof Purchases.configure === "function") {
-          const revenueCatKey = Platform.OS === "ios"
-            ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
-            : "goog_ANDROID_KEY_HERE"; // TODO: RevenueCat 대시보드에서 Android 키 발급 후 교체
+          const revenueCatKey =
+            Platform.OS === "ios"
+              ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
+              : "goog_ANDROID_KEY_HERE"; // TODO: RevenueCat 대시보드에서 Android 키 발급 후 교체
           await Purchases.configure({
             apiKey: revenueCatKey,
           });
@@ -173,10 +508,15 @@ export default function TrainerHomeScreen() {
       const jwt = await AsyncStorage.getItem("jwt");
       const res = await fetch(`${API_URL}/api/trainer/goals`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
         body: JSON.stringify({
           goalSessions: goalSessionsInput ? parseInt(goalSessionsInput) : null,
-          goalRevenue: goalRevenueInput ? parseInt(goalRevenueInput.replace(/,/g, "")) : null,
+          goalRevenue: goalRevenueInput
+            ? parseInt(goalRevenueInput.replace(/,/g, ""))
+            : null,
         }),
       });
       if (!res.ok) throw new Error("저장 실패");
@@ -191,46 +531,145 @@ export default function TrainerHomeScreen() {
 
   const openPayModal = async () => {
     setPaySelectedMember(null);
+    setPaySelectedManualMember(null);
     setPaySessionsInput("");
     setPayAmountInput("");
     setPayMemoInput("");
+    setPayContractDateInput(getTodayStr());
+    setPayMemberType("existing");
+    setPayNewName("");
+    setPayNewPhone("");
     setPayMembers([]);
+    setPayManualMembers([]);
+    setPayCombinedMembers([]);
     setPayMembersLoading(true);
     setPayAddModal(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/trainer/members`, {
-        headers: { Authorization: `Bearer ${jwt}` },
+      const [membersRes, manualRes] = await Promise.all([
+        fetch(`${API_URL}/api/trainer/members`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        fetch(`${API_URL}/api/trainer/manual-members`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+      ]);
+
+      const combined: CombinedPayMember[] = [];
+
+      if (membersRes.ok) {
+        const members = await membersRes.json();
+        setPayMembers(members);
+        members.forEach((m: any) => {
+          combined.push({
+            id: m.id,
+            name: m.user?.name ?? "",
+            ptRemaining: m.ptRemaining ?? 0,
+            isManual: false,
+            isDisconnected: m.connected === false,
+            originalLinked: m as Member,
+            originalManual: null,
+          });
+        });
+      }
+      if (manualRes.ok) {
+        const manualMembers = await manualRes.json();
+        setPayManualMembers(manualMembers);
+        manualMembers.forEach((m: any) => {
+          combined.push({
+            id: m.id,
+            name: m.name ?? "",
+            ptRemaining: m.ptRemaining ?? 0,
+            isManual: true,
+            isDisconnected: false,
+            originalLinked: null,
+            originalManual: m as ManualMemberItem,
+          });
+        });
+      }
+
+      // 연결해제 회원은 맨 끝, 나머지는 ptRemaining 오름차순 (0→1→3→5...)
+      combined.sort((a, b) => {
+        if (a.isDisconnected !== b.isDisconnected) return a.isDisconnected ? 1 : -1;
+        return a.ptRemaining - b.ptRemaining;
       });
-      if (res.ok) setPayMembers(await res.json());
-    } catch {}
-    finally { setPayMembersLoading(false); }
+
+      setPayCombinedMembers(combined);
+    } catch {
+    } finally {
+      setPayMembersLoading(false);
+    }
   };
 
   const addPayment = async () => {
-    if (!paySelectedMember) { Alert.alert("알림", "회원을 선택해주세요."); return; }
-    if (!paySessionsInput) { Alert.alert("알림", "수업 수를 입력해주세요."); return; }
-    if (!payAmountInput) { Alert.alert("알림", "금액을 입력해주세요."); return; }
+    if (!paySelectedMember && !paySelectedManualMember) {
+      Alert.alert("알림", "회원을 선택해주세요.");
+      return;
+    }
+    if (!paySessionsInput) {
+      Alert.alert("알림", "수업 수를 입력해주세요.");
+      return;
+    }
+    if (!payAmountInput) {
+      Alert.alert("알림", "금액을 입력해주세요.");
+      return;
+    }
     setAddingPay(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/trainer/members/${paySelectedMember.id}/pt/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({
-          sessions: parseInt(paySessionsInput),
-          amount: parseInt(payAmountInput.replace(/,/g, "")),
-          memo: payMemoInput.trim() || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error("결제 추가 실패");
+      let memberName = "";
+
+      if (paySelectedManualMember) {
+        // 미연동 회원 — PT 추가 엔드포인트 사용
+        const res = await fetch(
+          `${API_URL}/api/trainer/manual-members/${paySelectedManualMember.id}/pt`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({
+              sessions: parseInt(paySessionsInput),
+              amount: parseInt(payAmountInput.replace(/,/g, "")),
+              memo: payMemoInput.trim() || undefined,
+              paymentDate: payContractDateInput.trim() || undefined,
+            }),
+          },
+        );
+        if (!res.ok) throw new Error("결제 추가 실패");
+        memberName = paySelectedManualMember.name;
+      } else if (paySelectedMember) {
+        // 연동 회원 — 기존 pt/add 엔드포인트 사용
+        const res = await fetch(
+          `${API_URL}/api/trainer/members/${paySelectedMember.id}/pt/add`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({
+              sessions: parseInt(paySessionsInput),
+              amount: parseInt(payAmountInput.replace(/,/g, "")),
+              memo: payMemoInput.trim() || undefined,
+              contractDate: payContractDateInput.trim() || undefined,
+              startDate: payContractDateInput.trim() || getTodayStr(),
+            }),
+          },
+        );
+        if (!res.ok) throw new Error("결제 추가 실패");
+        memberName = paySelectedMember.user.name;
+      }
+
       setPayAddModal(false);
       setPaySelectedMember(null);
+      setPaySelectedManualMember(null);
       setPaySessionsInput("");
       setPayAmountInput("");
       setPayMemoInput("");
       fetchHome();
-      Alert.alert("완료", `${paySelectedMember.user.name}님 결제가 추가됐어요!`);
+      Alert.alert("완료", `${memberName}님 결제가 추가됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
     } finally {
@@ -238,7 +677,76 @@ export default function TrainerHomeScreen() {
     }
   };
 
-  useFocusEffect(useCallback(() => { fetchHome(); }, []));
+  // 신규 회원 결제 등록 (manual_members 테이블에 저장)
+  const addNewMemberPayment = async () => {
+    // FREE 플랜 회원 수 제한 체크
+    if (
+      (data?.plan ?? "FREE").toUpperCase() === "FREE" &&
+      (data?.totalMembers ?? 0) >= 5
+    ) {
+      setPayAddModal(false);
+      setPaymentVisible(true);
+      return;
+    }
+    if (!payNewName.trim()) {
+      Alert.alert("알림", "회원 이름을 입력해주세요.");
+      return;
+    }
+    if (!payNewPhone.trim()) {
+      Alert.alert(
+        "알림",
+        "전화번호를 입력해주세요.\n운동 기록 문자(SMS) 발송에 사용됩니다.",
+      );
+      return;
+    }
+    if (!paySessionsInput) {
+      Alert.alert("알림", "수업 수를 입력해주세요.");
+      return;
+    }
+    if (!payAmountInput) {
+      Alert.alert("알림", "금액을 입력해주세요.");
+      return;
+    }
+    setAddingPay(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/trainer/manual-members`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          name: payNewName.trim(),
+          phone: payNewPhone.trim(), // 필수값으로 변경
+          ptTotal: parseInt(paySessionsInput),
+          amount: parseInt(payAmountInput.replace(/,/g, "")),
+          paymentDate: payContractDateInput.trim() || null,
+          memo: payMemoInput.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error("등록 실패");
+      setPayAddModal(false);
+      setPayMemberType("existing");
+      setPayNewName("");
+      setPayNewPhone("");
+      setPaySessionsInput("");
+      setPayAmountInput("");
+      setPayMemoInput("");
+      fetchHome();
+      Alert.alert("완료", `${payNewName.trim()}님이 신규 회원으로 등록됐어요!`);
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    } finally {
+      setAddingPay(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchHome();
+    }, []),
+  );
 
   const handleCopy = () => {
     const code = data?.trainerCode ?? "";
@@ -335,157 +843,285 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(data?.plan ?? "FREE").toUpperCase() === "PRO" && (
-                <View
-                  style={{
-                    backgroundColor: Colors.greenLight,
-                    borderWidth: 1,
-                    borderColor: Colors.green + "44",
-                    borderRadius: 999,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: "900",
-                      color: Colors.green,
-                    }}
-                  >
-                    PRO
-                  </Text>
-                </View>
-              )}
+              {(data?.plan ?? "FREE").toUpperCase() === "PRO" &&
+                (() => {
+                  const isTrial = !!data?.trialEndDate;
+                  if (isTrial) {
+                    const ended = new Date(data!.trialEndDate!);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    ended.setHours(0, 0, 0, 0);
+                    const daysLeft = Math.max(
+                      0,
+                      Math.ceil(
+                        (ended.getTime() - today.getTime()) /
+                          (1000 * 60 * 60 * 24),
+                      ),
+                    );
+                    return (
+                      <View
+                        style={{
+                          backgroundColor: "#FEF3C7",
+                          borderWidth: 1,
+                          borderColor: "#FCD34D",
+                          borderRadius: 999,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "800",
+                            color: "#D97706",
+                          }}
+                        >
+                          무료체험 {daysLeft}일
+                        </Text>
+                      </View>
+                    );
+                  }
+                  return (
+                    <View
+                      style={{
+                        backgroundColor: Colors.greenLight,
+                        borderWidth: 1,
+                        borderColor: Colors.green + "44",
+                        borderRadius: 999,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "900",
+                          color: Colors.green,
+                        }}
+                      >
+                        PRO
+                      </Text>
+                    </View>
+                  );
+                })()}
             </View>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/trainer/notifications")}
+          <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
-              backgroundColor:
-                unreadCount > 0 ? Colors.greenLight : Colors.bgSub,
-              borderRadius: 20,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderWidth: 1,
-              borderColor:
-                unreadCount > 0 ? Colors.green + "44" : Colors.border,
+              gap: 8,
               marginTop: 6,
             }}
           >
-            {/* 커스텀 종 아이콘 */}
-            <View
+            {/* 회원 초대 버튼 (compact) */}
+            <TouchableOpacity
+              onPress={handleInvitePress}
               style={{
-                width: 18,
-                height: 18,
-                justifyContent: "center",
+                flexDirection: "row",
                 alignItems: "center",
+                gap: 4,
+                backgroundColor: Colors.bgSub,
+                borderRadius: 20,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderWidth: 1,
+                borderColor: Colors.border,
               }}
             >
-              <View
-                style={{
-                  width: 12,
-                  height: 10,
-                  backgroundColor:
-                    unreadCount > 0 ? Colors.green : Colors.textMuted,
-                  borderRadius: 6,
-                  borderBottomLeftRadius: 0,
-                  borderBottomRightRadius: 0,
-                }}
-              />
-              <View
-                style={{
-                  width: 14,
-                  height: 3,
-                  backgroundColor:
-                    unreadCount > 0 ? Colors.green : Colors.textMuted,
-                  borderRadius: 1,
-                }}
-              />
-              <View
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 3,
-                  borderWidth: 1.5,
-                  borderColor:
-                    unreadCount > 0 ? Colors.green : Colors.textMuted,
-                  marginTop: 1,
-                }}
-              />
-            </View>
-            {unreadCount > 0 ? (
-              <View
-                style={{
-                  backgroundColor: Colors.green,
-                  borderRadius: 10,
-                  minWidth: 20,
-                  height: 20,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  paddingHorizontal: 5,
-                }}
-              >
-                <Text
-                  style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}
-                >
-                  {unreadCount}
-                </Text>
-              </View>
-            ) : (
               <Text
                 style={{
                   fontSize: 12,
-                  color: Colors.textMuted,
-                  fontWeight: "600",
+                  color: Colors.textSub,
+                  fontWeight: "700",
                 }}
               >
-                알림
+                회원초대
               </Text>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+            {/* 알림 버튼 */}
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/trainer/notifications")}
+              style={{
+                width: 36,
+                height: 36,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor:
+                  unreadCount > 0 ? Colors.greenLight : Colors.bgSub,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor:
+                  unreadCount > 0 ? Colors.green + "44" : Colors.border,
+              }}
+            >
+              {/* 종 아이콘 */}
+              <View
+                style={{
+                  width: 16,
+                  height: 16,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <View
+                  style={{
+                    width: 10,
+                    height: 8,
+                    backgroundColor:
+                      unreadCount > 0 ? Colors.green : Colors.textMuted,
+                    borderRadius: 5,
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 12,
+                    height: 2.5,
+                    backgroundColor:
+                      unreadCount > 0 ? Colors.green : Colors.textMuted,
+                    borderRadius: 1,
+                  }}
+                />
+                <View
+                  style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    borderWidth: 1.5,
+                    borderColor:
+                      unreadCount > 0 ? Colors.green : Colors.textMuted,
+                    marginTop: 1,
+                  }}
+                />
+              </View>
+              {unreadCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: Colors.green,
+                  }}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* 회원 초대 버튼 */}
-        <TouchableOpacity
-          onPress={handleInvitePress}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: Colors.green,
-            borderRadius: 12,
-            paddingVertical: 12,
-            marginBottom: 20,
-            gap: 6,
-          }}
-        >
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
-            🔗 회원 초대하기
-          </Text>
-        </TouchableOpacity>
-
-        {/* 상단 요약: 총 회원 + 오늘 PT + 노쇼 */}
+        {/* 상단 요약: 총 회원 + 오늘 PT */}
         <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-          <View style={{ flex: 1, backgroundColor: Colors.bgSub, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}>
-            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>{data?.totalMembers ?? 0}</Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>총 회원</Text>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: Colors.bgSub,
+              borderRadius: 12,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
+              {data?.totalMembers ?? 0}
+            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+              총 회원
+            </Text>
           </View>
-          <View style={{ flex: 1, backgroundColor: Colors.bgSub, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}>
-            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.blue }}>{data?.todaySchedules ?? 0}</Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>오늘 PT</Text>
-          </View>
-          <View style={{ flex: 1, backgroundColor: (data?.noShowCount ?? 0) > 0 ? "#FEF2F2" : Colors.bgSub, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: (data?.noShowCount ?? 0) > 0 ? "#FECACA" : Colors.border, alignItems: "center" }}>
-            <Text style={{ fontSize: 22, fontWeight: "900", color: (data?.noShowCount ?? 0) > 0 ? Colors.red : Colors.textMuted }}>{data?.noShowCount ?? 0}</Text>
-            <Text style={{ fontSize: 12, color: (data?.noShowCount ?? 0) > 0 ? Colors.red : Colors.textMuted, marginTop: 2 }}>노쇼</Text>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: Colors.bgSub,
+              borderRadius: 12,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
+              {data?.todaySchedules ?? 0}
+            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+              오늘 PT
+            </Text>
           </View>
         </View>
+
+        {/* 무료 체험 배너 */}
+        {data?.trialEndDate &&
+          (() => {
+            const ended = new Date(data.trialEndDate!);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            ended.setHours(0, 0, 0, 0);
+            const daysLeft = Math.max(
+              0,
+              Math.ceil(
+                (ended.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+              ),
+            );
+            return (
+              <TouchableOpacity
+                onPress={() => setPaymentVisible(true)}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: "#FFFBEB",
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: "#FCD34D",
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  marginBottom: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <Text style={{ fontSize: 26 }}>🎁</Text>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "900",
+                      color: "#92400E",
+                    }}
+                  >
+                    무료 체험 {daysLeft}일 남았어요
+                  </Text>
+                  <Text
+                    style={{ fontSize: 11, color: "#B45309", marginTop: 3 }}
+                  >
+                    종료 후 회원 5명 제한으로 전환돼요.{"\n"}지금 구독하면 계속
+                    무제한으로 사용할 수 있어요.
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: "#F59E0B",
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 11, fontWeight: "900", color: "#fff" }}
+                  >
+                    PRO{"\n"}구독
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })()}
 
         {/* 목표 미설정 시 입력 유도 */}
-        {(data?.goalSessions == null && data?.goalRevenue == null) ? (
+        {data?.goalSessions == null && data?.goalRevenue == null ? (
           <>
             <TouchableOpacity
               onPress={() => {
@@ -493,99 +1129,619 @@ export default function TrainerHomeScreen() {
                 setGoalRevenueInput("");
                 setGoalModal(true);
               }}
-              style={{ backgroundColor: Colors.greenLight, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.green + "55", borderStyle: "dashed", padding: 18, alignItems: "center", marginBottom: 10 }}
+              style={{
+                backgroundColor: Colors.greenLight,
+                borderRadius: 14,
+                borderWidth: 1.5,
+                borderColor: Colors.green + "55",
+                borderStyle: "dashed",
+                padding: 18,
+                alignItems: "center",
+                marginBottom: 10,
+              }}
             >
-              <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.green, marginBottom: 4 }}>이번 달 목표를 설정해주세요</Text>
-              <Text style={{ fontSize: 12, color: Colors.textMuted }}>목표 수업 수와 목표 매출을 입력하면 진행률을 볼 수 있어요</Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "700",
+                  color: Colors.green,
+                  marginBottom: 4,
+                }}
+              >
+                이번 달 목표를 설정해주세요
+              </Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                목표 수업 수와 목표 매출을 입력하면 진행률을 볼 수 있어요
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { openPayModal(); }}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, marginBottom: 16, backgroundColor: Colors.bgSub }}
+              onPress={() => {
+                openPayModal();
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                paddingVertical: 12,
+                marginBottom: 16,
+                backgroundColor: Colors.bgSub,
+              }}
             >
-              <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}>+ 결제 추가</Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                }}
+              >
+                + 결제 추가
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            {/* 이번 달 수업 수 */}
-            <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 12 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>이번 달 수업</Text>
-                <TouchableOpacity onPress={() => { setGoalSessionsInput(String(data?.goalSessions ?? "")); setGoalRevenueInput((data?.goalRevenue ?? 0) > 0 ? (data!.goalRevenue!).toLocaleString() : ""); setGoalModal(true); }}>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted }}>목표 수정</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
-                <Text style={{ fontSize: 28, fontWeight: "900", color: Colors.green }}>{data?.monthSessions ?? 0}</Text>
-                <Text style={{ fontSize: 14, color: Colors.textMuted }}>/ {data?.goalSessions ?? "-"}회</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginLeft: "auto" }}>
-                  {data?.goalSessions ? Math.round(((data?.monthSessions ?? 0) / data.goalSessions) * 100) : 0}%
-                </Text>
-              </View>
-              <ProgressBar pct={data?.goalSessions ? Math.round(((data?.monthSessions ?? 0) / data.goalSessions) * 100) : 0} color={Colors.green} />
-            </View>
-
-            {/* 이번 달 매출 */}
-            <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>이번 달 매출</Text>
-                <TouchableOpacity
-                  onPress={() => { openPayModal(); }}
-                  style={{ backgroundColor: Colors.green, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+            {/* 이번 달 수업 수 — 수업 목표가 설정된 경우만 표시 */}
+            {data?.goalSessions != null && (
+              <View
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>+ 결제 추가</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
-                <Text style={{ fontSize: 24, fontWeight: "900", color: "#F59E0B" }}>
-                  {(data?.monthRevenue ?? 0).toLocaleString()}원
-                </Text>
-                <Text style={{ fontSize: 14, color: Colors.textMuted }}>
-                  / {data?.goalRevenue ? `${data.goalRevenue.toLocaleString()}원` : "-"}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#F59E0B", marginLeft: "auto" }}>
-                  {data?.goalRevenue ? Math.round(((data?.monthRevenue ?? 0) / data.goalRevenue) * 100) : 0}%
-                </Text>
-              </View>
-              <ProgressBar pct={data?.goalRevenue ? Math.round(((data?.monthRevenue ?? 0) / data.goalRevenue) * 100) : 0} color="#F59E0B" />
-              {(data?.monthRevenueDetails ?? []).length > 0 && (
-                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 }}>
-                  <ScrollView
-                    style={{ maxHeight: 140 }}
-                    showsVerticalScrollIndicator={false}
-                    nestedScrollEnabled
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: Colors.text,
+                    }}
                   >
-                    {(data?.monthRevenueDetails ?? []).map((d, i) => (
-                      <View key={i} style={{
-                        paddingVertical: 6,
-                        borderBottomWidth: i < (data?.monthRevenueDetails ?? []).length - 1 ? 1 : 0,
-                        borderBottomColor: Colors.border + "55",
-                      }}>
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                          <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: "600" }}>{d.memberName}</Text>
-                          <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-                            {d.sessions}회{"  "}{d.amount.toLocaleString()}원
-                          </Text>
-                        </View>
-                        {d.memo ? (
-                          <Text style={{ fontSize: 12, color: Colors.textMuted, fontStyle: "italic", marginTop: 3 }}>
-                            {d.memo}
-                          </Text>
-                        ) : null}
+                    이번 달 수업
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setGoalSessionsInput(String(data?.goalSessions ?? ""));
+                      setGoalRevenueInput(
+                        (data?.goalRevenue ?? 0) > 0
+                          ? data!.goalRevenue!.toLocaleString()
+                          : "",
+                      );
+                      setGoalModal(true);
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                      목표 수정
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    gap: 4,
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 28,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
+                    {data?.monthSessions ?? 0}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: Colors.textMuted }}>
+                    / {data.goalSessions}회
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: Colors.green,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {Math.round(
+                      ((data?.monthSessions ?? 0) / data.goalSessions) * 100,
+                    )}
+                    %
+                  </Text>
+                </View>
+                <ProgressBar
+                  pct={Math.round(
+                    ((data?.monthSessions ?? 0) / data.goalSessions) * 100,
+                  )}
+                  color={Colors.green}
+                />
+              </View>
+            )}
+
+            {/* 이번 달 노쇼 */}
+            {(data?.noShowCount ?? 0) > 0 && (
+              <View
+                style={{
+                  backgroundColor: "#FFF1F2",
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: "#FECDD3",
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  marginBottom: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 16 }}>⚠️</Text>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#BE123C" }}>
+                      이번 달 노쇼
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#9F1239", marginTop: 1 }}>
+                      미출석 처리된 수업
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 24, fontWeight: "900", color: "#EF4444" }}>
+                  {data?.noShowCount ?? 0}
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#F87171" }}>회</Text>
+                </Text>
+              </View>
+            )}
+
+            {/* 이번 달 매출 — 월별 네비게이션 포함 */}
+            {(() => {
+              const isCurrentMonth = revenueMonthOffset === 0;
+              const displayRevenue = isCurrentMonth
+                ? (data?.monthRevenue ?? 0)
+                : (selectedMonthRevenue?.monthRevenue ?? 0);
+              const displayDetails: any[] = isCurrentMonth
+                ? (data?.monthRevenueDetails ?? [])
+                : (selectedMonthRevenue?.monthRevenueDetails ?? []);
+              return (
+                <View
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 16,
+                    marginBottom: 12,
+                  }}
+                >
+                  {/* 월 네비게이션 */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          const next = revenueMonthOffset - 1;
+                          setRevenueMonthOffset(next);
+                          setSelectedMonthRevenue(null);
+                          fetchMonthRevenue(next);
+                        }}
+                        style={{ padding: 4 }}
+                      >
+                        <Text style={{ fontSize: 18, color: Colors.textSub }}>
+                          ‹
+                        </Text>
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "700",
+                          color: Colors.text,
+                        }}
+                      >
+                        {isCurrentMonth
+                          ? "이번 달 매출"
+                          : `${getMonthLabel(revenueMonthOffset)} 매출`}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const next = revenueMonthOffset + 1;
+                          if (next > 0) return;
+                          setRevenueMonthOffset(next);
+                          if (next === 0) {
+                            setSelectedMonthRevenue(null);
+                          } else {
+                            fetchMonthRevenue(next);
+                          }
+                        }}
+                        disabled={revenueMonthOffset >= 0}
+                        style={{
+                          padding: 4,
+                          opacity: revenueMonthOffset >= 0 ? 0.3 : 1,
+                        }}
+                      >
+                        <Text style={{ fontSize: 18, color: Colors.textSub }}>
+                          ›
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {/* PDF 버튼 */}
+                      <TouchableOpacity
+                        onPress={generatePdf}
+                        style={{
+                          backgroundColor: "#EEF2FF",
+                          borderRadius: 8,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderWidth: 1,
+                          borderColor: "#C7D2FE",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: "#4338CA",
+                          }}
+                        >
+                          📄 PDF
+                        </Text>
+                      </TouchableOpacity>
+                      {/* 목표 수정 & 결제 추가 (이번 달만) */}
+                      {isCurrentMonth && (
+                        <>
+                          {data?.goalSessions == null && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                setGoalSessionsInput("");
+                                setGoalRevenueInput(
+                                  data?.goalRevenue != null
+                                    ? data.goalRevenue.toLocaleString()
+                                    : "",
+                                );
+                                setGoalModal(true);
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: Colors.textMuted,
+                                }}
+                              >
+                                목표 수정
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity
+                            onPress={() => {
+                              openPayModal();
+                            }}
+                            style={{
+                              backgroundColor: Colors.green,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: "#fff",
+                              }}
+                            >
+                              + 결제 추가
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  {loadingRevenue ? (
+                    <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                      <ActivityIndicator size="small" color={Colors.green} />
+                    </View>
+                  ) : (
+                    <>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "baseline",
+                          gap: 4,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 24,
+                            fontWeight: "900",
+                            color: "#F59E0B",
+                          }}
+                        >
+                          {Number(displayRevenue).toLocaleString()}원
+                        </Text>
+                        {isCurrentMonth && data?.goalRevenue != null && (
+                          <>
+                            <Text
+                              style={{ fontSize: 14, color: Colors.textMuted }}
+                            >
+                              / {data.goalRevenue.toLocaleString()}원
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: "700",
+                                color: "#F59E0B",
+                                marginLeft: "auto",
+                              }}
+                            >
+                              {Math.round(
+                                (displayRevenue / data.goalRevenue) * 100,
+                              )}
+                              %
+                            </Text>
+                          </>
+                        )}
                       </View>
-                    ))}
-                  </ScrollView>
-                  {(data?.monthRevenueDetails ?? []).length > 3 && (
-                    <Text style={{ fontSize: 11, color: Colors.textMuted, textAlign: "center", marginTop: 4 }}>스크롤해서 더 보기</Text>
+                      {isCurrentMonth && data?.goalRevenue != null && (
+                        <ProgressBar
+                          pct={Math.round(
+                            (displayRevenue / data.goalRevenue) * 100,
+                          )}
+                          color="#F59E0B"
+                        />
+                      )}
+                      {displayDetails.length > 0 && (
+                        <View
+                          style={{
+                            marginTop: 12,
+                            borderTopWidth: 1,
+                            borderTopColor: Colors.border,
+                            paddingTop: 10,
+                          }}
+                        >
+                          <ScrollView
+                            style={{ maxHeight: 132 }}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled
+                          >
+                            {displayDetails.map((d, i) => (
+                              <View
+                                key={i}
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  paddingVertical: 8,
+                                  borderBottomWidth:
+                                    i < displayDetails.length - 1 ? 1 : 0,
+                                  borderBottomColor: Colors.border + "55",
+                                  gap: 6,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: Colors.textMuted,
+                                    width: 32,
+                                  }}
+                                >
+                                  {d.date}
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    color: Colors.textSub,
+                                    fontWeight: "600",
+                                    flex: 1,
+                                  }}
+                                >
+                                  {d.memberName}
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    color: Colors.textMuted,
+                                  }}
+                                >
+                                  {d.sessions}회{"  "}
+                                  {Number(d.amount).toLocaleString()}원
+                                </Text>
+                                {(d.contractId != null ||
+                                  d.manualMemberId != null) &&
+                                isCurrentMonth ? (
+                                  <>
+                                    <TouchableOpacity
+                                      onPress={() => {
+                                        setMemoPopup({
+                                          contractId: d.contractId ?? null,
+                                          memo: d.memo ?? "",
+                                        });
+                                        setMemoEditText(d.memo ?? "");
+                                      }}
+                                      style={{
+                                        backgroundColor: d.memo
+                                          ? Colors.bgSub
+                                          : "transparent",
+                                        borderRadius: 6,
+                                        borderWidth: 1,
+                                        borderColor: d.memo
+                                          ? Colors.border
+                                          : Colors.border + "66",
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 3,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 10,
+                                          color: d.memo
+                                            ? Colors.textSub
+                                            : Colors.textMuted,
+                                          fontWeight: "700",
+                                        }}
+                                      >
+                                        {d.memo ? "메모" : "+ 메모"}
+                                      </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      onPress={() => openEditModal(d)}
+                                      style={{
+                                        borderRadius: 6,
+                                        borderWidth: 1,
+                                        borderColor: Colors.border,
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 3,
+                                        backgroundColor: Colors.bgSub,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 10,
+                                          color: Colors.textSub,
+                                          fontWeight: "700",
+                                        }}
+                                      >
+                                        수정
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </>
+                                ) : (
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      setMemoPopup({
+                                        contractId: null,
+                                        memo: d.memo ?? "",
+                                      });
+                                      setMemoEditText(d.memo ?? "");
+                                    }}
+                                    style={{
+                                      backgroundColor: d.memo
+                                        ? Colors.bgSub
+                                        : "transparent",
+                                      borderRadius: 6,
+                                      borderWidth: 1,
+                                      borderColor: d.memo
+                                        ? Colors.border
+                                        : Colors.border + "66",
+                                      paddingHorizontal: 7,
+                                      paddingVertical: 3,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10,
+                                        color: d.memo
+                                          ? Colors.textSub
+                                          : Colors.textMuted,
+                                        fontWeight: "700",
+                                      }}
+                                    >
+                                      {d.memo ? "메모" : "메모 없음"}
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            ))}
+                          </ScrollView>
+                          {displayDetails.length > 3 && (
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: Colors.textMuted,
+                                textAlign: "center",
+                                marginTop: 4,
+                              }}
+                            >
+                              스크롤해서 더 보기
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                      {displayDetails.length === 0 && !isCurrentMonth && (
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: Colors.textMuted,
+                            textAlign: "center",
+                            paddingVertical: 16,
+                          }}
+                        >
+                          이 달 결제 내역이 없어요
+                        </Text>
+                      )}
+                    </>
                   )}
                 </View>
-              )}
-            </View>
+              );
+            })()}
+
+            {/* 수업 목표만 있고 매출 목표가 없을 때 목표 수정 버튼 */}
+            {data?.goalRevenue == null && data?.goalSessions != null && (
+              <TouchableOpacity
+                onPress={() => {
+                  setGoalSessionsInput(String(data?.goalSessions ?? ""));
+                  setGoalRevenueInput("");
+                  setGoalModal(true);
+                }}
+                style={{
+                  alignItems: "center",
+                  paddingVertical: 8,
+                  marginBottom: 4,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                  목표 수정
+                </Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
         {/* 오늘 PT 일정 */}
         <SectionTitle title="오늘 PT 일정" />
+        {data?.todayPtList && data.todayPtList.length > 0 && (
+          <Text
+            style={{
+              fontSize: 11,
+              color: Colors.textMuted,
+              marginBottom: 8,
+              marginTop: -4,
+            }}
+          >
+            회원을 탭하면 PT 일지를 등록할 수 있어요
+          </Text>
+        )}
         {data?.todayPtList && data.todayPtList.length > 0 ? (
           [...data.todayPtList]
             .sort((a, b) => {
@@ -606,8 +1762,8 @@ export default function TrainerHomeScreen() {
               const bEndTime = new Date();
               bEndTime.setHours(bh + 1, bm, 0, 0);
 
-              const aPast = a.completed || now > aEndTime;
-              const bPast = b.completed || now > bEndTime;
+              const aPast = a.completed || a.isNoShow || now > aEndTime;
+              const bPast = b.completed || b.isNoShow || now > bEndTime;
 
               // 지난 일정은 아래로
               if (aPast && !bPast) return 1;
@@ -616,97 +1772,184 @@ export default function TrainerHomeScreen() {
               // 같은 그룹 안에서는 시작 시간순
               return aStartTime.getTime() - bStartTime.getTime();
             })
-            .map((item) => (
-              <TouchableOpacity
-                key={`${item.memberId}-${item.time}`}
-                onPress={() =>
-                  router.push(
-                    `/(tabs)/trainer/member-detail?id=${item.memberId}`,
-                  )
-                }
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 10,
-                  borderLeftWidth: 3,
-                  borderLeftColor: Colors.green,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                }}
-              >
-                <View
+            .map((item) => {
+              // 수업 시작 +1시간 지나고 아직 COMPLETED 아니면 → 노쇼
+              const [h, m] = item.time.split(":").map(Number);
+              const sessionEnd = new Date();
+              sessionEnd.setHours(h + 1, m, 0, 0);
+              const isNoShow = !item.completed && new Date() > sessionEnd;
+              const isOt = item.sessionType === "OT";
+
+              // 아바타 색상: OT=오렌지, PT=초록 (노쇼도 초록 유지)
+              const avatarColor = isOt ? "#F97316" : Colors.green;
+              // 배경 색상: OT=연오렌지, PT/노쇼=기본
+              const bgColor = isOt ? "#FFF7ED" : Colors.bgSub;
+              const borderColor = isOt ? "#F9731644" : Colors.border;
+
+              return (
+                <TouchableOpacity
+                  key={`${item.isManual ? "manual" : "linked"}-${item.memberId}-${item.time}`}
+                  onPress={() => {
+                    if (isOt) {
+                      // OT 회원: 미연동 회원 운동일지 탭으로 이동
+                      router.push(
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
+                      );
+                    } else if (item.isManual) {
+                      // 일반 미연동 회원: 미연동 회원 상세로 이동
+                      router.push(
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
+                      );
+                    } else {
+                      // 연동 회원: 회원 상세로 이동
+                      router.push(
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=1`,
+                      );
+                    }
+                  }}
+                  activeOpacity={0.7}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: Colors.green,
-                    justifyContent: "center",
+                    flexDirection: "row",
                     alignItems: "center",
-                    marginRight: 12,
+                    backgroundColor: bgColor,
+                    borderRadius: 10,
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: borderColor,
+                    opacity: item.completed ? 0.65 : 1,
                   }}
                 >
-                  <Text
-                    style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}
-                  >
-                    {item.memberName[0]}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "700",
-                      color: Colors.text,
-                    }}
-                  >
-                    {item.memberName}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textMuted,
-                      marginTop: 1,
-                    }}
-                  >
-                    PT 수업 · 잔여 {item.ptRemaining}회
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "700",
-                      color: Colors.textSub,
-                    }}
-                  >
-                    {item.time}
-                  </Text>
+                  {/* 성 이니셜 아바타 */}
                   <View
                     style={{
-                      backgroundColor: item.completed
-                        ? Colors.green
-                        : Colors.blue + "22",
+                      width: 28,
+                      height: 28,
                       borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
+                      backgroundColor: avatarColor,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 10,
                     }}
                   >
                     <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "800",
-                        color: item.completed ? "#fff" : Colors.blue,
-                      }}
+                      style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}
                     >
-                      {item.completed ? "완료" : "확정"}
+                      {item.memberName[0]}
                     </Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))
+
+                  {/* 이름 + 구분 */}
+                  <View style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: Colors.text,
+                        }}
+                      >
+                        {item.memberName}
+                      </Text>
+                      {isOt && (
+                        <View
+                          style={{
+                            backgroundColor: "#F9731622",
+                            borderRadius: 4,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: "800",
+                              color: "#F97316",
+                            }}
+                          >
+                            OT
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                      {isOt ? "체험 수업" : `잔여 ${item.ptRemaining}회`}
+                    </Text>
+                  </View>
+
+                  {/* 시간 + 상태 */}
+                  <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.textSub,
+                      }}
+                    >
+                      {item.time}
+                    </Text>
+                    {item.completed ? (
+                      // 운동 로그 등록됨 → 완료
+                      <View style={{ backgroundColor: Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.green }}>완료 ✓</Text>
+                      </View>
+                    ) : item.isNoShow || isNoShow ? (
+                      // 노쇼 (명시적 or 시간 지남 자동)
+                      <View style={{ backgroundColor: Colors.textMuted + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.textMuted }}>노쇼</Text>
+                      </View>
+                    ) : (
+                      // 확정 → 탭해서 완료 / 노쇼 / 취소
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!item.scheduleId) return;
+                          Alert.alert(
+                            `${item.memberName}님 ${item.time} 수업`,
+                            "수업 처리를 선택해주세요.",
+                            [
+                              {
+                                text: "완료 처리",
+                                onPress: async () => {
+                                  const jwt = await AsyncStorage.getItem("jwt");
+                                  await fetch(`${API_URL}/api/schedule/${item.scheduleId}/complete`, {
+                                    method: "PATCH",
+                                    headers: { Authorization: `Bearer ${jwt}` },
+                                  });
+                                  fetchHome();
+                                },
+                              },
+                              {
+                                text: "노쇼 처리",
+                                style: "destructive",
+                                onPress: async () => {
+                                  const jwt = await AsyncStorage.getItem("jwt");
+                                  await fetch(`${API_URL}/api/schedule/${item.scheduleId}/no-show`, {
+                                    method: "PATCH",
+                                    headers: { Authorization: `Bearer ${jwt}` },
+                                  });
+                                  fetchHome();
+                                },
+                              },
+                              { text: "취소", style: "cancel" },
+                            ],
+                          );
+                        }}
+                        style={{ backgroundColor: isOt ? "#F9731618" : Colors.blue + "18", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: isOt ? "#F97316" : Colors.blue }}>확정 ›</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
         ) : (
           <View
             style={{
@@ -726,6 +1969,364 @@ export default function TrainerHomeScreen() {
         )}
       </ScrollView>
 
+      {/* ── 메모 수정 팝업 ──────────────────────────────────────────────── */}
+      <Modal
+        visible={memoPopup !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMemoPopup(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.45)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 28,
+            }}
+            activeOpacity={1}
+            onPress={() => setMemoPopup(null)}
+          >
+            <TouchableOpacity activeOpacity={1} style={{ width: "100%" }}>
+              <View
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 18,
+                  padding: 22,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowRadius: 20,
+                  elevation: 10,
+                }}
+              >
+                {/* 헤더 */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "800",
+                      color: Colors.text,
+                    }}
+                  >
+                    결제 메모
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setMemoPopup(null)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: Colors.bgSub,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                      ✕
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {/* 메모 입력/표시 */}
+                <TextInput
+                  value={memoEditText}
+                  onChangeText={
+                    memoPopup?.contractId != null ? setMemoEditText : undefined
+                  }
+                  editable={memoPopup?.contractId != null}
+                  placeholder="메모 없음"
+                  placeholderTextColor={Colors.textMuted}
+                  multiline
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 14,
+                    fontSize: 14,
+                    color: Colors.text,
+                    minHeight: 90,
+                    textAlignVertical: "top",
+                    marginBottom: 16,
+                  }}
+                />
+                {memoPopup?.contractId != null ? (
+                  /* 연동 회원 — 저장하기 */
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (!memoPopup) return;
+                      setSavingMemo(true);
+                      try {
+                        const jwt = await AsyncStorage.getItem("jwt");
+                        const res = await fetch(
+                          `${API_URL}/api/trainer/members/contracts/${memoPopup.contractId}/memo`,
+                          {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${jwt}`,
+                            },
+                            body: JSON.stringify({
+                              memo: memoEditText.trim() || null,
+                            }),
+                          },
+                        );
+                        if (!res.ok) throw new Error("저장 실패");
+                        setMemoPopup(null);
+                        fetchHome();
+                      } catch (e: any) {
+                        Alert.alert("오류", e.message);
+                      } finally {
+                        setSavingMemo(false);
+                      }
+                    }}
+                    disabled={savingMemo}
+                    style={{
+                      backgroundColor: Colors.green,
+                      borderRadius: 12,
+                      paddingVertical: 13,
+                      alignItems: "center",
+                      opacity: savingMemo ? 0.6 : 1,
+                    }}
+                  >
+                    <Text
+                      style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}
+                    >
+                      {savingMemo ? "저장 중..." : "저장하기"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  /* 미연동 회원 — 확인 (읽기 전용, 수정은 수정 버튼 이용) */
+                  <TouchableOpacity
+                    onPress={() => setMemoPopup(null)}
+                    style={{
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 12,
+                      paddingVertical: 13,
+                      alignItems: "center",
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: Colors.textSub,
+                        fontSize: 14,
+                        fontWeight: "800",
+                      }}
+                    >
+                      확인
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 결제 수정 모달 ──────────────────────────────────────────────── */}
+      <Modal
+        visible={editModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, justifyContent: "flex-end" }}
+        >
+          <TouchableOpacity
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+            }}
+            activeOpacity={1}
+            onPress={() => setEditModal(false)}
+          />
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingTop: 20,
+              maxHeight: "90%",
+            }}
+          >
+            <GestureDetector gesture={editDragGesture}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setEditModal(false)}
+                style={{ alignItems: "center", paddingBottom: 12 }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 4,
+                    backgroundColor: Colors.border,
+                    borderRadius: 99,
+                  }}
+                />
+              </TouchableOpacity>
+            </GestureDetector>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 28,
+                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 4,
+                }}
+              >
+                결제 수정
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  marginBottom: 24,
+                }}
+              >
+                수업 수, 금액, 메모를 수정할 수 있어요
+              </Text>
+
+              {/* 수업 수 */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                PT 수업 수 (회)
+              </Text>
+              <TextInput
+                value={editSessionsInput}
+                onChangeText={setEditSessionsInput}
+                keyboardType="number-pad"
+                placeholderTextColor={Colors.textMuted}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 16,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+              />
+
+              {/* 금액 */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                결제 금액 (원)
+              </Text>
+              <TextInput
+                value={editAmountInput}
+                onChangeText={(text) => {
+                  const digits = text.replace(/[^0-9]/g, "");
+                  setEditAmountInput(
+                    digits ? Number(digits).toLocaleString() : "",
+                  );
+                }}
+                keyboardType="number-pad"
+                placeholderTextColor={Colors.textMuted}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 16,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+              />
+
+              {/* 메모 */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                메모 (선택)
+              </Text>
+              <TextInput
+                value={editMemoInput}
+                onChangeText={setEditMemoInput}
+                placeholder="메모를 입력해주세요"
+                placeholderTextColor={Colors.textMuted}
+                multiline
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 14,
+                  color: Colors.text,
+                  marginBottom: 24,
+                  minHeight: 66,
+                  textAlignVertical: "top",
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={saveEdit}
+                disabled={savingEdit}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 12,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  opacity: savingEdit ? 0.6 : 1,
+                }}
+              >
+                <Text
+                  style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}
+                >
+                  {savingEdit ? "저장 중..." : "저장하기"}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── 목표 설정 모달 ──────────────────────────────────────────────── */}
       <Modal
         visible={goalModal}
@@ -733,94 +2334,149 @@ export default function TrainerHomeScreen() {
         animationType="slide"
         onRequestClose={() => setGoalModal(false)}
       >
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
-          activeOpacity={1}
-          onPress={() => setGoalModal(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, justifyContent: "flex-end" }}
         >
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <TouchableOpacity activeOpacity={1}>
-              <View
-                style={{
-                  backgroundColor: "#fff",
-                  borderTopLeftRadius: 24,
-                  borderTopRightRadius: 24,
-                  padding: 28,
-                  paddingBottom: Platform.OS === "ios" ? 44 : 28,
-                }}
+          <TouchableOpacity
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+            }}
+            activeOpacity={1}
+            onPress={() => setGoalModal(false)}
+          />
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 28,
+              paddingBottom: Platform.OS === "ios" ? 44 : 28,
+            }}
+          >
+            {/* 핸들 바 */}
+            <GestureDetector gesture={goalDragGesture}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setGoalModal(false)}
+                style={{ alignItems: "center", paddingBottom: 12 }}
               >
-                {/* 핸들 바 */}
-                <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-
-                <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
-                  이번 달 목표 설정
-                </Text>
-                <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
-                  목표 수업 수와 목표 매출을 입력해주세요
-                </Text>
-
-                {/* 목표 수업 수 */}
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>목표 수업 수 (회)</Text>
-                <TextInput
-                  value={goalSessionsInput}
-                  onChangeText={setGoalSessionsInput}
-                  keyboardType="number-pad"
-                  placeholder="예: 80"
-                  placeholderTextColor={Colors.textMuted}
+                <View
                   style={{
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: 14,
-                    fontSize: 16,
-                    color: Colors.text,
-                    marginBottom: 16,
+                    width: 40,
+                    height: 4,
+                    backgroundColor: Colors.border,
+                    borderRadius: 99,
                   }}
                 />
+              </TouchableOpacity>
+            </GestureDetector>
 
-                {/* 목표 매출 */}
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>목표 매출 (원)</Text>
-                <TextInput
-                  value={goalRevenueInput}
-                  onChangeText={(text) => {
-                    const digits = text.replace(/[^0-9]/g, "");
-                    setGoalRevenueInput(digits ? Number(digits).toLocaleString() : "");
-                  }}
-                  keyboardType="number-pad"
-                  placeholder="예: 3,000,000"
-                  placeholderTextColor={Colors.textMuted}
-                  style={{
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: 14,
-                    fontSize: 16,
-                    color: Colors.text,
-                    marginBottom: 24,
-                  }}
-                />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "800",
+                color: Colors.text,
+                marginBottom: 4,
+              }}
+            >
+              이번 달 목표 설정
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: Colors.textMuted,
+                marginBottom: 24,
+              }}
+            >
+              목표 수업 수와 목표 매출을 입력해주세요
+            </Text>
 
-                <TouchableOpacity
-                  onPress={saveGoals}
-                  disabled={savingGoal}
-                  style={{
-                    backgroundColor: Colors.green,
-                    borderRadius: 12,
-                    paddingVertical: 15,
-                    alignItems: "center",
-                    opacity: savingGoal ? 0.6 : 1,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>
-                    {savingGoal ? "저장 중..." : "저장하기"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            {/* 목표 수업 수 */}
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: Colors.textSub,
+                marginBottom: 8,
+              }}
+            >
+              목표 수업 수 (회)
+            </Text>
+            <TextInput
+              value={goalSessionsInput}
+              onChangeText={setGoalSessionsInput}
+              keyboardType="number-pad"
+              placeholder="예: 80"
+              placeholderTextColor={Colors.textMuted}
+              style={{
+                backgroundColor: Colors.bgSub,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                padding: 14,
+                fontSize: 16,
+                color: Colors.text,
+                marginBottom: 16,
+              }}
+            />
+
+            {/* 목표 매출 */}
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: Colors.textSub,
+                marginBottom: 8,
+              }}
+            >
+              목표 매출 (원)
+            </Text>
+            <TextInput
+              value={goalRevenueInput}
+              onChangeText={(text) => {
+                const digits = text.replace(/[^0-9]/g, "");
+                setGoalRevenueInput(
+                  digits ? Number(digits).toLocaleString() : "",
+                );
+              }}
+              keyboardType="number-pad"
+              placeholder="예: 3,000,000"
+              placeholderTextColor={Colors.textMuted}
+              style={{
+                backgroundColor: Colors.bgSub,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                padding: 14,
+                fontSize: 16,
+                color: Colors.text,
+                marginBottom: 24,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={saveGoals}
+              disabled={savingGoal}
+              style={{
+                backgroundColor: Colors.green,
+                borderRadius: 12,
+                paddingVertical: 15,
+                alignItems: "center",
+                opacity: savingGoal ? 0.6 : 1,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>
+                {savingGoal ? "저장 중..." : "저장하기"}
+              </Text>
             </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── 결제 추가 모달 ──────────────────────────────────────────────── */}
@@ -830,63 +2486,135 @@ export default function TrainerHomeScreen() {
         animationType="slide"
         onRequestClose={() => setPayAddModal(false)}
       >
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
-          activeOpacity={1}
-          onPress={() => setPayAddModal(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, justifyContent: "flex-end" }}
         >
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <TouchableOpacity activeOpacity={1}>
-              <View
+          <TouchableOpacity
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+            }}
+            activeOpacity={1}
+            onPress={() => setPayAddModal(false)}
+          />
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingTop: 20,
+              maxHeight: "88%",
+            }}
+          >
+            {/* 핸들 바 */}
+            <GestureDetector gesture={payAddDragGesture}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setPayAddModal(false)}
+                style={{ alignItems: "center", paddingBottom: 12 }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 4,
+                    backgroundColor: Colors.border,
+                    borderRadius: 99,
+                  }}
+                />
+              </TouchableOpacity>
+            </GestureDetector>
+
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingBottom: 48,
+              }}
+            >
+              <Text
                 style={{
-                  backgroundColor: "#fff",
-                  borderTopLeftRadius: 24,
-                  borderTopRightRadius: 24,
-                  paddingTop: 20,
-                  maxHeight: "90%",
+                  fontSize: 18,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 16,
                 }}
               >
-                {/* 핸들 바 */}
-                <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+                결제 추가
+              </Text>
 
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingHorizontal: 28,
-                    paddingBottom: Platform.OS === "ios" ? 44 : 28,
-                  }}
-                >
-                  <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>결제 추가</Text>
-                  <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 12 }}>회원을 선택하고 PT 수업 수와 금액을 입력해주세요</Text>
+              {/* 기존 회원 / 신규 회원 탭 */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  padding: 4,
+                  marginBottom: 20,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                {(["existing", "new"] as const).map((type) => {
+                  const active = payMemberType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => setPayMemberType(type)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 9,
+                        borderRadius: 9,
+                        alignItems: "center",
+                        backgroundColor: active ? "#fff" : "transparent",
+                        shadowColor: active ? "#000" : "transparent",
+                        shadowOpacity: active ? 0.06 : 0,
+                        shadowRadius: active ? 4 : 0,
+                        elevation: active ? 2 : 0,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "800",
+                          color: active ? Colors.green : Colors.textMuted,
+                        }}
+                      >
+                        {type === "existing" ? "기존 회원" : "신규 회원"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-                  {/* 신규 회원 안내 */}
-                  <TouchableOpacity
-                    onPress={() => { setPayAddModal(false); router.push("/(tabs)/trainer/members"); }}
+              {payMemberType === "existing" ? (
+                <>
+                  {/* 기존 연동 회원 선택 */}
+                  <Text
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                      backgroundColor: "#FFFBEB",
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: "#FCD34D",
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      marginBottom: 20,
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: Colors.textSub,
+                      marginBottom: 10,
                     }}
                   >
-                    <Text style={{ fontSize: 15 }}>⚠️</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#92400E" }}>신규 회원이라면?</Text>
-                      <Text style={{ fontSize: 11, color: "#B45309", marginTop: 1 }}>회원관리에서 먼저 추가한 뒤 결제를 등록해주세요 →</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* 회원 선택 */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 10 }}>회원 선택</Text>
+                    회원 선택
+                  </Text>
                   {payMembersLoading ? (
-                    <View style={{ height: 80, justifyContent: "center", alignItems: "center", marginBottom: 20 }}>
+                    <View
+                      style={{
+                        height: 80,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginBottom: 20,
+                      }}
+                    >
                       <ActivityIndicator size="small" color={Colors.green} />
                     </View>
                   ) : (
@@ -895,151 +2623,376 @@ export default function TrainerHomeScreen() {
                       showsHorizontalScrollIndicator={false}
                       keyboardShouldPersistTaps="handled"
                       style={{ height: 90, marginBottom: 20 }}
-                      contentContainerStyle={{ gap: 8, paddingRight: 4, alignItems: "center" }}
+                      contentContainerStyle={{
+                        gap: 8,
+                        paddingRight: 4,
+                        alignItems: "center",
+                      }}
                     >
-                      {payMembers.map((m) => (
-                        <TouchableOpacity
-                          key={m.id}
-                          onPress={() => setPaySelectedMember(m)}
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
-                            borderRadius: 12,
-                            borderWidth: 1.5,
-                            borderColor: paySelectedMember?.id === m.id ? Colors.green : Colors.border,
-                            backgroundColor: paySelectedMember?.id === m.id ? Colors.greenLight : Colors.bgSub,
-                            alignItems: "center",
-                            minWidth: 68,
-                          }}
-                        >
-                          <View style={{
-                            width: 34, height: 34, borderRadius: 10,
-                            backgroundColor: paySelectedMember?.id === m.id ? Colors.green : "#D1D5DB",
-                            justifyContent: "center", alignItems: "center", marginBottom: 4,
-                          }}>
-                            <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>{m.user.name[0]}</Text>
-                          </View>
-                          <Text style={{
-                            fontSize: 12, fontWeight: "700",
-                            color: paySelectedMember?.id === m.id ? Colors.green : Colors.text,
-                          }}>{m.user.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      {payMembers.length === 0 && (
-                        <TouchableOpacity
-                          onPress={() => {
-                            setPayAddModal(false);
-                            router.push("/(tabs)/trainer/members");
-                          }}
-                          style={{
-                            backgroundColor: Colors.bgSub,
-                            borderRadius: 12,
-                            borderWidth: 1.5,
-                            borderColor: Colors.border,
-                            borderStyle: "dashed",
-                            paddingHorizontal: 20,
-                            paddingVertical: 14,
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text }}>등록된 회원이 없어요</Text>
-                          <Text style={{ fontSize: 12, color: Colors.textMuted, textAlign: "center" }}>
-                            회원 관리에서 회원을 먼저 추가해주세요
-                          </Text>
-                          <View style={{ marginTop: 6, backgroundColor: Colors.green, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}>
-                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>회원 관리로 이동 →</Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
+                      {payCombinedMembers.map((m) => {
+                        const selected = m.isManual
+                          ? paySelectedManualMember?.id === m.id
+                          : paySelectedMember?.id === m.id;
+                        return (
+                          <TouchableOpacity
+                            key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
+                            onPress={() => {
+                              if (m.isManual) {
+                                setPaySelectedManualMember(m.originalManual);
+                                setPaySelectedMember(null);
+                              } else {
+                                setPaySelectedMember(m.originalLinked);
+                                setPaySelectedManualMember(null);
+                              }
+                            }}
+                            style={{
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 12,
+                              borderWidth: 1.5,
+                              borderColor: selected
+                                ? Colors.green
+                                : Colors.border,
+                              backgroundColor: selected
+                                ? Colors.greenLight
+                                : Colors.bgSub,
+                              alignItems: "center",
+                              minWidth: 68,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 10,
+                                backgroundColor: selected
+                                  ? Colors.green
+                                  : "#D1D5DB",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                marginBottom: 4,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 15,
+                                  fontWeight: "800",
+                                  color: "#fff",
+                                }}
+                              >
+                                {m.name[0]}
+                              </Text>
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: selected ? Colors.green : Colors.text,
+                              }}
+                            >
+                              {m.name}
+                            </Text>
+                            {m.isDisconnected && (
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  color: "#9CA3AF",
+                                  marginTop: 1,
+                                }}
+                              >
+                                연결해제
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {payCombinedMembers.length === 0 && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setPayAddModal(false);
+                              router.push("/(tabs)/trainer/members");
+                            }}
+                            style={{
+                              backgroundColor: Colors.bgSub,
+                              borderRadius: 12,
+                              borderWidth: 1.5,
+                              borderColor: Colors.border,
+                              borderStyle: "dashed",
+                              paddingHorizontal: 20,
+                              paddingVertical: 14,
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: "700",
+                                color: Colors.text,
+                              }}
+                            >
+                              등록된 회원이 없어요
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: Colors.textMuted,
+                                textAlign: "center",
+                              }}
+                            >
+                              회원 관리에서 먼저 추가해주세요
+                            </Text>
+                            <View
+                              style={{
+                                marginTop: 6,
+                                backgroundColor: Colors.green,
+                                borderRadius: 8,
+                                paddingHorizontal: 14,
+                                paddingVertical: 6,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "700",
+                                  color: "#fff",
+                                }}
+                              >
+                                회원 관리로 이동 →
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        )}
                     </ScrollView>
                   )}
-
-                  {/* 수업 수 */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>PT 수업 수 (회)</Text>
-                  <TextInput
-                    value={paySessionsInput}
-                    onChangeText={setPaySessionsInput}
-                    keyboardType="number-pad"
-                    placeholder="예: 20"
-                    placeholderTextColor={Colors.textMuted}
+                </>
+              ) : (
+                <>
+                  {/* 신규 회원 이름 / 전화번호 */}
+                  <Text
                     style={{
-                      backgroundColor: Colors.bgSub,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      padding: 14,
-                      fontSize: 16,
-                      color: Colors.text,
+                      fontSize: 13,
+                      color: Colors.textMuted,
                       marginBottom: 16,
-                    }}
-                  />
-
-                  {/* 금액 */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>결제 금액 (원)</Text>
-                  <TextInput
-                    value={payAmountInput}
-                    onChangeText={(text) => {
-                      const digits = text.replace(/[^0-9]/g, "");
-                      setPayAmountInput(digits ? Number(digits).toLocaleString() : "");
-                    }}
-                    keyboardType="number-pad"
-                    placeholder="예: 600,000"
-                    placeholderTextColor={Colors.textMuted}
-                    style={{
-                      backgroundColor: Colors.bgSub,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      padding: 14,
-                      fontSize: 16,
-                      color: Colors.text,
-                      marginBottom: 16,
-                    }}
-                  />
-
-                  {/* 메모 */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>메모 (선택)</Text>
-                  <TextInput
-                    value={payMemoInput}
-                    onChangeText={setPayMemoInput}
-                    placeholder="결제 관련 메모를 입력해주세요"
-                    placeholderTextColor={Colors.textMuted}
-                    multiline
-                    style={{
-                      backgroundColor: Colors.bgSub,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      padding: 14,
-                      fontSize: 14,
-                      color: Colors.text,
-                      marginBottom: 24,
-                      minHeight: 66,
-                      textAlignVertical: "top",
-                    }}
-                  />
-
-                  <TouchableOpacity
-                    onPress={addPayment}
-                    disabled={addingPay}
-                    style={{
-                      backgroundColor: Colors.green,
-                      borderRadius: 12,
-                      paddingVertical: 15,
-                      alignItems: "center",
-                      opacity: addingPay ? 0.6 : 1,
+                      lineHeight: 18,
                     }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>
-                      {addingPay ? "추가 중..." : "결제 추가하기"}
-                    </Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
+                    앱 미가입 신규 회원을 바로 등록하고 결제까지 한 번에
+                    처리해요
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: Colors.textSub,
+                      marginBottom: 8,
+                    }}
+                  >
+                    이름 *
+                  </Text>
+                  <TextInput
+                    value={payNewName}
+                    onChangeText={setPayNewName}
+                    placeholder="예: 홍길동"
+                    placeholderTextColor={Colors.textMuted}
+                    style={{
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      padding: 14,
+                      fontSize: 15,
+                      color: Colors.text,
+                      marginBottom: 14,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: Colors.textSub,
+                      marginBottom: 8,
+                    }}
+                  >
+                    전화번호 * (문자(SMS) 발송용)
+                  </Text>
+                  <TextInput
+                    value={payNewPhone}
+                    onChangeText={setPayNewPhone}
+                    placeholder="예: 010-1234-5678"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="phone-pad"
+                    style={{
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      padding: 14,
+                      fontSize: 15,
+                      color: Colors.text,
+                      marginBottom: 14,
+                    }}
+                  />
+                </>
+              )}
+
+              {/* ── 공통: 수업 수, 금액, 메모 ── */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                PT 수업 수 (회) *
+              </Text>
+              <TextInput
+                value={paySessionsInput}
+                onChangeText={setPaySessionsInput}
+                keyboardType="number-pad"
+                placeholder="예: 20"
+                placeholderTextColor={Colors.textMuted}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 16,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+              />
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                결제 금액 (원) *
+              </Text>
+              <TextInput
+                value={payAmountInput}
+                onChangeText={(text) => {
+                  const digits = text.replace(/[^0-9]/g, "");
+                  setPayAmountInput(
+                    digits ? Number(digits).toLocaleString() : "",
+                  );
+                }}
+                keyboardType="number-pad"
+                placeholder="예: 600,000"
+                placeholderTextColor={Colors.textMuted}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 16,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+              />
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 4,
+                }}
+              >
+                결제 날짜
+              </Text>
+              <TextInput
+                value={payContractDateInput}
+                onChangeText={(text) => {
+                  const digits = text.replace(/[^0-9]/g, "");
+                  let formatted = digits;
+                  if (digits.length >= 5)
+                    formatted = digits.slice(0, 4) + "-" + digits.slice(4);
+                  if (digits.length >= 7)
+                    formatted =
+                      digits.slice(0, 4) +
+                      "-" +
+                      digits.slice(4, 6) +
+                      "-" +
+                      digits.slice(6, 8);
+                  setPayContractDateInput(formatted);
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 15,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+              />
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textSub,
+                  marginBottom: 8,
+                }}
+              >
+                메모 (선택)
+              </Text>
+              <TextInput
+                value={payMemoInput}
+                onChangeText={setPayMemoInput}
+                placeholder="결제 관련 메모를 입력해주세요"
+                placeholderTextColor={Colors.textMuted}
+                multiline
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 14,
+                  fontSize: 14,
+                  color: Colors.text,
+                  marginBottom: 24,
+                  minHeight: 66,
+                  textAlignVertical: "top",
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={
+                  payMemberType === "existing"
+                    ? addPayment
+                    : addNewMemberPayment
+                }
+                disabled={addingPay}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 12,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  opacity: addingPay ? 0.6 : 1,
+                }}
+              >
+                <Text
+                  style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}
+                >
+                  {addingPay ? "추가 중..." : "결제 추가하기"}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* 초대 모달 */}
@@ -1227,44 +3180,148 @@ export default function TrainerHomeScreen() {
                 }}
               />
 
-              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 4,
+                }}
+              >
                 PRO 플랜으로 업그레이드
               </Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 20 }}>
-                무료 플랜은 회원 3명까지 연결할 수 있어요.
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
+                무료 플랜은 회원 5명까지 연결할 수 있어요.
               </Text>
 
-              <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>
-                  <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
-                    <Text style={{ fontSize: 26, fontWeight: "900", color: Colors.green }}>7,900</Text>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>원/월</Text>
+              <View
+                style={{
+                  borderRadius: 16,
+                  padding: 20,
+                  borderWidth: 1.5,
+                  borderColor: Colors.green + "55",
+                  backgroundColor: Colors.greenLight,
+                  marginBottom: 20,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
+                    PRO
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-end",
+                      gap: 2,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 26,
+                        fontWeight: "900",
+                        color: Colors.green,
+                      }}
+                    >
+                      15,900
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.green,
+                        marginBottom: 3,
+                      }}
+                    >
+                      원/월
+                    </Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>
-                  ✓ 회원 무제한{"\n"}✓ 사진/영상 첨부{"\n"}✓ 운동 기록 전체 조회{"\n"}✓ 데이터 분석
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textSub,
+                    lineHeight: 22,
+                  }}
+                >
+                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 3명)
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {
                     try {
-                      if (!Purchases || typeof Purchases.getOfferings !== "function") { Alert.alert("오류", "결제 모듈을 불러오지 못했어요."); return; }
+                      if (
+                        !Purchases ||
+                        typeof Purchases.getOfferings !== "function"
+                      ) {
+                        Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                        return;
+                      }
                       const offerings = await Purchases.getOfferings();
-                      const pkg = offerings.current?.availablePackages.find((p: any) => p.identifier === "pro_monthly") ?? offerings.current?.availablePackages[0];
-                      if (!pkg) { Alert.alert("오류", "구독 상품을 불러오지 못했어요."); return; }
+                      const pkg =
+                        offerings.current?.availablePackages.find(
+                          (p: any) => p.identifier === "pro_monthly",
+                        ) ?? offerings.current?.availablePackages[0];
+                      if (!pkg) {
+                        Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                        return;
+                      }
                       await Purchases.purchasePackage(pkg);
-                      setPaymentVisible(false); fetchHome();
+                      setPaymentVisible(false);
+                      fetchHome();
                       Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
-                    } catch (e: any) { if (!e.userCancelled) Alert.alert("결제 실패", e.message ?? "다시 시도해주세요."); }
+                    } catch (e: any) {
+                      if (!e.userCancelled)
+                        Alert.alert(
+                          "결제 실패",
+                          e.message ?? "다시 시도해주세요.",
+                        );
+                    }
                   }}
-                  style={{ marginTop: 16, backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                  style={{
+                    marginTop: 16,
+                    backgroundColor: Colors.green,
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                  }}
                 >
-                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>시작하기</Text>
+                  <Text
+                    style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}
+                  >
+                    시작하기
+                  </Text>
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity onPress={() => setPaymentVisible(false)}>
-                <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 14,
+                    color: Colors.textMuted,
+                  }}
+                >
+                  나중에 할게요
+                </Text>
               </TouchableOpacity>
             </View>
           </GestureDetector>

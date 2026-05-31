@@ -38,6 +38,8 @@ export default function FitLogWriteScreen() {
     { name: "", sets: [{ setNumber: 1, weight: 0, reps: 0 }] },
   ]);
   const [memo, setMemo] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [missions, setMissions] = useState<string[]>([""]);
   const [saving, setSaving] = useState(false);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState<number | null>(null);
@@ -158,6 +160,8 @@ export default function FitLogWriteScreen() {
           date,
           exercises: validExercises,
           memo: memo.trim() || undefined,
+          feedback: feedback.trim() || undefined,
+          missions: missions.filter(m => m.trim().length > 0),
         }),
       });
 
@@ -376,6 +380,89 @@ export default function FitLogWriteScreen() {
             marginBottom: 20,
           }}
         />
+
+        {/* 피드백 */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <View style={{ width: 3, height: 16, backgroundColor: "#6366f1", borderRadius: 2 }} />
+          <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>회원에게 한마디 💬</Text>
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>(선택)</Text>
+        </View>
+        <TextInput
+          value={feedback}
+          onChangeText={setFeedback}
+          placeholder="오늘 수업 어땠는지, 잘한 점 등을 회원에게 전달해요"
+          placeholderTextColor={Colors.textPlaceholder}
+          multiline
+          numberOfLines={3}
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderWidth: 1.5,
+            borderColor: feedback ? "#6366f1" : Colors.border,
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 14,
+            color: Colors.text,
+            textAlignVertical: "top",
+            minHeight: 80,
+            marginBottom: 20,
+          }}
+        />
+
+        {/* 챌린지 미션 */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <View style={{ width: 3, height: 16, backgroundColor: "#f97316", borderRadius: 2 }} />
+          <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>다음 수업 전 챌린지 🔥</Text>
+          <Text style={{ fontSize: 12, color: Colors.textMuted }}>(선택)</Text>
+        </View>
+        <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 10 }}>
+          부담 없이, 해보면 좋을 것들을 적어주세요
+        </Text>
+        {missions.map((m, idx) => (
+          <View key={idx} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Text style={{ fontSize: 16, color: "#f97316" }}>•</Text>
+            <TextInput
+              value={m}
+              onChangeText={(v) => {
+                const next = [...missions];
+                next[idx] = v;
+                setMissions(next);
+              }}
+              placeholder={idx === 0 ? "예: 스쿼트 50개" : "예: 물 2L 마시기"}
+              placeholderTextColor={Colors.textPlaceholder}
+              style={{
+                flex: 1,
+                backgroundColor: Colors.bgSub,
+                borderWidth: 1.5,
+                borderColor: m ? "#f97316" : Colors.border,
+                borderRadius: 10,
+                padding: 12,
+                fontSize: 14,
+                color: Colors.text,
+              }}
+            />
+            {missions.length > 1 && (
+              <TouchableOpacity
+                onPress={() => setMissions(missions.filter((_, i) => i !== idx))}
+                style={{ padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: Colors.textMuted }}>×</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+        {missions.length < 5 && (
+          <TouchableOpacity
+            onPress={() => setMissions([...missions, ""])}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "center",
+              gap: 6, paddingVertical: 10, borderWidth: 1,
+              borderColor: "#f97316" + "66", borderRadius: 10,
+              backgroundColor: "#fff7ed", marginBottom: 20,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: "#f97316", fontWeight: "700" }}>+ 챌린지 추가</Text>
+          </TouchableOpacity>
+        )}
 
         {/* 저장 버튼 */}
         <TouchableOpacity

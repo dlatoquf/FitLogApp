@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { router } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,10 +16,8 @@ import {
   View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
-import { ANALYTICS_URL, API_URL } from "../../../constants/api";
+import { API_URL } from "../../../constants/api";
 import { getWeekDates, toDateKey } from "../../../hooks/useApi";
-
-const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 interface ThisWeekSchedule {
   scheduleId: number;
@@ -28,14 +25,6 @@ interface ThisWeekSchedule {
   startTime: string;
   endTime: string;
   status?: string;
-}
-interface NextWeekSlot {
-  id: number;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: "OPEN" | "REQUESTED" | "MINE" | "FULL" | "CONFIRMED" | "COMPLETED";
-  myRequest?: boolean;
 }
 interface MemberHomeData {
   member: {
@@ -50,12 +39,8 @@ interface MemberHomeData {
   };
   ptRemaining: number;
   ptTotal: number;
-  todayDietCalories: number;
-  todayProtein: number;
-  goalCalories: number;
   nextSchedule: string | null;
   dDay: number | null;
-  unreadFeedbackCount: number;
 }
 
 interface Noti {
@@ -67,7 +52,11 @@ interface Noti {
 }
 
 const NOTI_ICON: Record<string, string> = {
-  WORKOUT_LOG: "💪", SCHEDULE: "📅", FEEDBACK: "💬", PT_EXPIRY: "⏰", GENERAL: "🔔",
+  WORKOUT_LOG: "💪",
+  SCHEDULE: "📅",
+  FEEDBACK: "💬",
+  PT_EXPIRY: "⏰",
+  GENERAL: "🔔",
 };
 
 const formatTime = (time?: string) => {
@@ -75,67 +64,38 @@ const formatTime = (time?: string) => {
   return String(time).slice(0, 5);
 };
 
-const normalizeSlotStatus = (slot: any): NextWeekSlot["status"] => {
-  const status = String(slot.status ?? "OPEN").toUpperCase();
-
-  if (slot.myRequest && (status === "CONFIRMED" || status === "MINE")) {
-    return "MINE";
-  }
-
-  if (slot.myRequest && status === "REQUESTED") {
-    return "REQUESTED";
-  }
-
-  if (status === "OPEN") {
-    return "OPEN";
-  }
-
-  if (status === "REQUESTED") {
-    return "REQUESTED";
-  }
-
-  // 다른 회원이 확정했거나 수업 완료된 슬롯은 회원 입장에서 마감
-  if (status === "CONFIRMED" || status === "COMPLETED" || status === "FULL") {
-    return "FULL";
-  }
-
-  return "FULL";
-};
-
 export default function MemberHomeScreen() {
-  const params = useLocalSearchParams<{ openSchedule?: string }>();
-  const didOpenScheduleFromNoti = useRef(false);
-  const [data, setData]                         = useState<MemberHomeData | null>(null);
-  const [loading, setLoading]                   = useState(true);
-  const [refreshing, setRefreshing]             = useState(false);
-  const [showSchedule, setShowSchedule]         = useState(false);
+  const [data, setData] = useState<MemberHomeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showTrainerConnect, setShowTrainerConnect] = useState(false);
-  const [trainerCode, setTrainerCode]           = useState("");
-  const [connecting, setConnecting]             = useState(false);
-  const [thisWeek, setThisWeek]                 = useState<ThisWeekSchedule[]>([]);
-  const [nextWeekSlots, setNextWeekSlots]       = useState<NextWeekSlot[]>([]);
-  const [slotsLoading, setSlotsLoading]         = useState(false);
-  const [requesting, setRequesting]             = useState<number | null>(null);
-  const [notifications, setNotifications]       = useState<Noti[]>([]);
-  const [summaryData, setSummaryData]           = useState<{ monthly_workout_days: number; top_2_workout_days: string[] } | null>(null);
-  const [summaryRadar, setSummaryRadar]         = useState<{ target_body_part: string; part_percentage: number }[]>([]);
-  const [weekSummary, setWeekSummary]           = useState<{ workout_days: number; avg_calories: number; avg_protein: number; goal_calories: number; goal_protein: number } | null>(null);
-  const [selectedDate, setSelectedDate]         = useState(() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() + (day === 0 ? 1 : 8 - day));
-    return d;
-  });
-
-  const weekDates = getWeekDates(1);
-  const dateKey   = toDateKey(selectedDate);
-  const daySlots  = nextWeekSlots
-    .filter(s => s.date === dateKey)
-    .sort((a, b) => formatTime(a.startTime).localeCompare(formatTime(b.startTime)));
-  const myDates   = new Set(nextWeekSlots.filter(s => s.status === "MINE" || s.status === "REQUESTED").map(s => s.date));
+  const [trainerCode, setTrainerCode] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [thisWeek, setThisWeek] = useState<ThisWeekSchedule[]>([]);
+  const [notifications, setNotifications] = useState<Noti[]>([]);
+  const [weekWorkoutDates, setWeekWorkoutDates] = useState<Set<string>>(
+    new Set(),
+  );
+  const [bodyLogs, setBodyLogs] = useState<
+    {
+      date: string;
+      weight: number | null;
+      bodyFat: number | null;
+      muscleMass: number | null;
+    }[]
+  >([]);
+  const [latestFeedback, setLatestFeedback] = useState<{
+    trainerName: string;
+    content: string;
+    date: string;
+  } | null>(null);
+  const [missions, setMissions] = useState<
+    { id: number; content: string; isDone: boolean; trainerName: string }[]
+  >([]);
 
   const fetchHome = async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       const headers = { Authorization: `Bearer ${jwt}` };
@@ -148,145 +108,174 @@ export default function MemberHomeScreen() {
       const homeData = await homeRes.json();
       setData(homeData);
 
-      // PRO일 때만 분석 fetch
-      if (homeData?.member?.id && homeData?.member?.trainerPlan === "PRO") {
-        const memberId = homeData.member.id;
-        try {
-          const [workoutRes, dietRes, goalsRes] = await Promise.all([
-            fetch(`${ANALYTICS_URL}/api/analytics/workout-habit/${memberId}`),
-            fetch(`${ANALYTICS_URL}/api/analytics/diet-pattern/${memberId}`),
-            fetch(`${API_URL}/api/member/goals/member/${memberId}`, { headers }),
+      // 이번 주 운동 날짜 + 체중 로그 + 최근 피드백 병렬 조회
+      const thisMonday = getWeekDates(0)[0];
+      const thisSunday = getWeekDates(0)[6];
+      const fromKey = toDateKey(thisMonday);
+      const toKey = toDateKey(thisSunday);
+      try {
+        const [fitlogRes, bodylogRes, feedbackRes, missionsRes] =
+          await Promise.all([
+            fetch(`${API_URL}/api/fitlog/me?from=${fromKey}&to=${toKey}`, {
+              headers,
+            }),
+            fetch(`${API_URL}/api/bodylog/me`, { headers }),
+            fetch(`${API_URL}/api/diet/feedback/latest`, { headers }),
+            fetch(`${API_URL}/api/missions/my`, { headers }),
           ]);
-          const workoutJson = await workoutRes.json();
-          if (workoutJson.status === "success") {
-            setSummaryData(workoutJson.data.metrics);
-            setSummaryRadar(workoutJson.data.charts.radar_chart_data ?? []);
-          }
-          let goalProtein = 0;
-          if (goalsRes.ok) {
-            const goalsData = await goalsRes.json();
-            goalProtein = Number(goalsData?.targetProtein ?? goalsData?.goalProtein ?? goalsData?.protein ?? 0);
-          }
-          const dietJson = await dietRes.json();
-          if (dietJson.status === "success") {
-            const m = dietJson.data.metrics;
-            setWeekSummary({
-              workout_days: m.workout_days ?? 0,
-              avg_calories: m.avg_calories ?? 0,
-              avg_protein: m.avg_protein ?? 0,
-              goal_calories: homeData.goalCalories ?? 0,
-              goal_protein: goalProtein,
-            });
-          }
-        } catch {}
-      }
+        if (fitlogRes.ok) {
+          try {
+            const logs: any[] = await fitlogRes.json();
+            const dates = new Set(
+              logs.map((l: any) =>
+                String(l.date ?? l.logDate ?? "").slice(0, 10),
+              ),
+            );
+            setWeekWorkoutDates(dates);
+          } catch {}
+        }
+        if (bodylogRes.ok) {
+          try {
+            const logs: any[] = await bodylogRes.json();
+            setBodyLogs(
+              logs.map((l: any) => ({
+                date: l.date,
+                weight: l.weight ?? null,
+                bodyFat: l.bodyFat ?? null,
+                muscleMass: l.muscleMass ?? null,
+              })),
+            );
+          } catch {}
+        }
+        if (feedbackRes.ok && feedbackRes.status !== 204) {
+          try {
+            const fb = await feedbackRes.json();
+            setLatestFeedback(
+              fb
+                ? {
+                    trainerName: fb.trainerName,
+                    content: fb.content,
+                    date: fb.date,
+                  }
+                : null,
+            );
+          } catch {}
+        }
+        if (missionsRes.ok) {
+          try {
+            const ms: any[] = await missionsRes.json();
+            setMissions(
+              ms.slice(0, 10).map((m: any) => ({
+                id: m.id,
+                content: m.content,
+                isDone: m.isDone,
+                trainerName: m.trainerName,
+              })),
+            );
+          } catch {}
+        }
+      } catch {}
       if (weekRes.ok) setThisWeek(await weekRes.json());
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
-    } finally { setLoading(false); setRefreshing(false); }
-  };
-
-  const fetchNextWeekSlots = async () => {
-    setSlotsLoading(true);
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/schedule/next-week-slots`, { headers: { Authorization: `Bearer ${jwt}` } });
-      if (!res.ok) throw new Error();
-      const rawSlots = await res.json();
-      setNextWeekSlots(
-        rawSlots.map((slot: any) => ({
-          ...slot,
-          id: slot.id ?? slot.scheduleId,
-          startTime: formatTime(slot.startTime),
-          endTime: formatTime(slot.endTime),
-          status: normalizeSlotStatus(slot),
-        }))
-      );
-    } catch {
-      const mk = toDateKey(weekDates[0]);
-      const tk = toDateKey(weekDates[1]);
-      setNextWeekSlots([
-        { id: 1, date: mk, startTime: "09:00", endTime: "10:00", status: "MINE" },
-        { id: 2, date: mk, startTime: "10:00", endTime: "11:00", status: "OPEN" },
-        { id: 3, date: mk, startTime: "11:00", endTime: "12:00", status: "OPEN" },
-        { id: 4, date: mk, startTime: "14:00", endTime: "15:00", status: "REQUESTED" },
-        { id: 5, date: tk, startTime: "09:00", endTime: "10:00", status: "OPEN" },
-        { id: 6, date: tk, startTime: "10:00", endTime: "11:00", status: "FULL" },
-      ]);
-    } finally { setSlotsLoading(false); }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const connectTrainer = async () => {
-    if (!trainerCode.trim()) { Alert.alert("오류", "트레이너 코드를 입력해주세요."); return; }
+    if (!trainerCode.trim()) {
+      Alert.alert("오류", "트레이너 코드를 입력해주세요.");
+      return;
+    }
     setConnecting(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       const res = await fetch(`${API_URL}/api/member/connect-trainer`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
         body: JSON.stringify({ trainerCode: trainerCode.trim().toUpperCase() }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "연결 실패");
+      if (!res.ok) {
+        const msg = result.message || "연결 실패";
+        if (msg.includes("무료 플랜") || msg.includes("회원 3명")) {
+          Alert.alert(
+            "연결 불가",
+            "이 트레이너는 현재 회원이 가득 찼어요.\n트레이너에게 문의해주세요.",
+          );
+        } else {
+          Alert.alert("오류", msg);
+        }
+        return;
+      }
       setTrainerCode("");
       setShowTrainerConnect(false);
       await fetchHome();
-      Alert.alert("연결 완료! 🎉", `${result.trainerName} 트레이너와 연결됐어요!`);
-    } catch (e: any) { Alert.alert("오류", e.message); }
-    finally { setConnecting(false); }
+      Alert.alert(
+        "연결 완료! 🎉",
+        `${result.trainerName} 트레이너와 연결됐어요!`,
+      );
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    } finally {
+      setConnecting(false);
+    }
   };
 
-  const requestSlot = async (slotId: number) => {
-    Alert.alert("수업 신청", "이 시간에 수업을 신청할까요?\n중복 신청도 가능해요!", [
-      { text: "취소", style: "cancel" },
-      { text: "신청", onPress: async () => {
-        setRequesting(slotId);
-        try {
-          const jwt = await AsyncStorage.getItem("jwt");
-          const res = await fetch(`${API_URL}/api/schedule/request/${slotId}`, {
-            method: "POST", headers: { Authorization: `Bearer ${jwt}` },
-          });
-          if (!res.ok) throw new Error("신청 실패");
-          await fetchNextWeekSlots();
-          Alert.alert("완료", "수업 신청이 완료됐어요!\n트레이너 확정 후 알림을 드릴게요.");
-        } catch (e: any) { Alert.alert("오류", e.message); }
-        finally { setRequesting(null); }
-      }},
-    ]);
-  };
-
-  const scheduleDragGesture = Gesture.Pan()
-    .runOnJS(true)
-    .onEnd((e) => {
-      if (e.translationY > 60) {
-        setShowSchedule(false);
+  const toggleMission = async (missionId: number) => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/missions/${missionId}/done`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        setMissions((prev) =>
+          prev.map((m) => (m.id === missionId ? { ...m, isDone: true } : m)),
+        );
       }
-    });
+    } catch {}
+  };
 
-  useFocusEffect(useCallback(() => { fetchHome(); }, []));
-
-  // 알림에서 "다음 주 수업 오픈"을 눌러 들어온 경우,
-  // 홈 화면의 다음 주 수업 신청 모달을 바로 열어준다.
-  useEffect(() => {
-    if (params.openSchedule !== "true") return;
-    if (didOpenScheduleFromNoti.current) return;
-
-    didOpenScheduleFromNoti.current = true;
-    setShowSchedule(true);
-    fetchNextWeekSlots();
-  }, [params.openSchedule]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchHome();
+    }, []),
+  );
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#fff",
+        }}
+      >
         <ActivityIndicator color={Colors.green} size="large" />
       </View>
     );
   }
 
-  const ptPct   = data && data.ptTotal > 0 ? Math.min((data.ptRemaining / data.ptTotal) * 100, 100) : 0;
-  const dietPct = data ? Math.min((data.todayDietCalories / data.goalCalories) * 100, 100) : 0;
+  const ptPct =
+    data && data.ptTotal > 0
+      ? Math.min((data.ptRemaining / data.ptTotal) * 100, 100)
+      : 0;
+  const lastBodyLog =
+    bodyLogs.length > 0 ? bodyLogs[bodyLogs.length - 1] : null;
+  const prevBodyLog =
+    bodyLogs.length > 1 ? bodyLogs[bodyLogs.length - 2] : null;
+  const weightDiff =
+    lastBodyLog?.weight != null && prevBodyLog?.weight != null
+      ? Math.round((lastBodyLog.weight - prevBodyLog.weight) * 10) / 10
+      : null;
 
   // 현재 시간이 수업 종료시간을 지나면 홈의 "이번 주 내 수업"에서 숨김
   const now = new Date();
@@ -299,39 +288,142 @@ export default function MemberHomeScreen() {
     <>
       <ScrollView
         style={{ flex: 1, backgroundColor: "#fff" }}
-        contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchHome(true)} tintColor={Colors.green} />}
+        contentContainerStyle={{
+          padding: 20,
+          paddingTop: 56,
+          paddingBottom: 32,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchHome(true)}
+            tintColor={Colors.green}
+          />
+        }
       >
         {/* 인사 + 알림 버튼 */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 20,
+          }}
+        >
           <View>
-            <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}>안녕하세요 👋</Text>
-            <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>{data?.member.name}님</Text>
+            <Text
+              style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}
+            >
+              안녕하세요 👋
+            </Text>
+            <Text
+              style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}
+            >
+              {data?.member.name}님
+            </Text>
             {data?.member.trainerName && (
-              <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>담당: {data.member.trainerName} 트레이너</Text>
+              <Text
+                style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}
+              >
+                담당: {data.member.trainerName} 트레이너
+              </Text>
             )}
           </View>
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/member/notifications")}
             style={{
-              flexDirection: "row", alignItems: "center", gap: 6,
-              backgroundColor: notifications.filter(n => !n.isRead).length > 0 ? "#EFF6FF" : Colors.bgSub,
-              borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
-              borderWidth: 1, borderColor: notifications.filter(n => !n.isRead).length > 0 ? Colors.blue + "44" : Colors.border,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              backgroundColor:
+                notifications.filter((n) => !n.isRead).length > 0
+                  ? "#EFF6FF"
+                  : Colors.bgSub,
+              borderRadius: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderWidth: 1,
+              borderColor:
+                notifications.filter((n) => !n.isRead).length > 0
+                  ? Colors.blue + "44"
+                  : Colors.border,
               marginTop: 6,
             }}
           >
-            <View style={{ width: 18, height: 18, justifyContent: "center", alignItems: "center" }}>
-              <View style={{ width: 12, height: 10, backgroundColor: notifications.filter(n => !n.isRead).length > 0 ? Colors.blue : Colors.textMuted, borderRadius: 6, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
-              <View style={{ width: 14, height: 3, backgroundColor: notifications.filter(n => !n.isRead).length > 0 ? Colors.blue : Colors.textMuted, borderRadius: 1 }} />
-              <View style={{ width: 5, height: 5, borderRadius: 3, borderWidth: 1.5, borderColor: notifications.filter(n => !n.isRead).length > 0 ? Colors.blue : Colors.textMuted, marginTop: 1 }} />
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  width: 12,
+                  height: 10,
+                  backgroundColor:
+                    notifications.filter((n) => !n.isRead).length > 0
+                      ? Colors.blue
+                      : Colors.textMuted,
+                  borderRadius: 6,
+                  borderBottomLeftRadius: 0,
+                  borderBottomRightRadius: 0,
+                }}
+              />
+              <View
+                style={{
+                  width: 14,
+                  height: 3,
+                  backgroundColor:
+                    notifications.filter((n) => !n.isRead).length > 0
+                      ? Colors.blue
+                      : Colors.textMuted,
+                  borderRadius: 1,
+                }}
+              />
+              <View
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 3,
+                  borderWidth: 1.5,
+                  borderColor:
+                    notifications.filter((n) => !n.isRead).length > 0
+                      ? Colors.blue
+                      : Colors.textMuted,
+                  marginTop: 1,
+                }}
+              />
             </View>
-            {notifications.filter(n => !n.isRead).length > 0 ? (
-              <View style={{ backgroundColor: Colors.blue, borderRadius: 10, minWidth: 20, height: 20, justifyContent: "center", alignItems: "center", paddingHorizontal: 5 }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{notifications.filter(n => !n.isRead).length}</Text>
+            {notifications.filter((n) => !n.isRead).length > 0 ? (
+              <View
+                style={{
+                  backgroundColor: Colors.blue,
+                  borderRadius: 10,
+                  minWidth: 20,
+                  height: 20,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 5,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}
+                >
+                  {notifications.filter((n) => !n.isRead).length}
+                </Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: "600" }}>알림</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: Colors.textMuted,
+                  fontWeight: "600",
+                }}
+              >
+                알림
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -340,374 +432,770 @@ export default function MemberHomeScreen() {
         {!data?.member.trainerName && (
           <TouchableOpacity
             onPress={() => setShowTrainerConnect(true)}
-            style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 14, padding: 16, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 }}
+            style={{
+              backgroundColor: Colors.greenLight,
+              borderWidth: 1,
+              borderColor: Colors.green + "44",
+              borderRadius: 14,
+              padding: 16,
+              marginBottom: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
           >
-            <View style={{ width: 40, height: 40, backgroundColor: Colors.green, borderRadius: 10, justifyContent: "center", alignItems: "center" }}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                backgroundColor: Colors.green,
+                borderRadius: 10,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <Text style={{ fontSize: 20 }}>🔑</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.green }}>트레이너 연결하기</Text>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>트레이너 코드를 입력해 연결해요</Text>
+              <Text
+                style={{ fontSize: 14, fontWeight: "700", color: Colors.green }}
+              >
+                트레이너 연결하기
+              </Text>
+              <Text
+                style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
+              >
+                트레이너 코드를 입력해 연결해요
+              </Text>
             </View>
             <Text style={{ fontSize: 16, color: Colors.green }}>›</Text>
           </TouchableOpacity>
         )}
 
         {/* PT 잔여 */}
-        <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: Colors.border }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, color: Colors.textSub }}>PT 잔여 횟수</Text>
-            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
-              <Text style={{ fontSize: 28, fontWeight: "900", color: Colors.blue }}>{data?.ptRemaining ?? 0}</Text>
-              <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 4 }}>/ {data?.ptTotal ?? 0}회</Text>
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: Colors.textSub }}>
+              PT 신청가능 횟수
+            </Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}
+            >
+              <Text
+                style={{ fontSize: 28, fontWeight: "900", color: Colors.blue }}
+              >
+                {data?.ptRemaining ?? 0}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: Colors.textMuted,
+                  marginBottom: 4,
+                }}
+              >
+                / {data?.ptTotal ?? 0}회
+              </Text>
             </View>
           </View>
-          <View style={{ backgroundColor: Colors.border, borderRadius: 99, height: 8 }}>
-            <View style={{ width: `${ptPct}%` as any, height: 8, borderRadius: 99, backgroundColor: Colors.blue }} />
+          <View
+            style={{
+              backgroundColor: Colors.border,
+              borderRadius: 99,
+              height: 8,
+            }}
+          >
+            <View
+              style={{
+                width: `${ptPct}%` as any,
+                height: 8,
+                borderRadius: 99,
+                backgroundColor: Colors.blue,
+              }}
+            />
           </View>
           {data?.member.ptExpDate && (
-            <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 6 }}>만료일: {data.member.ptExpDate}</Text>
+            <Text
+              style={{ fontSize: 11, color: Colors.textMuted, marginTop: 6 }}
+            >
+              만료일: {data.member.ptExpDate}
+            </Text>
           )}
         </View>
 
-        {/* 오늘 통계 */}
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/member/diet")}
-            style={{ flex: 2, backgroundColor: Colors.bgSub, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.border }}
+        {/* 이번 주 운동 현황 */}
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "700",
+              color: Colors.textSub,
+              marginBottom: 12,
+            }}
           >
-            <Text style={{ fontSize: 12, color: Colors.textSub, marginBottom: 4 }}>오늘 칼로리</Text>
-            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.gold }}>
-              {data?.todayDietCalories.toLocaleString() ?? 0}
-              <Text style={{ fontSize: 12, color: Colors.textMuted, fontWeight: "400" }}> kcal</Text>
-            </Text>
-            <View style={{ backgroundColor: Colors.border, borderRadius: 99, height: 5, marginTop: 8 }}>
-              <View style={{ width: `${dietPct}%` as any, height: 5, borderRadius: 99, backgroundColor: Colors.gold }} />
-            </View>
-            <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 4 }}>목표 {data?.goalCalories.toLocaleString()}kcal</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1, gap: 10 }}>
-            <View style={{ flex: 1, backgroundColor: Colors.bgSub, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.border }}>
-              <Text style={{ fontSize: 11, color: Colors.textSub }}>체중</Text>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}> {data?.member?.weight ?? "-"}<Text style={{ fontSize: 11 }}>kg</Text></Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: Colors.bgSub, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.border }}>
-              <Text style={{ fontSize: 11, color: Colors.textSub }}>단백질</Text>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>{Math.round(data?.todayProtein ?? 0)}<Text style={{ fontSize: 11 }}>g</Text></Text>           
-              </View>
+            이번 주 운동 현황
+          </Text>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            {getWeekDates(0).map((d, i) => {
+              const key = toDateKey(d);
+              const hasLog = weekWorkoutDates.has(key);
+              const isToday = key === toDateKey(new Date());
+              return (
+                <View key={key} style={{ alignItems: "center", gap: 6 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: isToday ? Colors.green : Colors.textMuted,
+                      fontWeight: isToday ? "800" : "400",
+                    }}
+                  >
+                    {["월", "화", "수", "목", "금", "토", "일"][i]}
+                  </Text>
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      backgroundColor: hasLog
+                        ? Colors.green
+                        : isToday
+                          ? Colors.greenLight
+                          : Colors.border + "55",
+                      borderWidth: isToday && !hasLog ? 1.5 : 0,
+                      borderColor: Colors.green + "88",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    {hasLog ? (
+                      <Text style={{ fontSize: 14 }}>💪</Text>
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: isToday ? Colors.green : Colors.textMuted,
+                        }}
+                      >
+                        {d.getDate()}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
+          <Text
+            style={{
+              fontSize: 11,
+              color: Colors.textMuted,
+              marginTop: 10,
+              textAlign: "center",
+            }}
+          >
+            이번 주 {weekWorkoutDates.size}일 운동했어요{" "}
+            {weekWorkoutDates.size >= 3 ? "🔥" : ""}
+          </Text>
         </View>
 
-        {/* 이번 주 내 수업 */}
-        <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: Colors.border }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>이번 주 내 수업</Text>
-            <TouchableOpacity onPress={() => {
-              if (!data?.member.trainerName) {
-                Alert.alert("트레이너 연결 필요", "수업 신청을 하려면 먼저 트레이너를 연결해야 해요!", [
-                  { text: "취소", style: "cancel" },
-                  { text: "연결하기", onPress: () => setShowTrainerConnect(true) },
-                ]);
-                return;
-              }
-              setShowSchedule(true);
-              fetchNextWeekSlots();
-            }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>다음 주 신청 →</Text>
-            </TouchableOpacity>
+        {/* 트레이너 챌린지 — 운동현황 바로 아래 */}
+        <View
+          style={{
+            backgroundColor: "#fff7ed",
+            borderRadius: 14,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: "#f9731644",
+            marginBottom: 12,
+            minHeight: 60,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: missions.length > 0 ? 12 : 0,
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#f97316" }}>
+              트레이너 챌린지
+            </Text>
+            {missions.length > 0 && (
+              <Text
+                style={{ fontSize: 11, color: "#f9731699", marginLeft: "auto" }}
+              >
+                {missions.filter((m) => m.isDone).length}/{missions.length} 완료
+              </Text>
+            )}
           </View>
+          {missions.length === 0 ? (
+            <Text
+              style={{
+                fontSize: 13,
+                color: "#f9731688",
+                textAlign: "center",
+                paddingVertical: 6,
+              }}
+            >
+              아직 트레이너가 챌린지를 내지 않았어요
+            </Text>
+          ) : (
+            <>
+              {missions.map((m) => (
+                <View
+                  key={m.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    paddingVertical: 10,
+                    paddingHorizontal: 2,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#f9731622",
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: "#f97316" }}>•</Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 14,
+                      color: m.isDone ? "#f9731688" : "#1c1c1e",
+                      textDecorationLine: m.isDone ? "line-through" : "none",
+                      fontWeight: "500",
+                      lineHeight: 20,
+                    }}
+                  >
+                    {m.content}
+                  </Text>
+                  {m.isDone ? (
+                    <View
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        backgroundColor: "#f9731622",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#f97316",
+                          fontWeight: "700",
+                        }}
+                      >
+                        완료 ✓
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => toggleMission(m.id)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        backgroundColor: "#f97316",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: "#fff",
+                          fontWeight: "700",
+                        }}
+                      >
+                        완료
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              {missions.every((m) => m.isDone) && (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#f97316",
+                    textAlign: "center",
+                    marginTop: 10,
+                    fontWeight: "700",
+                  }}
+                >
+                  모든 챌린지 완료! 정말 대단해요
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* 바디 로그 */}
+        <TouchableOpacity
+          onPress={() => router.push("/(tabs)/member/growth" as any)}
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <Text
+              style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub }}
+            >
+              바디 로그
+            </Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
+              {lastBodyLog && (
+                <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                  {lastBodyLog.date}
+                </Text>
+              )}
+              <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
+            </View>
+          </View>
+          {lastBodyLog ? (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {/* 체중 */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: "#fff",
+                  borderRadius: 10,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  체중
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    color: Colors.text,
+                  }}
+                >
+                  {lastBodyLog.weight ?? "-"}
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "400",
+                      color: Colors.textMuted,
+                    }}
+                  >
+                    kg
+                  </Text>
+                </Text>
+                {weightDiff != null && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "700",
+                      color:
+                        weightDiff < 0
+                          ? Colors.blue
+                          : weightDiff > 0
+                            ? Colors.red
+                            : Colors.textMuted,
+                      marginTop: 2,
+                    }}
+                  >
+                    {weightDiff > 0 ? `+${weightDiff}` : weightDiff}
+                  </Text>
+                )}
+              </View>
+              {/* 체지방 */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: "#fff",
+                  borderRadius: 10,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  체지방률
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    color: Colors.gold,
+                  }}
+                >
+                  {lastBodyLog.bodyFat ?? "-"}
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "400",
+                      color: Colors.textMuted,
+                    }}
+                  >
+                    %
+                  </Text>
+                </Text>
+              </View>
+              {/* 근육량 */}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: "#fff",
+                  borderRadius: 10,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  근육량
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    color: Colors.green,
+                  }}
+                >
+                  {lastBodyLog.muscleMass ?? "-"}
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "400",
+                      color: Colors.textMuted,
+                    }}
+                  >
+                    kg
+                  </Text>
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ alignItems: "center", paddingVertical: 12 }}>
+              <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                아직 기록이 없어요
+              </Text>
+              <Text
+                style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
+              >
+                탭하여 첫 번째 바디 로그를 남겨보세요
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* 이번 주 내 수업 */}
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "700",
+              color: Colors.text,
+              marginBottom: 10,
+            }}
+          >
+            이번 주 내 수업
+          </Text>
           {activeThisWeek.length === 0 ? (
-            <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: "center", paddingVertical: 8 }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: Colors.textMuted,
+                textAlign: "center",
+                paddingVertical: 8,
+              }}
+            >
               이번 주 확정된 수업이 없어요
             </Text>
           ) : (
             activeThisWeek.map((s) => (
-              <View key={`${s.scheduleId}-${s.date}-${s.startTime}`} style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.blueBg, borderRadius: 10, padding: 12, marginBottom: 6, borderWidth: 1, borderColor: Colors.blue + "44" }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.blue, marginRight: 10 }} />
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text, flex: 1 }}>{s.date}</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.blue }}>{s.startTime}</Text>
+              <View
+                key={`${s.scheduleId}-${s.date}-${s.startTime}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: Colors.blueBg,
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 6,
+                  borderWidth: 1,
+                  borderColor: Colors.blue + "44",
+                }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: Colors.blue,
+                    marginRight: 10,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.text,
+                    flex: 1,
+                  }}
+                >
+                  {s.date}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.blue,
+                  }}
+                >
+                  {s.startTime}
+                </Text>
               </View>
             ))
           )}
         </View>
 
-        {/* 피드백 배너 */}
-        {(data?.unreadFeedbackCount ?? 0) > 0 && (
+        {/* 최근 트레이너 피드백 */}
+        {latestFeedback && (
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/member/diet")}
-            style={{ backgroundColor: Colors.blueBg, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.blue + "44", flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}
+            style={{
+              backgroundColor: Colors.greenLight,
+              borderRadius: 14,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: Colors.green + "44",
+              marginBottom: 12,
+            }}
           >
-            <View style={{ backgroundColor: Colors.red, width: 24, height: 24, borderRadius: 12, justifyContent: "center", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>{data?.unreadFeedbackCount}</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              <Text
+                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
+              >
+                💬 {latestFeedback.trainerName} 트레이너 식단 피드백
+              </Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: Colors.textMuted,
+                  marginLeft: "auto",
+                }}
+              >
+                {latestFeedback.date}
+              </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.blue }}>트레이너 피드백이 도착했어요!</Text>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>탭하여 확인하기</Text>
-            </View>
-            <Text style={{ fontSize: 16, color: Colors.blue }}>›</Text>
+            <Text
+              style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
+              numberOfLines={2}
+            >
+              {latestFeedback.content}
+            </Text>
+            <Text style={{ fontSize: 11, color: Colors.green, marginTop: 6 }}>
+              탭하여 식단 보기 →
+            </Text>
           </TouchableOpacity>
         )}
-
-        {/* 이번 주 요약 카드 (PRO) */}
-        {weekSummary && (
-          <View style={{
-            backgroundColor: Colors.bgSub, borderRadius: 14,
-            borderWidth: 1, borderColor: Colors.border,
-            paddingTop: 12, paddingHorizontal: 10, paddingBottom: 10,
-            marginBottom: 12,
-          }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, paddingHorizontal: 2 }}>
-              이번 주 요약
-            </Text>
-            <View style={{ flexDirection: "row", gap: 4 }}>
-              {/* 운동한 날 */}
-              <View style={{
-                flex: 1, backgroundColor: "#fff", borderRadius: 10,
-                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
-                alignItems: "center",
-              }}>
-                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>운동한 날</Text>
-                <Text style={{ fontSize: 20, fontWeight: "900", color: Colors.blue }}>
-                  {weekSummary.workout_days}
-                  <Text style={{ fontSize: 12, fontWeight: "400", color: Colors.textMuted }}>/7일</Text>
-                </Text>
-              </View>
-              {/* 평균 칼로리 */}
-              <View style={{
-                flex: 1, backgroundColor: "#fff", borderRadius: 10,
-                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
-                alignItems: "center",
-              }}>
-                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>평균 칼로리</Text>
-                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.gold }}>
-                    {Math.round(weekSummary.avg_calories).toLocaleString()}
-                  </Text>
-                  <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                    {weekSummary.goal_calories > 0
-                      ? `/${weekSummary.goal_calories.toLocaleString()}kcal`
-                      : "kcal"}
-                  </Text>
-                </View>
-              </View>
-              {/* 평균 단백질 */}
-              <View style={{
-                flex: 1, backgroundColor: "#fff", borderRadius: 10,
-                borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 6,
-                alignItems: "center",
-              }}>
-                <Text style={{ fontSize: 11, color: Colors.textSub, marginBottom: 6 }}>평균 단백질</Text>
-                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 1 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>
-                    {Math.round(weekSummary.avg_protein)}
-                  </Text>
-                  <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                    {weekSummary.goal_protein > 0
-                      ? `/${Math.round(weekSummary.goal_protein)}g`
-                      : "g"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-
       </ScrollView>
 
       {/* 트레이너 코드 입력 모달 */}
       <Modal visible={showTrainerConnect} animationType="slide" transparent>
         <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "flex-end",
+          }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
-            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-            <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>트레이너 연결</Text>
-            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>트레이너에게 받은 6자리 코드를 입력해주세요</Text>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.textSub, marginBottom: 8 }}>트레이너 코드</Text>
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: Colors.border,
+                borderRadius: 99,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "800",
+                color: Colors.text,
+                marginBottom: 6,
+              }}
+            >
+              트레이너 연결
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: Colors.textMuted,
+                marginBottom: 20,
+              }}
+            >
+              트레이너에게 받은 6자리 코드를 입력해주세요
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: Colors.textSub,
+                marginBottom: 8,
+              }}
+            >
+              트레이너 코드
+            </Text>
             <TextInput
               value={trainerCode}
-              onChangeText={v => setTrainerCode(v.toUpperCase())}
+              onChangeText={(v) => setTrainerCode(v.toUpperCase())}
               placeholder="예: A1B2C3"
               placeholderTextColor={Colors.textPlaceholder}
               autoCapitalize="characters"
               maxLength={6}
               style={{
-                backgroundColor: Colors.bgSub, borderWidth: 2,
-                borderColor: trainerCode.length === 6 ? Colors.green : Colors.border,
-                borderRadius: 12, padding: 16, fontSize: 22, fontWeight: "800",
-                color: Colors.text, textAlign: "center", letterSpacing: 6, marginBottom: 20,
+                backgroundColor: Colors.bgSub,
+                borderWidth: 2,
+                borderColor:
+                  trainerCode.length === 6 ? Colors.green : Colors.border,
+                borderRadius: 12,
+                padding: 16,
+                fontSize: 22,
+                fontWeight: "800",
+                color: Colors.text,
+                textAlign: "center",
+                letterSpacing: 6,
+                marginBottom: 20,
               }}
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                onPress={() => { setShowTrainerConnect(false); setTrainerCode(""); }}
-                style={{ flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14, alignItems: "center" }}
+                onPress={() => {
+                  setShowTrainerConnect(false);
+                  setTrainerCode("");
+                }}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: 12,
+                  padding: 14,
+                  alignItems: "center",
+                }}
               >
-                <Text style={{ fontSize: 14, color: Colors.textSub }}>취소</Text>
+                <Text style={{ fontSize: 14, color: Colors.textSub }}>
+                  취소
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={connectTrainer}
                 disabled={connecting || trainerCode.length < 4}
-                style={{ flex: 2, backgroundColor: trainerCode.length >= 4 ? Colors.green : Colors.border, borderRadius: 12, padding: 14, alignItems: "center" }}
+                style={{
+                  flex: 2,
+                  backgroundColor:
+                    trainerCode.length >= 4 ? Colors.green : Colors.border,
+                  borderRadius: 12,
+                  padding: 14,
+                  alignItems: "center",
+                }}
               >
-                <Text style={{ fontSize: 14, fontWeight: "700", color: trainerCode.length >= 4 ? "#fff" : Colors.textMuted }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: trainerCode.length >= 4 ? "#fff" : Colors.textMuted,
+                  }}
+                >
                   {connecting ? "연결 중..." : "연결하기"}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
-
-      {/* 다음 주 수업 신청 모달 */}
-      <Modal visible={showSchedule} animationType="slide" transparent onRequestClose={() => setShowSchedule(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34, height: "75%" }}>
-            <GestureDetector gesture={scheduleDragGesture}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setShowSchedule(false)}
-                style={{ alignItems: "center", paddingVertical: 8, marginTop: -6, marginBottom: 8 }}
-              >
-                <View style={{ width: 44, height: 5, backgroundColor: Colors.border, borderRadius: 99 }} />
-              </TouchableOpacity>
-            </GestureDetector>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>다음 주 수업 신청</Text>
-              <TouchableOpacity onPress={() => setShowSchedule(false)}>
-                <Text style={{ fontSize: 14, color: Colors.textMuted }}>닫기</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 4 }}>
-              {weekDates[0].getMonth() + 1}/{weekDates[0].getDate()} ~ {weekDates[6].getMonth() + 1}/{weekDates[6].getDate()}
-            </Text>
-            <View style={{ backgroundColor: Colors.greenLight, borderRadius: 8, padding: 8, marginBottom: 14 }}>
-              <Text style={{ fontSize: 12, color: Colors.green }}>여러 시간대에 중복 신청 가능해요. 트레이너가 한 곳을 확정해드려요.</Text>
-            </View>
-
-            {/* 요일 선택 */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
-              {weekDates.map((date, i) => {
-                const key        = toDateKey(date);
-                const isSelected = dateKey === key;
-                const isMine     = myDates.has(key);
-                return (
-                  <TouchableOpacity key={key} onPress={() => setSelectedDate(date)} style={{ alignItems: "center", gap: 4 }}>
-                    <Text style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600" }}>{DAYS[i]}</Text>
-                    <View style={{
-                      width: 34, height: 34, borderRadius: 10,
-                      backgroundColor: isSelected ? Colors.green : isMine ? Colors.greenLight : "transparent",
-                      borderWidth: isMine && !isSelected ? 1 : 0,
-                      borderColor: Colors.green + "44",
-                      justifyContent: "center", alignItems: "center",
-                    }}>
-                      <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{date.getDate()}</Text>
-                    </View>
-                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: isMine ? Colors.green : "transparent" }} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* 슬롯 목록 */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-              {slotsLoading ? (
-                <ActivityIndicator color={Colors.green} style={{ marginTop: 20 }} />
-              ) : daySlots.length === 0 ? (
-                <View style={{ alignItems: "center", paddingVertical: 32 }}>
-                  <Text style={{ fontSize: 14, color: Colors.textMuted }}>이날은 수업이 없어요</Text>
-                </View>
-              ) : (
-                daySlots.map((slot) => {
-                  const isMine      = slot.status === "MINE";
-                  const isRequested = slot.status === "REQUESTED";
-                  const isFull      =
-                    slot.status === "FULL" ||
-                    slot.status === "CONFIRMED" ||
-                    slot.status === "COMPLETED";
-                  const isOpen      = slot.status === "OPEN";
-
-                  const statusText = isMine
-                    ? "내 수업"
-                    : isRequested
-                    ? "신청 대기"
-                    : isFull
-                    ? "마감"
-                    : "신청 가능";
-
-                  const statusColor = isMine
-                    ? Colors.blue
-                    : isRequested
-                    ? Colors.gold
-                    : isFull
-                    ? Colors.textMuted
-                    : Colors.green;
-
-                  return (
-                    <View
-                      key={`${slot.id}-${slot.date}-${formatTime(slot.startTime)}`}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        backgroundColor: isMine
-                          ? Colors.blueBg
-                          : isRequested
-                          ? Colors.goldBg
-                          : "#fff",
-                        borderRadius: 12,
-                        paddingVertical: 10,
-                        paddingHorizontal: 12,
-                        marginBottom: 6,
-                        borderWidth: 1,
-                        borderColor: isMine
-                          ? Colors.blue + "44"
-                          : isRequested
-                          ? Colors.gold + "44"
-                          : Colors.border,
-                        opacity: isFull ? 0.55 : 1,
-                      }}
-                    >
-                      <View style={{ width: 54 }}>
-                        <Text style={{ fontSize: 15, fontWeight: "900", color: Colors.text }}>
-                          {formatTime(slot.startTime)}
-                        </Text>
-                        <Text style={{ fontSize: 10, color: Colors.textMuted, marginTop: 1 }}>
-                          ~{formatTime(slot.endTime)}
-                        </Text>
-                      </View>
-
-                      <View style={{ width: 1, height: 28, backgroundColor: Colors.border, marginHorizontal: 10 }} />
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: statusColor }}>
-                          {statusText}
-                        </Text>
-                      </View>
-
-                      {isOpen && (
-                        <TouchableOpacity
-                          onPress={() => requestSlot(slot.id)}
-                          disabled={requesting === slot.id}
-                          style={{
-                            backgroundColor: Colors.green,
-                            paddingHorizontal: 14,
-                            paddingVertical: 7,
-                            borderRadius: 10,
-                          }}
-                        >
-                          <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>
-                            {requesting === slot.id ? "..." : "신청"}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </View>
       </Modal>
     </>
   );

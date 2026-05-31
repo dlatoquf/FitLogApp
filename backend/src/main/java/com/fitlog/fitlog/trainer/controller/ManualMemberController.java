@@ -1,15 +1,27 @@
 package com.fitlog.fitlog.trainer.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.fitlog.fitlog.auth.service.JwtService;
+import com.fitlog.fitlog.member.entity.PtContract;
+import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
+import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 
 @RestController
 @RequestMapping("/api/trainer/manual-members")
@@ -18,25 +30,41 @@ public class ManualMemberController {
     private final ManualMemberRepository manualMemberRepository;
     private final TrainerRepository trainerRepository;
     private final JwtService jwtService;
+    private final PtContractRepository ptContractRepository;
+    private final WorkoutLogRepository workoutLogRepository;
 
     public ManualMemberController(ManualMemberRepository manualMemberRepository,
                                    TrainerRepository trainerRepository,
-                                   JwtService jwtService) {
+                                   JwtService jwtService,
+                                   PtContractRepository ptContractRepository,
+                                   WorkoutLogRepository workoutLogRepository) {
         this.manualMemberRepository = manualMemberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
+        this.ptContractRepository = ptContractRepository;
+        this.workoutLogRepository = workoutLogRepository;
     }
 
-    // 미연동 회원 목록 조회
+    // 미연동 회원 목록 조회 (OT 회원 제외 — OT는 체험 회원으로 별도 관리)
     @GetMapping
     public List<ManualMember> getAll(@RequestHeader("Authorization") String authorization) {
         Long userId = jwtService.getUserIdFromToken(authorization.replace("Bearer ", ""));
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
-        return manualMemberRepository.findByTrainerOrderByPtRemainingAsc(trainer);
+        return manualMemberRepository.findNonOtByTrainer(trainer);
     }
 
-    // 미연동 회원 추가
+    // 미연동 회원 단건 조회
+    @GetMapping("/{id}")
+    public ResponseEntity<ManualMember> getOne(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        return ResponseEntity.ok(m);
+    }
+
+    // 미연동 회원 추가 (신규 등록 시 결제정보 있으면 PtContract도 생성)
     @PostMapping
     public ResponseEntity<ManualMember> create(
             @RequestHeader("Authorization") String authorization,
@@ -45,21 +73,151 @@ public class ManualMemberController {
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
 
+        // 무료 플랜 5명 제한 (OT 회원은 제외, PT 회원 기준)
+        boolean isOtNew = "OT".equals(body.get("memo"));
+        if (!isOtNew && !trainer.isProEffective()) {
+            long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer)
+                    + trainer.getMembers().size();
+            if (nonOtCount >= 5) {
+                return ResponseEntity.status(403).body(null);
+            }
+        }
+
+        // OT 회원 매칭: 동일 트레이너의 OT 회원 중 전화번호(우선) 또는 이름이 일치하면 PT로 전환
+        String incomingPhone = body.get("phone") != null ? ((String) body.get("phone")).trim() : null;
+        String incomingName  = body.get("name")  != null ? ((String) body.get("name")).trim()  : null;
+        boolean isNewOtMember = "OT".equals(body.get("memo")); // isOtNew와 동일 — 아래 로직에서 사용
+
+        if (!isNewOtMember && (incomingPhone != null || incomingName != null)) {
+            java.util.Optional<ManualMember> otMatch = java.util.Optional.empty();
+            if (incomingPhone != null && !incomingPhone.isBlank()) {
+                otMatch = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", incomingPhone);
+            }
+            if (otMatch.isEmpty() && incomingName != null && !incomingName.isBlank()) {
+                otMatch = manualMemberRepository.findByTrainerAndMemoAndName(trainer, "OT", incomingName);
+            }
+
+            if (otMatch.isPresent()) {
+                // 기존 OT 회원을 PT 회원으로 전환
+                ManualMember ot = otMatch.get();
+                int otSessions = (int) workoutLogRepository.countByManualMember(ot);
+                ot.setOtCount(otSessions > 0 ? otSessions : null);
+                ot.setMemo(null); // OT 태그 제거 → 회원관리에 노출
+                int ptTotal = 0;
+                if (body.get("ptTotal") != null) {
+                    ptTotal = ((Number) body.get("ptTotal")).intValue();
+                }
+                ot.setPtTotal(ptTotal);
+                ot.setPtRemaining(body.get("ptRemaining") != null
+                        ? ((Number) body.get("ptRemaining")).intValue() : ptTotal);
+                if (body.get("amount") != null) ot.setAmount(((Number) body.get("amount")).longValue());
+                java.time.LocalDate pd = java.time.LocalDate.now();
+                if (body.get("paymentDate") != null) {
+                    try { pd = java.time.LocalDate.parse((String) body.get("paymentDate")); } catch (Exception ignored) {}
+                }
+                ot.setPaymentDate(pd);
+                ManualMember converted = manualMemberRepository.save(ot);
+                if (ot.getAmount() != null && ptTotal > 0) {
+                    PtContract contract = new PtContract();
+                    contract.setTrainer(trainer);
+                    contract.setManualMember(converted);
+                    contract.setTotalSessions(ptTotal);
+                    contract.setRemainSessions(converted.getPtRemaining());
+                    contract.setAmount(converted.getAmount());
+                    contract.setPaymentDate(pd);
+                    contract.setStartDate(pd.toString());
+                    ptContractRepository.save(contract);
+                }
+                return ResponseEntity.ok(converted);
+            }
+        }
+
         ManualMember m = new ManualMember();
         m.setTrainer(trainer);
         m.setName((String) body.get("name"));
         if (body.get("phone") != null) m.setPhone((String) body.get("phone"));
         if (body.get("memo") != null) m.setMemo((String) body.get("memo"));
+
+        boolean isOtMember = "OT".equals(body.get("memo"));
+        int ptTotal = 0;
         if (body.get("ptTotal") != null) {
-            int pt = ((Number) body.get("ptTotal")).intValue();
-            m.setPtTotal(pt);
-            m.setPtRemaining(pt);
+            ptTotal = ((Number) body.get("ptTotal")).intValue();
+            m.setPtTotal(ptTotal);
+            if (body.get("ptRemaining") != null) {
+                m.setPtRemaining(((Number) body.get("ptRemaining")).intValue());
+            } else {
+                m.setPtRemaining(ptTotal);
+            }
+        } else if (!isOtMember) {
+            // OT가 아닌 일반 미연동 회원은 ptTotal/ptRemaining 기본값 0
+            m.setPtTotal(0);
+            m.setPtRemaining(0);
+        }
+        // OT 회원은 ptTotal/ptRemaining = null (PT 횟수 개념 없음)
+
+        Long amount = null;
+        if (body.get("amount") != null) {
+            amount = ((Number) body.get("amount")).longValue();
+            m.setAmount(amount);
         }
 
+        java.time.LocalDate paymentDate = null;
+        if (body.get("paymentDate") != null) {
+            try {
+                paymentDate = java.time.LocalDate.parse((String) body.get("paymentDate"));
+                m.setPaymentDate(paymentDate);
+            } catch (Exception ignored) {}
+        }
+
+        ManualMember saved = manualMemberRepository.save(m);
+
+        // 결제 정보가 있으면 PtContract 생성 (월별 매출 추적용)
+        if (amount != null && ptTotal > 0) {
+            PtContract contract = new PtContract();
+            contract.setTrainer(trainer);
+            contract.setManualMember(saved);
+            contract.setTotalSessions(ptTotal);
+            contract.setRemainSessions(body.get("ptRemaining") != null
+                    ? ((Number) body.get("ptRemaining")).intValue() : ptTotal);
+            contract.setAmount(amount);
+            java.time.LocalDate effectiveDate = paymentDate != null ? paymentDate : java.time.LocalDate.now();
+            contract.setPaymentDate(effectiveDate);
+            contract.setStartDate(effectiveDate.toString()); // start_date = payment_date
+            if (body.containsKey("memo")) {
+                String memo = (String) body.get("memo");
+                contract.setMemo(memo != null && !memo.isBlank() ? memo : null);
+            }
+            ptContractRepository.save(contract);
+        }
+
+        return ResponseEntity.ok(saved);
+    }
+
+    // 결제 수정 (수업수 / 금액 / 메모) — PtContract 직접 수정은 contracts 엔드포인트 사용
+    @PutMapping("/{id}")
+    public ResponseEntity<ManualMember> update(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (body.get("sessions") != null) {
+            int newSessions = ((Number) body.get("sessions")).intValue();
+            int diff = newSessions - (m.getPtTotal() != null ? m.getPtTotal() : 0);
+            m.setPtTotal(newSessions);
+            m.setPtRemaining(Math.max(0, (m.getPtRemaining() != null ? m.getPtRemaining() : 0) + diff));
+        }
+        if (body.get("amount") != null) {
+            m.setAmount(((Number) body.get("amount")).longValue());
+        }
+        if (body.containsKey("memo")) {
+            String memo = (String) body.get("memo");
+            m.setMemo(memo != null && !memo.isBlank() ? memo : null);
+        }
         return ResponseEntity.ok(manualMemberRepository.save(m));
     }
 
-    // PT 추가 (잔여 + 전체 증가)
+    // PT 추가 결제 — PtContract 생성 + ManualMember 세션 증가
     @PutMapping("/{id}/pt")
     public ResponseEntity<ManualMember> addPt(
             @RequestHeader("Authorization") String authorization,
@@ -68,9 +226,39 @@ public class ManualMemberController {
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
         int sessions = ((Number) body.get("sessions")).intValue();
-        m.setPtTotal(m.getPtTotal() + sessions);
-        m.setPtRemaining(m.getPtRemaining() + sessions);
-        return ResponseEntity.ok(manualMemberRepository.save(m));
+        m.setPtTotal((m.getPtTotal() != null ? m.getPtTotal() : 0) + sessions);
+        m.setPtRemaining((m.getPtRemaining() != null ? m.getPtRemaining() : 0) + sessions);
+        m.setPtEndedAt(null); // 재결제 시 비활성화 타이머 초기화
+        manualMemberRepository.save(m);
+
+        // PtContract 생성 (월별 매출 추적)
+        PtContract contract = new PtContract();
+        contract.setTrainer(m.getTrainer());
+        contract.setManualMember(m);
+        contract.setTotalSessions(sessions);
+        contract.setRemainSessions(sessions);
+        if (body.get("amount") != null) {
+            long amount = ((Number) body.get("amount")).longValue();
+            contract.setAmount(amount);
+            m.setAmount(amount); // 최근 결제 금액 표시용
+        }
+        if (body.containsKey("memo")) {
+            String memo = (String) body.get("memo");
+            contract.setMemo(memo != null && !memo.isBlank() ? memo : null);
+        }
+        java.time.LocalDate pd = java.time.LocalDate.now();
+        if (body.get("paymentDate") != null) {
+            try {
+                pd = java.time.LocalDate.parse((String) body.get("paymentDate"));
+                m.setPaymentDate(pd);
+            } catch (Exception ignored) {}
+        }
+        contract.setPaymentDate(pd);
+        contract.setStartDate(pd.toString()); // start_date = payment_date
+        ptContractRepository.save(contract);
+        manualMemberRepository.save(m);
+
+        return ResponseEntity.ok(m);
     }
 
     // 미연동 회원 삭제

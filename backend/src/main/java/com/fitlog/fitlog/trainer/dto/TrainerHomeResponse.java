@@ -1,5 +1,6 @@
 package com.fitlog.fitlog.trainer.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 public class TrainerHomeResponse {
@@ -12,6 +13,7 @@ public class TrainerHomeResponse {
     private List<TodayPt> todayPtList;
     private String plan;
     private String trainerCode;
+    private String trialEndDate; // "YYYY-MM-DD" 형식, 무료 체험 중일 때만
 
     // 목표값
     private Integer goalSessions;
@@ -29,7 +31,8 @@ public class TrainerHomeResponse {
                                int attendanceRate, List<TodayPt> todayPtList, String plan,
                                String trainerCode, Integer goalSessions, Long goalRevenue,
                                int monthSessions, long monthRevenue,
-                               List<MonthRevenueDetail> monthRevenueDetails, int noShowCount) {
+                               List<MonthRevenueDetail> monthRevenueDetails, int noShowCount,
+                               String trialEndDate) {
         this.trainerId = trainerId;
         this.trainerName = trainerName;
         this.totalMembers = totalMembers;
@@ -44,6 +47,7 @@ public class TrainerHomeResponse {
         this.monthRevenue = monthRevenue;
         this.monthRevenueDetails = monthRevenueDetails;
         this.noShowCount = noShowCount;
+        this.trialEndDate = trialEndDate;
     }
 
     public Long getTrainerId() { return trainerId; }
@@ -60,27 +64,42 @@ public class TrainerHomeResponse {
     public long getMonthRevenue() { return monthRevenue; }
     public List<MonthRevenueDetail> getMonthRevenueDetails() { return monthRevenueDetails; }
     public int getNoShowCount() { return noShowCount; }
+    public String getTrialEndDate() { return trialEndDate; }
 
     public static class TodayPt {
+        private Long scheduleId;
         private Long memberId;
         private String memberName;
         private String time;
         private int ptRemaining;
         private boolean completed;
+        private boolean isManual;
+        private String sessionType; // "PT" or "OT"
+        private boolean isNoShow;   // 명시적 NO_SHOW 처리됨
 
-        public TodayPt(Long memberId, String memberName, String time, int ptRemaining, boolean completed) {
+        public TodayPt(Long scheduleId, Long memberId, String memberName, String time, int ptRemaining, boolean completed, boolean isManual, String sessionType, boolean isNoShow) {
+            this.scheduleId = scheduleId;
             this.memberId = memberId;
             this.memberName = memberName;
             this.time = time;
             this.ptRemaining = ptRemaining;
             this.completed = completed;
+            this.isManual = isManual;
+            this.sessionType = sessionType != null ? sessionType : "PT";
+            this.isNoShow = isNoShow;
         }
 
+        public Long getScheduleId() { return scheduleId; }
         public Long getMemberId() { return memberId; }
         public String getMemberName() { return memberName; }
         public String getTime() { return time; }
         public int getPtRemaining() { return ptRemaining; }
         public boolean isCompleted() { return completed; }
+        @JsonProperty("isManual")
+        public boolean isManual() { return isManual; }
+        public String getSessionType() { return sessionType; }
+        @JsonProperty("isNoShow")
+        public boolean isNoShow() { return isNoShow; }
     }
 
     public static class MonthRevenueDetail {
@@ -88,17 +107,26 @@ public class TrainerHomeResponse {
         private int sessions;
         private long amount;
         private String memo;
+        private String date; // "5/25" 형식
+        private Long contractId;
+        private Long manualMemberId;
 
-        public MonthRevenueDetail(String memberName, int sessions, long amount, String memo) {
+        public MonthRevenueDetail(String memberName, int sessions, long amount, String memo, String date, Long contractId, Long manualMemberId) {
             this.memberName = memberName;
             this.sessions = sessions;
             this.amount = amount;
             this.memo = memo;
+            this.date = date;
+            this.contractId = contractId;
+            this.manualMemberId = manualMemberId;
         }
 
         public String getMemberName() { return memberName; }
         public int getSessions() { return sessions; }
         public long getAmount() { return amount; }
         public String getMemo() { return memo; }
+        public String getDate() { return date; }
+        public Long getContractId() { return contractId; }
+        public Long getManualMemberId() { return manualMemberId; }
     }
 }

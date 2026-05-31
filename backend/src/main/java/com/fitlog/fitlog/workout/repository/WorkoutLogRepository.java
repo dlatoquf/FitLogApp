@@ -1,6 +1,7 @@
 package com.fitlog.fitlog.workout.repository;
 
 import com.fitlog.fitlog.member.entity.Member;
+import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.workout.entity.WorkoutLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -33,4 +34,18 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkoutLog w SET w.trainer = null WHERE w.trainer = :trainer")
     void detachTrainerFromWorkoutLogs(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer);
+
+    // 미연동 회원 운동 로그 조회
+    @Query("SELECT w FROM WorkoutLog w LEFT JOIN FETCH w.sets WHERE w.manualMember = :mm AND w.logDate BETWEEN :from AND :to ORDER BY w.logDate ASC")
+    List<WorkoutLog> findByManualMemberAndDateBetween(@Param("mm") ManualMember mm,
+                                                      @Param("from") LocalDate from,
+                                                      @Param("to") LocalDate to);
+
+    // OT→PT 전환 시 세션 수 카운트
+    long countByManualMember(ManualMember mm);
+
+    // 연동 시 이전: manualMember → member 로 일괄 업데이트
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE WorkoutLog w SET w.member = :member, w.manualMember = null WHERE w.manualMember = :mm")
+    void transferManualMemberLogs(@Param("mm") ManualMember mm, @Param("member") Member member);
 }

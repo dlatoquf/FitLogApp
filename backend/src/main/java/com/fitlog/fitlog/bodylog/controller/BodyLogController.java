@@ -1,13 +1,19 @@
 package com.fitlog.fitlog.bodylog.controller;
 
 import com.fitlog.fitlog.bodylog.entity.BodyLog;
+import com.fitlog.fitlog.bodylog.entity.ManualBodyLog;
+import com.fitlog.fitlog.bodylog.repository.ManualBodyLogRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.trainer.entity.ManualMember;
+import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,18 +24,37 @@ import java.util.stream.Collectors;
 public class BodyLogController {
 
     private final BodyLogRepository bodyLogRepository;
+    private final ManualBodyLogRepository manualBodyLogRepository;
     private final MemberRepository memberRepository;
+    private final ManualMemberRepository manualMemberRepository;
     private final JwtService jwtService;
 
     public BodyLogController(BodyLogRepository bodyLogRepository,
+                             ManualBodyLogRepository manualBodyLogRepository,
                              MemberRepository memberRepository,
+                             ManualMemberRepository manualMemberRepository,
                              JwtService jwtService) {
         this.bodyLogRepository = bodyLogRepository;
+        this.manualBodyLogRepository = manualBodyLogRepository;
         this.memberRepository = memberRepository;
+        this.manualMemberRepository = manualMemberRepository;
         this.jwtService = jwtService;
     }
 
     private Map<String, Object> toMap(BodyLog log) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id",          log.getId());
+        map.put("date",        log.getLogDate() != null ? log.getLogDate().toString() : "");
+        map.put("weight",      log.getWeight());
+        map.put("bodyFat",     log.getBodyFat());
+        map.put("bodyFatMass", log.getBodyFatMass());
+        map.put("muscleMass",  log.getMuscleMass());
+        map.put("memo",        log.getMemo());
+        map.put("createdAt",   log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
+        return map;
+    }
+
+    private Map<String, Object> toManualMap(ManualBodyLog log) {
         Map<String, Object> map = new HashMap<>();
         map.put("id",          log.getId());
         map.put("date",        log.getLogDate() != null ? log.getLogDate().toString() : "");
@@ -105,5 +130,93 @@ public class BodyLogController {
                 .map(this::toMap)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(result);
+    }
+
+    // ── 미연동 회원 바디로그 ──────────────────────────────────────────────
+
+    // GET /api/bodylog/manual/{manualMemberId} - 트레이너가 미연동 회원 바디로그 조회
+    @GetMapping("/manual/{manualMemberId}")
+    public ResponseEntity<List<Map<String, Object>>> getManualBodyLogs(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long manualMemberId) {
+        // 인증 확인 (JWT 유효성만)
+        String token = authorization.replace("Bearer ", "");
+        jwtService.getUserIdFromToken(token);
+
+        ManualMember mm = manualMemberRepository.findById(manualMemberId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        List<Map<String, Object>> result = manualBodyLogRepository
+                .findByManualMemberOrderByLogDateAsc(mm)
+                .stream()
+                .map(this::toManualMap)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    // POST /api/bodylog/manual/{manualMemberId} - 트레이너가 미연동 회원 바디로그 저장
+    @PostMapping("/manual/{manualMemberId}")
+    public ResponseEntity<Map<String, Object>> saveManualBodyLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long manualMemberId,
+            @RequestBody Map<String, Object> body) {
+        String token = authorization.replace("Bearer ", "");
+        jwtService.getUserIdFromToken(token);
+
+        ManualMember mm = manualMemberRepository.findById(manualMemberId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+
+        ManualBodyLog log = new ManualBodyLog();
+        log.setManualMember(mm);
+
+        // 날짜: 요청에서 받거나 오늘
+        if (body.get("date") != null && !body.get("date").toString().isBlank()) {
+            log.setLogDate(LocalDate.parse(body.get("date").toString()));
+        } else {
+            log.setLogDate(LocalDate.now());
+        }
+        log.setCreatedAt(LocalDateTime.now());
+        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
+        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.get("memo") != null)        log.setMemo(body.get("memo").toString());
+
+        manualBodyLogRepository.save(log);
+
+        // 저장 후 전체 목록 반환
+        List<Map<String, Object>> allLogs = manualBodyLogRepository
+                .findByManualMemberOrderByLogDateAsc(mm)
+                .stream()
+                .map(this::toManualMap)
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("saved", toManualMap(log));
+        result.put("logs", allLogs);
+        return ResponseEntity.ok(result);
+    }
+
+    // DELETE /api/bodylog/manual/{logId} - 트레이너가 미연동 회원 바디로그 삭제
+    @DeleteMapping("/manual/{logId}")
+    public ResponseEntity<Map<String, Object>> deleteManualBodyLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long logId) {
+        String token = authorization.replace("Bearer ", "");
+        jwtService.getUserIdFromToken(token);
+
+        ManualBodyLog log = manualBodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+        Long mmId = log.getManualMember().getId();
+        manualBodyLogRepository.delete(log);
+
+        ManualMember mm = manualMemberRepository.findById(mmId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        List<Map<String, Object>> remaining = manualBodyLogRepository
+                .findByManualMemberOrderByLogDateAsc(mm)
+                .stream()
+                .map(this::toManualMap)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("message", "삭제됐어요.", "logs", remaining));
     }
 }

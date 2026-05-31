@@ -18,8 +18,13 @@ public class WorkoutLog {
     private Long workoutId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(name = "member_id", nullable = true)
     private Member member;
+
+    // 미연동 회원 운동 로그 지원 — 연동 시 member 로 이전됨
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manual_member_id", nullable = true)
+    private com.fitlog.fitlog.trainer.entity.ManualMember manualMember;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trainer_id")
@@ -56,6 +61,8 @@ public class WorkoutLog {
     public Long getWorkoutId() { return workoutId; }
     public Member getMember() { return member; }
     public void setMember(Member member) { this.member = member; }
+    public com.fitlog.fitlog.trainer.entity.ManualMember getManualMember() { return manualMember; }
+    public void setManualMember(com.fitlog.fitlog.trainer.entity.ManualMember manualMember) { this.manualMember = manualMember; }
     public Trainer getTrainer() { return trainer; }
     public void setTrainer(Trainer trainer) { this.trainer = trainer; }
     public LocalDate getLogDate() { return logDate; }

@@ -1,5 +1,6 @@
 package com.fitlog.fitlog.member.entity;
 
+import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -45,6 +46,15 @@ public class PtContract {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    // 결제 기준일 — 과거 건 등록 시 사용 (null이면 created_at 기준)
+    @Column(name = "payment_date")
+    private java.time.LocalDate paymentDate;
+
+    // 미연동 회원 계약 (member와 둘 중 하나만 채워짐)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manual_member_id")
+    private ManualMember manualMember;
+
     public Long getId() { return id; }
     public Trainer getTrainer() { return trainer; }
     public Member getMember() { return member; }
@@ -66,4 +76,8 @@ public class PtContract {
     public void setAmount(Long amount) { this.amount = amount; }
     public void setMemo(String memo) { this.memo = memo; }
     public void setStatus(String status) { this.status = status; }
+    public java.time.LocalDate getPaymentDate() { return paymentDate; }
+    public void setPaymentDate(java.time.LocalDate paymentDate) { this.paymentDate = paymentDate; }
+    public ManualMember getManualMember() { return manualMember; }
+    public void setManualMember(ManualMember manualMember) { this.manualMember = manualMember; }
 }

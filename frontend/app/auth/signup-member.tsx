@@ -21,17 +21,28 @@ function formatPhone(value: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
 }
 
+function formatBirth(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
 export default function SignupMemberScreen() {
-  const [phone, setPhone] = useState("");
   const [trainerCode, setTrainerCode] = useState("");
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [trainerName, setTrainerName] = useState("");
+
+  const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const [bodyFat, setBodyFat] = useState("");
   const [muscleMass, setMuscleMass] = useState("");
+
   const [loading, setLoading] = useState(false);
-  const [codeVerified, setCodeVerified] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [trainerName, setTrainerName] = useState("");
 
   const handleVerifyCode = async () => {
     if (trainerCode.trim().length < 4) {
@@ -41,24 +52,20 @@ export default function SignupMemberScreen() {
     setVerifying(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/member/check-trainer?code=${trainerCode.trim().toUpperCase()}`, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/member/check-trainer?code=${trainerCode.trim().toUpperCase()}`,
+        { headers: { Authorization: `Bearer ${jwt}` } }
+      );
       const data = await res.json();
 
       if (data.full) {
-        Alert.alert(
-          "연결 불가",
-          data.message ?? "트레이너에게 PRO 플랜 업그레이드를 요청해주세요."
-        );
+        Alert.alert("연결 불가", "이 트레이너는 현재 회원이 가득 찼어요.\n트레이너에게 문의해주세요.");
         return;
       }
-
       if (!data.valid) {
         Alert.alert("확인 실패", data.message ?? "유효하지 않은 트레이너 코드예요.");
         return;
       }
-
       setTrainerName(data.trainerName ?? "");
       setCodeVerified(true);
     } catch {
@@ -69,8 +76,24 @@ export default function SignupMemberScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!codeVerified) {
+      Alert.alert("입력 오류", "트레이너 코드를 먼저 확인해주세요.");
+      return;
+    }
     if (!phone.trim()) {
       Alert.alert("입력 오류", "전화번호를 입력해주세요.");
+      return;
+    }
+    if (birthDate.replace(/\D/g, "").length < 8) {
+      Alert.alert("입력 오류", "생년월일을 올바르게 입력해주세요. (예: 1995-03-15)");
+      return;
+    }
+    if (!height.trim()) {
+      Alert.alert("입력 오류", "키를 입력해주세요.");
+      return;
+    }
+    if (!weight.trim()) {
+      Alert.alert("입력 오류", "체중을 입력해주세요.");
       return;
     }
 
@@ -79,83 +102,50 @@ export default function SignupMemberScreen() {
       const jwt = await AsyncStorage.getItem("jwt");
       const name = await AsyncStorage.getItem("pendingName");
 
+      // 1. 프로필 저장
       const body: Record<string, any> = {
         name,
         phone: phone.replace(/-/g, ""),
+        birthDate,
+        height: parseFloat(height),
+        weight: parseFloat(weight),
       };
-      if (height) body.height = parseFloat(height);
-      if (weight) body.weight = parseFloat(weight);
       if (bodyFat) body.bodyFat = parseFloat(bodyFat);
       if (muscleMass) body.muscleMass = parseFloat(muscleMass);
 
       const res = await fetch(`${API_URL}/api/profile/member`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const raw = await res.text();
-        let message = raw || "프로필 저장 실패";
-
-        try {
-          const data = raw ? JSON.parse(raw) : {};
-          message = data.message ?? message;
-        } catch {}
-
-        if (message.includes("무료 플랜") || message.includes("회원 3명")) {
-          Alert.alert(
-            "연결 불가",
-            "트레이너의 무료 플랜은 회원 3명까지 연결할 수 있어요.\n트레이너에게 PRO 업그레이드를 요청해주세요."
-          );
-          return;
-        }
-
+        let message = "프로필 저장에 실패했어요.";
+        try { message = JSON.parse(raw).message ?? message; } catch {}
         throw new Error(message);
       }
 
-      const code = trainerCode.trim().toUpperCase();
+      // 2. 트레이너 연결 (병합 포함)
+      const connectRes = await fetch(`${API_URL}/api/member/connect-trainer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ trainerCode: trainerCode.trim().toUpperCase() }),
+      });
 
-      if (code) {
-        const connectRes = await fetch(`${API_URL}/api/member/connect-trainer`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-          },
-          body: JSON.stringify({ trainerCode: code }),
-        });
-
+      if (!connectRes.ok) {
         const raw = await connectRes.text();
-        let message = raw || "트레이너 연결 실패";
-
-        try {
-          const data = raw ? JSON.parse(raw) : {};
-          message = data.message ?? message;
-        } catch {}
-
-        if (!connectRes.ok) {
-          await AsyncStorage.removeItem("pendingName");
-
-          if (message.includes("무료 플랜") || message.includes("회원 3명")) {
-            Alert.alert(
-              "가입 완료 · 트레이너 연결 불가",
-              "프로필 가입은 완료됐지만, 트레이너의 무료 플랜은 회원 3명까지라 연결할 수 없어요.\n트레이너에게 PRO 업그레이드를 요청해주세요.",
-              [{ text: "확인", onPress: () => router.replace("/(tabs)/member/home") }]
-            );
-            return;
-          }
-
+        let message = "트레이너 연결에 실패했어요.";
+        try { message = JSON.parse(raw).message ?? message; } catch {}
+        if (message.includes("무료 플랜") || message.includes("회원 3명")) {
           Alert.alert(
-            "가입 완료 · 트레이너 연결 실패",
-            message,
+            "가입 완료 · 트레이너 연결 불가",
+            "프로필은 저장됐지만 이 트레이너는 회원이 가득 찼어요.\n트레이너에게 문의해주세요.",
             [{ text: "확인", onPress: () => router.replace("/(tabs)/member/home") }]
           );
           return;
         }
+        throw new Error(message);
       }
 
       await AsyncStorage.removeItem("pendingName");
@@ -167,62 +157,33 @@ export default function SignupMemberScreen() {
     }
   };
 
+  const allFilled =
+    codeVerified &&
+    phone.trim().length > 0 &&
+    birthDate.replace(/\D/g, "").length === 8 &&
+    height.trim().length > 0 &&
+    weight.trim().length > 0;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#fff" }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View
-          style={{
-            flex: 1,
-            paddingHorizontal: 24,
-            paddingTop: 56,
-            paddingBottom: 40,
-          }}
-        >
-          {/* 뒤로가기 */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 40 }}>
           <Pressable onPress={() => router.back()} style={{ marginBottom: 24 }}>
             <Text style={{ fontSize: 22, color: Colors.text }}>←</Text>
           </Pressable>
 
-          <Text
-            style={{
-              fontSize: 11,
-              color: Colors.textMuted,
-              marginBottom: 4,
-              fontWeight: "600",
-            }}
-          >
+          <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 4, fontWeight: "600" }}>
             회원 가입 · 프로필 정보
           </Text>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "800",
-              color: Colors.text,
-              marginBottom: 28,
-            }}
-          >
+          <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text, marginBottom: 28 }}>
             기본 정보를 입력해주세요
           </Text>
 
-          {/* 전화번호 */}
-          <FieldLabel label="전화번호" required />
-          <TextInput
-            placeholder="010-0000-0000"
-            placeholderTextColor={Colors.textPlaceholder}
-            value={phone}
-            onChangeText={(v) => setPhone(formatPhone(v))}
-            keyboardType="phone-pad"
-            style={inputStyle(!!phone)}
-          />
-
-          {/* 트레이너 코드 */}
-          <FieldLabel label="트레이너 코드 (선택)" />
+          {/* 트레이너 코드 (필수) */}
+          <FieldLabel label="트레이너 코드" required />
           <View style={{ flexDirection: "row", gap: 8, marginBottom: codeVerified ? 6 : 20 }}>
             <TextInput
               placeholder="트레이너에게 받은 코드 입력"
@@ -234,7 +195,7 @@ export default function SignupMemberScreen() {
                 setTrainerName("");
               }}
               autoCapitalize="characters"
-              style={[inputStyle(!!trainerCode), { flex: 1, marginBottom: 0 }]}
+              style={[inputStyle(!!trainerCode, codeVerified), { flex: 1, marginBottom: 0 }]}
             />
             <Pressable
               onPress={handleVerifyCode}
@@ -260,92 +221,76 @@ export default function SignupMemberScreen() {
             </Text>
           ) : null}
 
+          {/* 전화번호 */}
+          <FieldLabel label="전화번호" required />
+          <TextInput
+            placeholder="010-0000-0000"
+            placeholderTextColor={Colors.textPlaceholder}
+            value={phone}
+            onChangeText={(v) => setPhone(formatPhone(v))}
+            keyboardType="phone-pad"
+            style={inputStyle(!!phone)}
+          />
+
+          {/* 생년월일 */}
+          <FieldLabel label="생년월일" required />
+          <TextInput
+            placeholder="1995-03-15"
+            placeholderTextColor={Colors.textPlaceholder}
+            value={birthDate}
+            onChangeText={(v) => setBirthDate(formatBirth(v))}
+            keyboardType="numeric"
+            style={inputStyle(!!birthDate)}
+          />
+
           {/* 신체 정보 */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "700",
-              color: Colors.text,
-              marginBottom: 4,
-            }}
-          >
-            신체 정보 (선택)
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: Colors.textMuted,
-              marginBottom: 16,
-            }}
-          >
-            나중에 설정에서도 입력할 수 있어요
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4, gap: 6 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>신체 정보</Text>
+            <Text style={{ fontSize: 11, color: Colors.textMuted }}>키·체중 필수 / 체지방·근육 선택</Text>
+          </View>
+          <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 16 }}>
+            나중에 설정에서도 수정할 수 있어요
           </Text>
 
-          <View style={{ flexDirection: "row", gap: 12, marginBottom: 0 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <FieldLabel label="키 (cm)" />
-              <UnitInput
-                value={height}
-                onChangeText={setHeight}
-                unit="cm"
-                placeholder="170"
-              />
+              <FieldLabel label="키 (cm)" required />
+              <UnitInput value={height} onChangeText={setHeight} unit="cm" placeholder="170" />
             </View>
             <View style={{ flex: 1 }}>
-              <FieldLabel label="체중 (kg)" />
-              <UnitInput
-                value={weight}
-                onChangeText={setWeight}
-                unit="kg"
-                placeholder="70"
-              />
+              <FieldLabel label="체중 (kg)" required />
+              <UnitInput value={weight} onChangeText={setWeight} unit="kg" placeholder="70" />
             </View>
           </View>
 
           <View style={{ flexDirection: "row", gap: 12, marginBottom: 32 }}>
             <View style={{ flex: 1 }}>
               <FieldLabel label="체지방률 (%)" />
-              <UnitInput
-                value={bodyFat}
-                onChangeText={setBodyFat}
-                unit="%"
-                placeholder="20"
-              />
+              <UnitInput value={bodyFat} onChangeText={setBodyFat} unit="%" placeholder="20" />
             </View>
             <View style={{ flex: 1 }}>
               <FieldLabel label="골격근량 (kg)" />
-              <UnitInput
-                value={muscleMass}
-                onChangeText={setMuscleMass}
-                unit="kg"
-                placeholder="30"
-              />
+              <UnitInput value={muscleMass} onChangeText={setMuscleMass} unit="kg" placeholder="30" />
             </View>
           </View>
 
           <View style={{ flex: 1 }} />
 
-          {/* 가입 완료 버튼 */}
-          {(() => {
-            const needsVerify = trainerCode.trim().length > 0 && !codeVerified;
-            const disabled = loading || !phone.trim() || needsVerify;
-            return (
-              <Pressable
-                onPress={handleSubmit}
-                disabled={disabled}
-                style={({ pressed }) => ({
-                  backgroundColor: disabled ? Colors.border : pressed ? "#256e47" : Colors.green,
-                  padding: 17,
-                  borderRadius: 14,
-                  alignItems: "center",
-                })}
-              >
-                <Text style={{ color: disabled ? Colors.textMuted : "#fff", fontWeight: "700", fontSize: 16 }}>
-                  {loading ? "처리 중..." : needsVerify ? "트레이너 코드를 먼저 확인해주세요" : "가입 완료 ✓"}
-                </Text>
-              </Pressable>
-            );
-          })()}
+          <Pressable
+            onPress={handleSubmit}
+            disabled={loading || !allFilled}
+            style={({ pressed }) => ({
+              backgroundColor:
+                !allFilled || loading ? Colors.border : pressed ? "#256e47" : Colors.green,
+              padding: 17,
+              borderRadius: 14,
+              alignItems: "center",
+            })}
+          >
+            <Text style={{ color: !allFilled || loading ? Colors.textMuted : "#fff", fontWeight: "700", fontSize: 16 }}>
+              {loading ? "처리 중..." : "가입 완료 ✓"}
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -354,27 +299,18 @@ export default function SignupMemberScreen() {
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <Text
-      style={{
-        fontSize: 13,
-        fontWeight: "600",
-        color: Colors.textSub,
-        marginBottom: 8,
-      }}
-    >
+    <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.textSub, marginBottom: 8 }}>
       {label}
-      {required && (
-        <Text style={{ color: Colors.red }}> *</Text>
-      )}
+      {required && <Text style={{ color: Colors.red }}> *</Text>}
     </Text>
   );
 }
 
-function inputStyle(active: boolean) {
+function inputStyle(active: boolean, verified?: boolean) {
   return {
     backgroundColor: Colors.bgSub,
     borderWidth: 1.5,
-    borderColor: active ? Colors.green : Colors.border,
+    borderColor: verified ? Colors.green : active ? Colors.green : Colors.border,
     padding: 15,
     borderRadius: 12,
     marginBottom: 20,
@@ -384,29 +320,21 @@ function inputStyle(active: boolean) {
 }
 
 function UnitInput({
-  value,
-  onChangeText,
-  unit,
-  placeholder,
+  value, onChangeText, unit, placeholder,
 }: {
-  value: string;
-  onChangeText: (v: string) => void;
-  unit: string;
-  placeholder: string;
+  value: string; onChangeText: (v: string) => void; unit: string; placeholder: string;
 }) {
   return (
-    <View
-      style={{
-        backgroundColor: Colors.bgSub,
-        borderWidth: 1.5,
-        borderColor: value ? Colors.green : Colors.border,
-        borderRadius: 12,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 14,
-        marginBottom: 20,
-      }}
-    >
+    <View style={{
+      backgroundColor: Colors.bgSub,
+      borderWidth: 1.5,
+      borderColor: value ? Colors.green : Colors.border,
+      borderRadius: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 14,
+      marginBottom: 20,
+    }}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -415,9 +343,7 @@ function UnitInput({
         keyboardType="decimal-pad"
         style={{ flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 14 }}
       />
-      <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "600" }}>
-        {unit}
-      </Text>
+      <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "600" }}>{unit}</Text>
     </View>
   );
 }

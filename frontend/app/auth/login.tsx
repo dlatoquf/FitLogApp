@@ -18,7 +18,8 @@ import { saveFcmToken } from "../../utils/fcm";
 // 카카오 로그인 라이브러리가 없는 환경을 위한 조건부 import
 let loginWithKakaoAccount: (() => Promise<any>) | null = null;
 try {
-  loginWithKakaoAccount = require("@react-native-seoul/kakao-login").loginWithKakaoAccount;
+  loginWithKakaoAccount =
+    require("@react-native-seoul/kakao-login").loginWithKakaoAccount;
 } catch {
   // 라이브러리 없을 경우 무시
 }
@@ -101,11 +102,21 @@ export default function LoginScreen() {
   // ─────────────────────────────────────────────
   const handleKakaoLogin = async () => {
     if (!loginWithKakaoAccount) {
-      Alert.alert("개발 모드", "카카오 로그인 라이브러리가 없습니다.\n테스트용으로 이동합니다.", [
-        { text: "트레이너", onPress: () => router.replace("/(tabs)/trainer/home") },
-        { text: "회원", onPress: () => router.replace("/(tabs)/member/home") },
-        { text: "가입", onPress: () => router.replace("/auth/signup") },
-      ]);
+      Alert.alert(
+        "개발 모드",
+        "카카오 로그인 라이브러리가 없습니다.\n테스트용으로 이동합니다.",
+        [
+          {
+            text: "트레이너",
+            onPress: () => router.replace("/(tabs)/trainer/home"),
+          },
+          {
+            text: "회원",
+            onPress: () => router.replace("/(tabs)/member/home"),
+          },
+          { text: "가입", onPress: () => router.replace("/auth/signup") },
+        ],
+      );
       return;
     }
 
@@ -118,14 +129,17 @@ export default function LoginScreen() {
         kakaoResult = await loginWithKakaoAccount();
         console.log("[카카오] SDK 결과:", JSON.stringify(kakaoResult));
       } catch (kakaoErr: any) {
-        console.log("[카카오] SDK 에러:", kakaoErr?.message, kakaoErr?.code, JSON.stringify(kakaoErr));
+        console.log(
+          "[카카오] SDK 에러:",
+          kakaoErr?.message,
+          kakaoErr?.code,
+          JSON.stringify(kakaoErr),
+        );
         throw new Error(`카카오 SDK 오류: ${kakaoErr?.message ?? kakaoErr}`);
       }
 
       const accessToken =
-        kakaoResult?.accessToken ??
-        kakaoResult?.access_token ??
-        null;
+        kakaoResult?.accessToken ?? kakaoResult?.access_token ?? null;
 
       if (!accessToken) {
         throw new Error("카카오 accessToken을 가져오지 못했어요.");
@@ -143,7 +157,11 @@ export default function LoginScreen() {
         });
         console.log("[서버] 응답 status:", res.status);
       } catch (fetchErr: any) {
-        console.log("[서버] fetch 에러:", fetchErr?.message, JSON.stringify(fetchErr));
+        console.log(
+          "[서버] fetch 에러:",
+          fetchErr?.message,
+          JSON.stringify(fetchErr),
+        );
         throw new Error(`서버 연결 실패: ${fetchErr?.message ?? fetchErr}`);
       }
 
@@ -156,7 +174,8 @@ export default function LoginScreen() {
         throw new Error(`서버 응답 오류: ${text}`);
       }
 
-      if (!res.ok) throw new Error((data as any)?.message || `오류: ${res.status}`);
+      if (!res.ok)
+        throw new Error((data as any)?.message || `오류: ${res.status}`);
 
       const { jwt, isNewUser, role } = data;
 
@@ -177,7 +196,8 @@ export default function LoginScreen() {
         navigateByRole(role);
       }
     } catch (e: any) {
-      Alert.alert("로그인 실패", e?.message ?? "알 수 없는 오류가 발생했어요.");
+      console.log("[로그인 실패]", e?.message ?? e);
+      Alert.alert("로그인 실패", "로그인에 실패했어요. 다시 시도해주세요.");
     } finally {
       setLoading(false);
     }
@@ -188,7 +208,14 @@ export default function LoginScreen() {
   // ─────────────────────────────────────────────
   if (checkingToken) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff", justifyContent: "center", alignItems: "center" }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: "#fff",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         <ActivityIndicator size="large" color={Colors.green} />
       </SafeAreaView>
     );
@@ -203,149 +230,116 @@ export default function LoginScreen() {
         style={{
           flex: 1,
           paddingHorizontal: 28,
-          justifyContent: "center",
-          paddingTop: 40,
-          paddingBottom: 40,
+          justifyContent: "space-between",
+          paddingTop: 70,
+          paddingBottom: 34,
         }}
       >
-        {/* 로고 */}
-        <View style={{ alignItems: "center", marginBottom: 32 }}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={{
-              width: 100,
-              height: 100,
+        <View>
+          {/* 로고 */}
+          <View style={{ alignItems: "center", marginTop: 40 }}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: 28,
+                marginBottom: 14,
+              }}
+              resizeMode="contain"
+            />
+            <Text
+              style={{ fontSize: 46, fontWeight: "900", color: Colors.text }}
+            >
+              <Text style={{ color: Colors.green }}>Fit</Text>Log
+            </Text>
+            <Text
+              style={{
+                marginTop: 8,
+                fontSize: 18,
+                fontWeight: "800",
+                color: Colors.green,
+              }}
+            >
+              트레이너와 회원을
+            </Text>
+            <Text
+              style={{
+                marginTop: 2,
+                fontSize: 18,
+                fontWeight: "800",
+                color: Colors.green,
+              }}
+            >
+              하나의 기록으로 연결하다
+            </Text>
+            <Text
+              style={{
+                marginTop: 14,
+                fontSize: 14,
+                color: Colors.textMuted,
+                textAlign: "center",
+                lineHeight: 22,
+                fontWeight: "600",
+              }}
+            >
+              PT 일정 · 운동기록 · 식단관리 · 피드백
+            </Text>
+          </View>
+        </View>
+
+        <View>
+          {/* 카카오 로그인 버튼 */}
+          <Pressable
+            onPress={handleKakaoLogin}
+            disabled={loading}
+            style={({ pressed }) => ({
+              width: "100%",
+              height: 64,
               borderRadius: 22,
-              marginBottom: 14,
-            }}
-            resizeMode="contain"
-          />
-          <Text style={{ fontSize: 40, fontWeight: "900", color: Colors.text }}>
-            <Text style={{ color: Colors.green }}>Fit</Text>Log
-          </Text>
-          <Text
-            style={{
-              marginTop: 6,
-              fontSize: 16,
-              fontWeight: "700",
-              color: Colors.green,
-            }}
+              backgroundColor: pressed ? "#E8D000" : Colors.kakao,
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              marginBottom: 24,
+              opacity: loading ? 0.7 : 1,
+            })}
           >
-            기록이 곧 성장이다
-          </Text>
+            {loading ? (
+              <ActivityIndicator color={Colors.kakaoText} />
+            ) : (
+              <>
+                <Text style={{ fontSize: 22, marginRight: 10 }}>💬</Text>
+                <Text
+                  style={{
+                    color: Colors.kakaoText,
+                    fontWeight: "900",
+                    fontSize: 18,
+                  }}
+                >
+                  카카오로 로그인
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          {/* 약관 */}
           <Text
             style={{
-              marginTop: 8,
-              fontSize: 15,
-              color: Colors.textSub,
               textAlign: "center",
+              color: Colors.textMuted,
+              fontSize: 12,
+              lineHeight: 20,
             }}
           >
-            핏로그, 기록으로 완성하는 PT
+            로그인 시{"\n"}
+            <Text style={{ textDecorationLine: "underline" }}>
+              이용약관 및 개인정보보호정책
+            </Text>
+            에 동의함으로 간주합니다
           </Text>
         </View>
-
-        {/* 기능 카드 */}
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 40 }}>
-          <FeatureCard icon="📅" title="일정 관리" desc="수업 스케줄" />
-          <FeatureCard icon="📊" title="기록 & 통계" desc="운동 변화" />
-          <FeatureCard icon="💬" title="피드백" desc="실시간 소통" />
-        </View>
-
-        {/* 카카오 로그인 버튼 */}
-        <Pressable
-          onPress={handleKakaoLogin}
-          disabled={loading}
-          style={({ pressed }) => ({
-            width: "100%",
-            height: 60,
-            borderRadius: 30,
-            backgroundColor: pressed ? "#E8D000" : Colors.kakao,
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "row",
-            marginBottom: 24,
-            opacity: loading ? 0.7 : 1,
-          })}
-        >
-          {loading ? (
-            <ActivityIndicator color={Colors.kakaoText} />
-          ) : (
-            <>
-              <Text style={{ fontSize: 22, marginRight: 10 }}>💬</Text>
-              <Text
-                style={{
-                  color: Colors.kakaoText,
-                  fontWeight: "900",
-                  fontSize: 18,
-                }}
-              >
-                카카오로 로그인
-              </Text>
-            </>
-          )}
-        </Pressable>
-
-        {/* 약관 */}
-        <Text
-          style={{
-            textAlign: "center",
-            color: Colors.textMuted,
-            fontSize: 12,
-            lineHeight: 20,
-          }}
-        >
-          로그인 시{"\n"}
-          <Text style={{ textDecorationLine: "underline" }}>
-            이용약관 및 개인정보보호정책
-          </Text>
-          에 동의함으로 간주합니다
-        </Text>
       </View>
     </SafeAreaView>
-  );
-}
-
-function FeatureCard({
-  icon,
-  title,
-  desc,
-}: {
-  icon: string;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        height: 110,
-        borderRadius: 18,
-        backgroundColor: Colors.bgSub,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 6,
-        borderWidth: 1,
-        borderColor: Colors.border,
-      }}
-    >
-      <Text style={{ fontSize: 26, marginBottom: 6 }}>{icon}</Text>
-      <Text
-        style={{
-          fontSize: 13,
-          fontWeight: "800",
-          color: Colors.text,
-          marginBottom: 4,
-          textAlign: "center",
-        }}
-      >
-        {title}
-      </Text>
-      <Text
-        style={{ fontSize: 11, color: Colors.textMuted, textAlign: "center" }}
-      >
-        {desc}
-      </Text>
-    </View>
   );
 }

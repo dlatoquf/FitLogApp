@@ -39,7 +39,9 @@
           "NSAllowsLocalNetworking": true
         },
         "NSPhotoLibraryUsageDescription": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요.",
-        "NSPhotoLibraryAddUsageDescription": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요."
+        "NSPhotoLibraryAddUsageDescription": "운동 사진/영상을 갤러리에 저장하기 위해 접근이 필요해요.",
+        "CFBundleDevelopmentRegion": "ko",
+        "CFBundleLocalizations": ["ko", "en"]
       }
     },
     "android": {

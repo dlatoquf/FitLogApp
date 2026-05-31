@@ -98,7 +98,7 @@ public class TrainerController {
         Long trainerId = trainerRepository.findTrainerIdByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
 
-        return memberRepository.findActiveMembersByTrainerIdWithUser(trainerId)
+        return memberRepository.findAllMembersByTrainerIdWithUser(trainerId)
                 .stream()
                 .map(MemberResponse::new)
                 .collect(Collectors.toList());
@@ -154,8 +154,17 @@ public class TrainerController {
 
         if (body.containsKey("ptTotal"))
             member.setPtTotal(body.get("ptTotal") != null ? ((Number) body.get("ptTotal")).intValue() : null);
-        if (body.containsKey("ptRemaining"))
-            member.setPtRemaining(body.get("ptRemaining") != null ? ((Number) body.get("ptRemaining")).intValue() : null);
+        if (body.containsKey("ptRemaining")) {
+            Integer newRemaining = body.get("ptRemaining") != null
+                    ? ((Number) body.get("ptRemaining")).intValue() : null;
+            member.setPtRemaining(newRemaining);
+            // 잔여가 0이 되면 ptEndedAt 기록, 0보다 크면 초기화 (재등록)
+            if (newRemaining != null && newRemaining == 0 && member.getPtEndedAt() == null) {
+                member.setPtEndedAt(java.time.LocalDate.now());
+            } else if (newRemaining != null && newRemaining > 0) {
+                member.setPtEndedAt(null);
+            }
+        }
         if (body.containsKey("ptStartDate"))
             member.setPtStartDate(body.get("ptStartDate") != null ? body.get("ptStartDate").toString() : null);
         if (body.containsKey("ptExpDate"))
@@ -225,6 +234,83 @@ public class TrainerController {
         userRepository.save(member.getUser());
 
         return ResponseEntity.ok(Map.of("success", true, "message", member.getUser().getName() + " 회원이 복구됐어요."));
+    }
+
+    // PATCH /api/trainer/notif-settings — 알림 설정 저장 (현재는 생일 알림)
+    @PatchMapping("/trainer/notif-settings")
+    public ResponseEntity<Map<String, Object>> updateNotifSettings(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, Object> body) {
+        Trainer trainer = getTrainer(authorization);
+        if (body.containsKey("notifBirthday")) {
+            trainer.setNotifBirthday(Boolean.TRUE.equals(body.get("notifBirthday")));
+        }
+        if (body.containsKey("notifMissionDone")) {
+            trainer.setNotifMissionDone(Boolean.TRUE.equals(body.get("notifMissionDone")));
+        }
+        if (body.containsKey("notifPersonalWorkout")) {
+            trainer.setNotifPersonalWorkout(Boolean.TRUE.equals(body.get("notifPersonalWorkout")));
+        }
+        trainerRepository.save(trainer);
+        return ResponseEntity.ok(Map.of(
+                "notifBirthday", trainer.getNotifBirthday(),
+                "notifMissionDone", trainer.getNotifMissionDone(),
+                "notifPersonalWorkout", trainer.getNotifPersonalWorkout()
+        ));
+    }
+
+    // GET /api/trainer/notif-settings — 알림 설정 조회
+    @GetMapping("/trainer/notif-settings")
+    public ResponseEntity<Map<String, Object>> getNotifSettings(
+            @RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        return ResponseEntity.ok(Map.of(
+                "notifBirthday", trainer.getNotifBirthday(),
+                "notifMissionDone", trainer.getNotifMissionDone(),
+                "notifPersonalWorkout", trainer.getNotifPersonalWorkout()
+        ));
+    }
+
+    // GET /api/trainer/slot-settings — 슬롯 오프셋 조회
+    @GetMapping("/trainer/slot-settings")
+    public ResponseEntity<Map<String, Object>> getSlotSettings(
+            @RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        Map<String, Object> result = new HashMap<>();
+        result.put("slotOffset", trainer.getSlotOffset()); // null이면 미설정
+        return ResponseEntity.ok(result);
+    }
+
+    // PATCH /api/trainer/slot-settings — 슬롯 오프셋 저장 (0=정각, 30=30분)
+    @PatchMapping("/trainer/slot-settings")
+    public ResponseEntity<Map<String, Object>> saveSlotSettings(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, Object> body) {
+        Trainer trainer = getTrainer(authorization);
+        if (body.containsKey("slotOffset")) {
+            Object val = body.get("slotOffset");
+            trainer.setSlotOffset(val != null ? ((Number) val).intValue() : null);
+        }
+        trainerRepository.save(trainer);
+        return ResponseEntity.ok(Map.of("slotOffset", trainer.getSlotOffset()));
+    }
+
+    // POST /api/trainer/members/{memberId}/disconnect — 연동 회원 연결 해제 (INACTIVE 전환, trainer 참조 유지)
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/trainer/members/{memberId}/disconnect")
+    public ResponseEntity<Map<String, Object>> disconnectMember(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long memberId) {
+        Trainer trainer = getTrainer(authorization);
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
+        }
+        member.setStatus(Member.Status.INACTIVE);
+        member.setDisconnectedAt(java.time.LocalDate.now());
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
     }
 
     private Trainer getTrainer(String authorization) {

@@ -2,11 +2,13 @@ package com.fitlog.fitlog.schedule.repository;
 
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.schedule.entity.Schedule;
+import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -51,13 +53,14 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     List<Schedule> findTodayConfirmedWithMember(@Param("trainer") Trainer trainer,
                                                 @Param("date") LocalDate date);
 
-    // 오늘 PT 일정 + 완료 수업 조회
+    // 오늘 PT 일정 + 완료 수업 조회 (연동 + 미연동 모두)
     @Query("SELECT s FROM Schedule s " +
             "LEFT JOIN FETCH s.member m " +
             "LEFT JOIN FETCH m.user " +
+            "LEFT JOIN FETCH s.manualMember mm " +
             "WHERE s.trainer = :trainer " +
             "AND s.date = :date " +
-            "AND s.status IN ('CONFIRMED', 'COMPLETED') " +
+            "AND s.status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW') " +
             "ORDER BY s.startTime")
     List<Schedule> findTodayPtWithMember(@Param("trainer") Trainer trainer,
                                          @Param("date") LocalDate date);
@@ -67,6 +70,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
         FROM Schedule s
         LEFT JOIN FETCH s.member m
         LEFT JOIN FETCH m.user
+        LEFT JOIN FETCH s.manualMember mm
         WHERE s.trainer.id = :trainerId
           AND s.date BETWEEN :from AND :to
         ORDER BY s.date, s.startTime
@@ -144,8 +148,6 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("to") LocalTime to
     );
 
-    // 일요일 알림 조건용 (토요일 오픈 여부)
-    boolean existsByOpenedAtBetween(LocalDateTime from, LocalDateTime to);
 
     // 다음 주 OPEN 슬롯 가진 트레이너 목록
     @Query("""
@@ -180,20 +182,17 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                            @Param("from") java.time.LocalDate from,
                            @Param("to") java.time.LocalDate to);
 
-    // 오늘 노쇼 수 (CONFIRMED인데 운동 로그 없는 회원 수)
+    // 이번 달 노쇼 수 (명시적 NO_SHOW 상태 기준)
     @Query("""
         SELECT COUNT(s) FROM Schedule s
         WHERE s.trainer = :trainer
-        AND s.date = :today
-        AND s.status = 'CONFIRMED'
-        AND s.member IS NOT NULL
-        AND NOT EXISTS (
-            SELECT 1 FROM WorkoutLog w
-            WHERE w.member = s.member AND w.logDate = :today
-        )
+        AND s.date >= :monthStart
+        AND s.date <= :monthEnd
+        AND s.status = 'NO_SHOW'
     """)
     int countNoShows(@Param("trainer") Trainer trainer,
-                     @Param("today") java.time.LocalDate today);
+                     @Param("monthStart") java.time.LocalDate monthStart,
+                     @Param("monthEnd") java.time.LocalDate monthEnd);
 
     // 계정 삭제용 - 트레이너의 전체 스케줄
     List<Schedule> findByTrainer(Trainer trainer);
@@ -206,4 +205,17 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     // 계정 삭제용 - 미래 스케줄 조회 (요청 삭제 후 슬롯 삭제용)
     @Query("SELECT s FROM Schedule s WHERE s.member = :member AND s.date >= :today")
     List<Schedule> findFutureSchedulesByMember(@Param("member") Member member, @Param("today") java.time.LocalDate today);
+
+    // 연동 시 이전 - 미연동 회원 일정 → 연동 회원으로 일괄 이전
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Schedule s SET s.member = :member, s.manualMember = null WHERE s.manualMember = :manualMember")
+    void transferManualMemberSchedules(@Param("manualMember") ManualMember manualMember,
+                                       @Param("member") Member member);
+
+    // 자동 오픈 cron 용 - 다음 주 OPEN 슬롯 존재 여부 확인
+    @Query("SELECT COUNT(s) > 0 FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to AND s.status = 'OPEN'")
+    boolean existsOpenSlotsByTrainerAndDateBetween(@Param("trainer") Trainer trainer,
+                                                   @Param("from") LocalDate from,
+                                                   @Param("to") LocalDate to);
 }

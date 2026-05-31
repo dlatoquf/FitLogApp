@@ -57,31 +57,33 @@ public class NotificationService {
         try {
             Message message = Message.builder()
                     .setToken(fcmToken)
-                    // iOS 설정
                     .setApnsConfig(ApnsConfig.builder()
-                            .setAps(Aps.builder()
-                                    .setSound("default")
-                                    .setBadge(1)
-                                    .build())
+                            .setAps(Aps.builder().setSound("default").setBadge(1).build())
                             .build())
-                    // Android 설정
                     .setAndroidConfig(AndroidConfig.builder()
-                            .setNotification(AndroidNotification.builder()
-                                    .setSound("default")
-                                    .build())
+                            .setNotification(AndroidNotification.builder().setSound("default").build())
                             .build())
-                    // 알림 내용
                     .setNotification(com.google.firebase.messaging.Notification.builder()
                             .setTitle("FitLog")
                             .setBody(body)
                             .build())
-                    // 커스텀 데이터 (프론트에서 타입별 라우팅에 사용)
                     .putData("type", type)
                     .build();
 
             FirebaseMessaging.getInstance().send(message);
+        } catch (com.google.firebase.messaging.FirebaseMessagingException e) {
+            String errorCode = e.getMessagingErrorCode() != null ? e.getMessagingErrorCode().name() : "";
+            // 토큰 무효 (앱 삭제·재설치) → DB에서 토큰 제거
+            if (errorCode.equals("UNREGISTERED") || errorCode.equals("INVALID_ARGUMENT")) {
+                userRepository.findByFcmToken(fcmToken).ifPresent(u -> {
+                    u.setFcmToken(null);
+                    userRepository.save(u);
+                    System.out.println("만료된 FCM 토큰 삭제: userId=" + u.getId());
+                });
+            } else {
+                System.out.println("FCM 푸시 전송 실패 [" + errorCode + "]: " + e.getMessage());
+            }
         } catch (Exception e) {
-            // 푸시 실패해도 알림 저장은 됐으니 무시
             System.out.println("FCM 푸시 전송 실패: " + e.getMessage());
         }
     }

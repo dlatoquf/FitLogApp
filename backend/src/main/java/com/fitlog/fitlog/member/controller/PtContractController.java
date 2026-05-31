@@ -36,4 +36,24 @@ public class PtContractController {
     public List<PtContract> getContracts(@PathVariable Long memberId) {
         return ptContractService.getContracts(memberId);
     }
+
+    // 결제 메모 수정
+    // PATCH /api/trainer/contracts/{contractId}/memo
+    @PatchMapping("/contracts/{contractId}/memo")
+    public ResponseEntity<Map<String, String>> updateMemo(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, String> body) {
+        ptContractService.updateMemo(contractId, body.get("memo"));
+        return ResponseEntity.ok(Map.of("message", "메모가 수정됐어요."));
+    }
+
+    // 결제 건 전체 수정 (수업수 / 금액 / 메모)
+    // PUT /api/trainer/members/contracts/{contractId}
+    @PutMapping("/contracts/{contractId}")
+    public ResponseEntity<Map<String, String>> updateContract(
+            @PathVariable Long contractId,
+            @RequestBody Map<String, Object> body) {
+        ptContractService.updateContract(contractId, body);
+        return ResponseEntity.ok(Map.of("message", "결제 내역이 수정됐어요."));
+    }
 }

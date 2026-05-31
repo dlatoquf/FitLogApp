@@ -3,10 +3,6 @@ package com.fitlog.fitlog.member.service;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
-import com.fitlog.fitlog.diet.entity.DietLog;
-import com.fitlog.fitlog.diet.repository.DietLogRepository;
-import com.fitlog.fitlog.member.entity.MemberGoal;
-import com.fitlog.fitlog.member.repository.MemberGoalRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import com.fitlog.fitlog.schedule.dto.ScheduleRequest;
 import com.fitlog.fitlog.schedule.entity.Schedule;
@@ -29,23 +25,17 @@ public class MemberHomeService {
     private final ScheduleRepository scheduleRepository;
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final JwtService jwtService;
-    private final DietLogRepository dietLogRepository;
-    private final MemberGoalRepository memberGoalRepository;
     private final NotificationRepository notificationRepository;
 
     public MemberHomeService(MemberRepository memberRepository,
                              ScheduleRepository scheduleRepository,
                              ScheduleRequestRepository scheduleRequestRepository,
                              JwtService jwtService,
-                             DietLogRepository dietLogRepository,
-                             MemberGoalRepository memberGoalRepository,
                              NotificationRepository notificationRepository) {
         this.memberRepository = memberRepository;
         this.scheduleRepository = scheduleRepository;
         this.scheduleRequestRepository = scheduleRequestRepository;
         this.jwtService = jwtService;
-        this.dietLogRepository = dietLogRepository;
-        this.memberGoalRepository = memberGoalRepository;
         this.notificationRepository = notificationRepository;
     }
 
@@ -61,27 +51,15 @@ public class MemberHomeService {
         LocalDate today = LocalDate.now();
         LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
-        List<DietLog> todayLogs = dietLogRepository.findByMemberAndDate(member, today);
-
-        double todayCalories = todayLogs.stream()
-                .mapToDouble(log -> log.getCalories() != null ? log.getCalories() : 0)
-                .sum();
-
-        double todayProtein = todayLogs.stream()
-                .mapToDouble(log -> log.getProtein() != null ? log.getProtein() : 0)
-                .sum();
-
-        MemberGoal goal = memberGoalRepository
-                .findTopByMemberOrderByCreatedAtDesc(member)
-                .orElse(null);
-
-        result.put("todayDietCalories", todayCalories);
-        result.put("todayProtein", todayProtein);
-        result.put("goalCalories", goal != null ? goal.getTargetCalories() : 2000);
+        // 식단은 사진 기반으로 전환 — 칼로리 집계 제거
+        result.put("todayDietCalories", 0);
+        result.put("todayProtein", 0);
+        result.put("goalCalories", 0);
 
         List<Map<String, Object>> thisWeekSchedules = new ArrayList<>();
 
-        if (member.getTrainer() != null) {
+        boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
+        if (member.getTrainer() != null && isActive) {
             List<ScheduleRequest> confirmedRequests =
                     scheduleRequestRepository.findThisWeekConfirmedByMemberId(
                             member.getId(),
@@ -136,7 +114,8 @@ public class MemberHomeService {
     public Map<String, Object> getMe(String authorization) {
         Member member = getMember(authorization);
         Map<String, Object> result = buildMemberInfo(member);
-        if (member.getTrainer() != null) {
+        boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
+        if (member.getTrainer() != null && isActive) {
             result.put("gymName", member.getTrainer().getGymName());
         }
         return result;
@@ -148,7 +127,8 @@ public class MemberHomeService {
         LocalDate today = LocalDate.now();
         LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
-        if (member.getTrainer() == null) {
+        boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
+        if (member.getTrainer() == null || !isActive) {
             return Collections.emptyList();
         }
 
@@ -196,7 +176,9 @@ public class MemberHomeService {
         map.put("ptTotal",     member.getPtTotal());
         map.put("ptStartDate", member.getPtStartDate());
         map.put("ptExpDate",   member.getPtExpDate());
-        if (member.getTrainer() != null) {
+        // ACTIVE 상태일 때만 트레이너 정보 노출 (INACTIVE = 연결해제 상태)
+        boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
+        if (member.getTrainer() != null && isActive) {
             map.put("trainerName", member.getTrainer().getUser().getName());
             map.put("trainerCode", member.getTrainer().getTrainerCode());
             map.put("gymName", member.getTrainer().getGymName());

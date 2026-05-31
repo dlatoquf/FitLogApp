@@ -1,5 +1,5 @@
-import { Tabs } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 import { Colors } from "../../../constants/Colors";
 
 export default function MemberTabLayout() {
@@ -28,7 +28,7 @@ export default function MemberTabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "700",
-          marginTop:1,
+          marginTop: 1,
         },
       }}
     >
@@ -65,11 +65,7 @@ export default function MemberTabLayout() {
         options={{
           title: "운동",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons
-              name="dumbbell"
-              size={24}
-              color={color}
-            />
+            <MaterialCommunityIcons name="dumbbell" size={24} color={color} />
           ),
         }}
       />
