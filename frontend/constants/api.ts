@@ -15,8 +15,11 @@ export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINA
 /*오ㅃㅏ집 */
 /*export const API_URL = "http://192.168.219.155:8080";*/
 /*본가*/
-export const API_URL = "http://192.168.219.129:8080";
-export const ANALYTICS_URL = "http://192.168.219.129:8001";
+/*export const API_URL = "http://192.168.219.129:8080";*/
+/*export const ANALYTICS_URL = "http://192.168.219.129:8001";*/
+/*테스트 서버 (TestFlight)*/
+export const API_URL = "http://52.78.154.44:8080";
+export const ANALYTICS_URL = "http://52.78.154.44:8001";
 /*운영 서버*/
 /*export const API_URL = "https://fitlog-api.duckdns.org";*/
 /*개발 - 맥 로컬 (Android 에뮬레이터)*/
