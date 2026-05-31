@@ -78,9 +78,12 @@ import { API_URL } from "../../../constants/api";
                 return;
             }
 
-            // DIET_LOG: type="DIET_LOG", targetType="MEMBER" 로 저장됨
-            if (n.type === "DIET_LOG") {
-                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0`);
+            // DIET_PHOTO: 식단 사진 등록 알림 → 해당 날짜 식단 탭으로 이동
+            if (n.type === "DIET_PHOTO") {
+                // content 예: "OO님이 2026-05-31 식단 사진을 등록했어요"
+                const dateMatch = n.content?.match(/(\d{4}-\d{2}-\d{2})/);
+                const dateParam = dateMatch ? `&date=${dateMatch[1]}` : "";
+                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0${dateParam}` as any);
                 return;
             }
 
@@ -100,7 +103,7 @@ import { API_URL } from "../../../constants/api";
             }
 
             if (n.targetType === "MEMBER") {
-                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}`);
+                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any);
                 return;
             }
         

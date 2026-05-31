@@ -25,19 +25,19 @@ public class DeletedMemberCleanupScheduler {
         this.memberDeleteService = memberDeleteService;
     }
 
-    // 매일 새벽 3시에 실행 — 소프트 딜리트 후 7일 초과된 회원 완전 삭제
+    // 매일 새벽 3시 — 탈퇴 후 30일 경과된 회원 개인정보 삭제
     @Scheduled(cron = "0 0 3 * * *")
     public void cleanupExpiredDeletedMembers() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(7);
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
         List<User> expiredUsers = userRepository.findUsersToHardDelete(cutoff);
 
         for (User user : expiredUsers) {
             memberRepository.findByUserId(user.getId()).ifPresent(member -> {
                 try {
                     memberDeleteService.hardDeleteMember(member);
-                    System.out.println("완전 삭제 완료: userId=" + user.getId());
+                    System.out.println("개인정보 삭제 완료: 유저ID=" + user.getId());
                 } catch (Exception e) {
-                    System.err.println("완전 삭제 실패: userId=" + user.getId() + " - " + e.getMessage());
+                    System.err.println("개인정보 삭제 실패: 유저ID=" + user.getId() + " - " + e.getMessage());
                 }
             });
         }

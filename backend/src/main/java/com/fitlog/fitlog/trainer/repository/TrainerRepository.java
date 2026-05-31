@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface TrainerRepository extends JpaRepository<Trainer, Long> {
@@ -37,4 +39,8 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
 
     @Query("SELECT t.id FROM Trainer t WHERE t.user.id = :userId")
     Optional<Long> findTrainerIdByUserId(@Param("userId") Long userId);
+
+    // 제휴 만료 대상 (gymConfirmedAt이 기준일 이전인 경우 — 1월 1일 기준으로 사용)
+    @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.gymConfirmedAt IS NOT NULL AND t.gymConfirmedAt < :expiredBefore")
+    List<Trainer> findTrainersWithExpiredGymConfirmation(@Param("expiredBefore") LocalDate expiredBefore);
 }

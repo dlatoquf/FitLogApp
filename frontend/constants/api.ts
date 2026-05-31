@@ -8,15 +8,15 @@ export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
 export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 /*자취방 */
-export const API_URL = "http://192.168.0.106:8080";
-export const ANALYTICS_URL = "http://192.168.0.106:8001";
+/*export const API_URL = "http://192.168.0.182:8080";*/
+/*export const ANALYTICS_URL = "http://192.168.0.106:8001";*/
 /*카페 */
 /*export const API_URL = "http://192.168.45.99:8080";*/
 /*오ㅃㅏ집 */
 /*export const API_URL = "http://192.168.219.155:8080";*/
 /*본가*/
-/*export const API_URL = "http://192.168.219.129:8080";*/
-/*export const ANALYTICS_URL = "http://192.168.219.129:8001";*/
+export const API_URL = "http://192.168.219.129:8080";
+export const ANALYTICS_URL = "http://192.168.219.129:8001";
 /*운영 서버*/
 /*export const API_URL = "https://fitlog-api.duckdns.org";*/
 /*개발 - 맥 로컬 (Android 에뮬레이터)*/
@@ -53,17 +53,11 @@ export const ENDPOINTS = {
     confirm: (scheduleId: number) => `/api/schedule/confirm/${scheduleId}`,
     request: (slotId: number) => `/api/schedule/request/${slotId}`,
   },
-  // 식단
+  // 식단 사진 (Cloudinary 기반)
   diet: {
-    me: "/api/diet/me",
-    member: (memberId: number) => `/api/diet/member/${memberId}`,
-    search: "/api/diet/search",
-    log: "/api/diet/log",
-    logDelete: (id: number) => `/api/diet/log/${id}`,
-    feedback: "/api/diet/feedback",
-    feedbackByMember: (memberId: number) =>
-      `/api/diet/feedback/member/${memberId}`,
-    myFeedbacks: "/api/diet/feedback",
+    photos: "/api/diet/photos",
+    memberPhotos: (memberId: number) => `/api/diet/photos/member/${memberId}`,
+    feedback: (photoId: number) => `/api/diet/photos/${photoId}/feedback`,
   },
   // FitLog
   fitlog: {
@@ -77,6 +71,8 @@ export const ENDPOINTS = {
     me: "/api/bodylog/me",
     create: "/api/bodylog",
     member: (memberId: number) => `/api/bodylog/member/${memberId}`,
+    manual: (manualMemberId: number) => `/api/bodylog/manual/${manualMemberId}`,
+    deleteManual: (logId: number) => `/api/bodylog/manual/${logId}`,
   },
   // 결제
   payment: {

@@ -1,28 +1,48 @@
 package com.fitlog.fitlog.workout.controller;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.mission.service.MissionService;
 import com.fitlog.fitlog.notification.service.NotificationService;
+import com.fitlog.fitlog.notification.service.SolapiService;
+import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
+import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
+import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.workout.entity.WorkoutLog;
 import com.fitlog.fitlog.workout.entity.WorkoutMedia;
 import com.fitlog.fitlog.workout.entity.WorkoutSet;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import com.fitlog.fitlog.workout.repository.WorkoutMediaRepository;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/fitlog")
@@ -36,6 +56,9 @@ public class WorkoutLogController {
     private final JwtService jwtService;
     private final NotificationService notificationService;
     private final ScheduleRepository scheduleRepository;
+    private final ManualMemberRepository manualMemberRepository;
+    private final SolapiService solapiService;
+    private final MissionService missionService;
 
     public WorkoutLogController(WorkoutLogRepository workoutLogRepository,
                                 WorkoutMediaRepository workoutMediaRepository,
@@ -44,7 +67,10 @@ public class WorkoutLogController {
                                 UserRepository userRepository,
                                 JwtService jwtService,
                                 NotificationService notificationService,
-                                ScheduleRepository scheduleRepository){
+                                ScheduleRepository scheduleRepository,
+                                ManualMemberRepository manualMemberRepository,
+                                SolapiService solapiService,
+                                MissionService missionService){
         this.workoutLogRepository = workoutLogRepository;
         this.workoutMediaRepository = workoutMediaRepository;
         this.memberRepository = memberRepository;
@@ -53,6 +79,9 @@ public class WorkoutLogController {
         this.jwtService = jwtService;
         this.notificationService = notificationService;
         this.scheduleRepository = scheduleRepository;
+        this.manualMemberRepository = manualMemberRepository;
+        this.solapiService = solapiService;
+        this.missionService = missionService;
     }
 
     // ── 트레이너: 회원 운동로그 저장 + 알림 ──────────────────────────────
@@ -70,9 +99,19 @@ public class WorkoutLogController {
         Member member = memberRepository.findByIdWithUser(memberId)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
 
+        // 피드백 필드 처리
         WorkoutLog log = buildLog(body, member, trainer, "PT");
+        if (body.containsKey("feedback")) log.setFeedback((String) body.get("feedback"));
         workoutLogRepository.save(log);
         saveMediaFiles(body, log);
+
+        // 새 수업 등록 시 이전 PENDING 미션 → FAILED 처리
+        missionService.failPendingMissions(member.getId());
+
+        // 미션 저장
+        List<String> missions = body.containsKey("missions")
+                ? (List<String>) body.get("missions") : null;
+        missionService.createMissions(log.getWorkoutId(), missions, trainer, member);
 
         // 운동 저장 후 COMPLETED 처리 + 스케줄 없는 경우 PT 차감
         boolean scheduleFound = false;
@@ -105,10 +144,19 @@ public class WorkoutLogController {
         String notiContent;
         if (!scheduleFound && member.getPtRemaining() != null && member.getPtRemaining() > 0) {
             member.setPtRemaining(member.getPtRemaining() - 1);
+            // PT 잔여 0이 되면 종료일 기록 (7일 유예 후 비활성화 기준)
+            if (member.getPtRemaining() == 0 && member.getPtEndedAt() == null) {
+                member.setPtEndedAt(java.time.LocalDate.now());
+            }
             memberRepository.save(member);
-            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " 운동 로그를 등록했어요. PT 1회 차감 · 잔여 " + member.getPtRemaining() + "회";
+            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요. PT 1회 차감 · 잔여 " + member.getPtRemaining() + "회.";
         } else {
-            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " 운동 로그를 등록했어요!";
+            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요.";
+        }
+
+        // 미션이 있으면 알림 내용 추가
+        if (missions != null && !missions.isEmpty()) {
+            notiContent += " 챌린지도 등록됐어요.";
         }
 
         // FCM 푸시 + 인앱 알림
@@ -123,7 +171,185 @@ public class WorkoutLogController {
         return ResponseEntity.ok(Map.of("message", "운동 로그가 저장됐어요.", "workoutId", log.getWorkoutId()));
     }
 
+    // ── 트레이너: 미연동 회원 운동 로그 저장 ────────────────────────────────
+    @Transactional
+    @PostMapping("/manual/{manualMemberId}")
+    public ResponseEntity<Map<String, Object>> saveManualMemberLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long manualMemberId,
+            @RequestBody Map<String, Object> body) {
+
+        User trainerUser = getUserFromToken(authorization);
+        Trainer trainer = trainerRepository.findByUser(trainerUser)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
+
+        ManualMember mm = manualMemberRepository.findById(manualMemberId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+
+        WorkoutLog log = new WorkoutLog();
+        log.setManualMember(mm);
+        log.setMember(null);
+        log.setTrainer(trainer);
+        log.setLogDate(java.time.LocalDate.parse((String) body.get("date")));
+        log.setWorkoutType("PT");
+        if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
+            log.setConditionScore(((Number) body.get("conditionScore")).intValue());
+        if (body.containsKey("painPoints"))
+            log.setPainPoints((String) body.get("painPoints"));
+        if (body.containsKey("feedback"))
+            log.setFeedback((String) body.get("feedback"));
+
+        // 운동 세트 파싱
+        List<Map<String, Object>> exercises = (List<Map<String, Object>>) body.get("exercises");
+        List<WorkoutSet> sets = new ArrayList<>();
+        if (exercises != null) {
+            for (Map<String, Object> ex : exercises) {
+                String name = (String) ex.get("name");
+                String exMemo = ex.containsKey("memo") ? (String) ex.get("memo") : null;
+                List<Map<String, Object>> exSets = (List<Map<String, Object>>) ex.get("sets");
+                if (exSets != null) {
+                    for (Map<String, Object> s : exSets) {
+                        WorkoutSet ws = new WorkoutSet();
+                        ws.setWorkoutLog(log);
+                        ws.setExerciseName(name);
+                        if (s.get("weight") != null) ws.setWeight(new java.math.BigDecimal(s.get("weight").toString()));
+                        if (s.get("reps") != null) ws.setReps(((Number) s.get("reps")).intValue());
+                        if (s.get("rpe") != null) ws.setRpe(((Number) s.get("rpe")).intValue());
+                        ws.setMemo(exMemo);
+                        sets.add(ws);
+                    }
+                }
+            }
+        }
+        log.setSets(sets);
+        workoutLogRepository.save(log);
+        saveMediaFiles(body, log);
+
+        // 해당 날짜 CONFIRMED 스케줄 → COMPLETED 처리 (노쇼 카운트 방지)
+        scheduleRepository.findByTrainerAndDateAndStatus(trainer, log.getLogDate(), "CONFIRMED")
+                .stream()
+                .filter(s -> s.getManualMember() != null && s.getManualMember().getId().equals(mm.getId()))
+                .findFirst()
+                .ifPresent(s -> {
+                    s.setStatusStr("COMPLETED");
+                    scheduleRepository.save(s);
+                });
+
+        // PT 차감 (잔여 있을 때)
+        if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
+            mm.setPtRemaining(mm.getPtRemaining() - 1);
+            // 잔여 0회가 된 날짜 기록 (7일 후 비활성화 기준)
+            if (mm.getPtRemaining() == 0) {
+                mm.setPtEndedAt(java.time.LocalDate.now());
+            }
+            manualMemberRepository.save(mm);
+        }
+
+        // 미션 저장
+        List<String> missions = body.containsKey("missions")
+                ? (List<String>) body.get("missions") : null;
+        missionService.createMissionsForManual(log.getWorkoutId(), missions, trainer, mm);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "운동 로그가 저장됐어요.",
+                "workoutId", log.getWorkoutId(),
+                // 전화번호 있으면 프론트에서 알림 버튼 표시
+                "hasPhone", mm.getPhone() != null && !mm.getPhone().isBlank()
+        ));
+    }
+
+    // ── 트레이너: 미연동 회원에게 카카오 알림톡 / LMS 수동 발송 ─────────────
+    // POST /api/fitlog/manual/{manualMemberId}/notify
+    @Transactional
+    @PostMapping("/manual/{manualMemberId}/notify")
+    public ResponseEntity<Map<String, Object>> notifyManualMember(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long manualMemberId,
+            @RequestBody Map<String, Object> body) {
+
+        User trainerUser = getUserFromToken(authorization);
+
+        ManualMember mm = manualMemberRepository.findById(manualMemberId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+
+        if (mm.getPhone() == null || mm.getPhone().isBlank()) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("success", false, "message", "전화번호가 없어 알림을 보낼 수 없어요.")
+            );
+        }
+
+        // 전체 운동 데이터 파싱: [{name, memo, sets:[{setNumber,weight,reps}]}]
+        List<Map<String, Object>> exercises = Collections.emptyList();
+        if (body.containsKey("exercises") && body.get("exercises") instanceof List<?> rawList) {
+            exercises = rawList.stream()
+                    .filter(e -> e instanceof Map)
+                    .map(e -> (Map<String, Object>) e)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        // 하위 호환: exerciseNames만 있을 때
+        if (exercises.isEmpty() && body.containsKey("exerciseNames")) {
+            List<String> names = ((List<?>) body.get("exerciseNames")).stream()
+                    .map(Object::toString).collect(java.util.stream.Collectors.toList());
+            exercises = names.stream()
+                    .map(n -> (Map<String, Object>) new HashMap<String, Object>(Map.of("name", n)))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        // 컨디션 / 피드백 / 미션
+        Integer conditionScore = null;
+        if (body.containsKey("conditionScore") && body.get("conditionScore") != null) {
+            conditionScore = ((Number) body.get("conditionScore")).intValue();
+        }
+        String feedback = body.containsKey("feedback") && body.get("feedback") != null
+                ? (String) body.get("feedback") : null;
+        List<String> missions = Collections.emptyList();
+        if (body.containsKey("missions") && body.get("missions") instanceof List<?> ml) {
+            missions = ml.stream().filter(m -> m != null).map(Object::toString)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        boolean isOt = "OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "");
+        if (isOt) {
+            solapiService.sendOtWorkoutComplete(
+                    mm.getName(),
+                    mm.getPhone(),
+                    trainerUser.getName(),
+                    exercises
+            );
+        } else {
+            solapiService.sendWorkoutLogNotice(
+                    mm.getName(),
+                    mm.getPhone(),
+                    exercises,
+                    trainerUser.getName(),
+                    conditionScore,
+                    feedback,
+                    missions
+            );
+        }
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "알림을 발송했어요."));
+    }
+
+    // ── 트레이너: 미연동 회원 운동 로그 조회 ────────────────────────────────
+    @GetMapping("/manual/{manualMemberId}")
+    public ResponseEntity<List<Map<String, Object>>> getManualMemberLogs(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long manualMemberId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+
+        getUserFromToken(authorization);
+        ManualMember mm = manualMemberRepository.findById(manualMemberId)
+                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        java.time.LocalDate fromDate = from != null ? java.time.LocalDate.parse(from) : java.time.LocalDate.now().minusWeeks(4);
+        java.time.LocalDate toDate   = to   != null ? java.time.LocalDate.parse(to)   : java.time.LocalDate.now();
+
+        return ResponseEntity.ok(toResponse(workoutLogRepository.findByManualMemberAndDateBetween(mm, fromDate, toDate)));
+    }
+
     // ── 회원: 개인 운동 저장 ─────────────────────────────────────────────
+    @Transactional
     @PostMapping("/personal")
     public ResponseEntity<Map<String, Object>> savePersonalLog(
             @RequestHeader("Authorization") String authorization,
@@ -133,7 +359,55 @@ public class WorkoutLogController {
         Member member = getMemberFromToken(authorization);
         WorkoutLog log = buildLog(body, member, null, "PERSONAL");
         workoutLogRepository.save(log);
+        saveMediaFiles(body, log);
+
+        Trainer trainer = member.getTrainer();
+        if (trainer != null && trainer.getUser() != null && trainer.getNotifPersonalWorkout()) {
+            String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
+            String notiContent = memberName + " 회원이 " + log.getLogDate() + " 개인 운동 로그를 등록했어요.";
+            notificationService.sendNotification(
+                    trainer.getUser(),
+                    "WORKOUT_LOG",
+                    notiContent,
+                    "WORKOUT_LOG",
+                    log.getWorkoutId()
+            );
+        }
+
         return ResponseEntity.ok(Map.of("message", "개인 운동 로그가 저장됐어요.", "workoutId", log.getWorkoutId()));
+    }
+
+    // ── 트레이너: 개인 운동에 피드백 달기 ──────────────────────────────────
+    @Transactional
+    @PutMapping("/{workoutId}/feedback")
+    public ResponseEntity<Map<String, Object>> updateFeedback(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long workoutId,
+            @RequestBody Map<String, String> body) {
+
+        User trainerUser = getUserFromToken(authorization);
+        Trainer trainer = trainerRepository.findByUser(trainerUser)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
+
+        WorkoutLog log = workoutLogRepository.findById(workoutId)
+                .orElseThrow(() -> new RuntimeException("운동 기록을 찾을 수 없습니다."));
+
+        String feedback = body.get("feedback");
+        log.setFeedback(feedback);
+        workoutLogRepository.save(log);
+
+        // 회원에게 알림
+        if (feedback != null && !feedback.isBlank()) {
+            notificationService.sendNotification(
+                log.getMember().getUser(),
+                "FEEDBACK",
+                trainer.getUser().getName() + " 트레이너가 운동 피드백을 남겼어요.",
+                "WORKOUT_LOG",
+                log.getWorkoutId()
+            );
+        }
+
+        return ResponseEntity.ok(Map.of("message", "피드백이 저장됐어요."));
     }
 
     // ── 트레이너: 회원 운동로그 조회 ─────────────────────────────────────
@@ -169,6 +443,108 @@ public class WorkoutLogController {
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().minusWeeks(4);
         LocalDate toDate   = to   != null ? LocalDate.parse(to)   : LocalDate.now();
         return ResponseEntity.ok(toResponse(workoutLogRepository.findByMemberAndDateBetween(member, fromDate, toDate)));
+    }
+
+    @Transactional
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateWorkoutLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+
+        User user = getUserFromToken(authorization);
+
+        WorkoutLog log = workoutLogRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("운동 기록을 찾을 수 없습니다."));
+
+        boolean isMemberOwner =
+                log.getMember() != null &&
+                        log.getMember().getUser() != null &&
+                        log.getMember().getUser().getId().equals(user.getId());
+
+        boolean isTrainerOwner = false;
+        Optional<Trainer> trainerOpt = trainerRepository.findByUser(user);
+
+        if (trainerOpt.isPresent()) {
+            Trainer trainer = trainerOpt.get();
+            isTrainerOwner =
+                    log.getTrainer() != null &&
+                            log.getTrainer().getId().equals(trainer.getId());
+        }
+
+        if (!isMemberOwner && !isTrainerOwner) {
+            throw new RuntimeException("수정 권한이 없습니다.");
+        }
+
+        if (body.get("date") != null) {
+            log.setLogDate(LocalDate.parse((String) body.get("date")));
+        }
+        if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
+            log.setConditionScore(((Number) body.get("conditionScore")).intValue());
+        if (body.containsKey("painPoints"))
+            log.setPainPoints((String) body.get("painPoints"));
+        if (body.containsKey("feedback"))
+            log.setFeedback((String) body.get("feedback"));
+
+        log.getSets().clear();
+
+        List<Map<String, Object>> exercises =
+                (List<Map<String, Object>>) body.get("exercises");
+
+        if (exercises != null) {
+            for (Map<String, Object> ex : exercises) {
+                String name = (String) ex.get("name");
+                String exMemo = ex.containsKey("memo") ? (String) ex.get("memo") : null;
+                List<Map<String, Object>> exSets =
+                        (List<Map<String, Object>>) ex.get("sets");
+
+                if (exSets != null) {
+                    for (Map<String, Object> s : exSets) {
+                        WorkoutSet ws = new WorkoutSet();
+                        ws.setWorkoutLog(log);
+                        ws.setExerciseName(name);
+
+                        if (s.get("weight") != null) {
+                            ws.setWeight(new BigDecimal(s.get("weight").toString()));
+                        }
+                        if (s.get("reps") != null) {
+                            ws.setReps(((Number) s.get("reps")).intValue());
+                        }
+                        if (s.get("rpe") != null) {
+                            ws.setRpe(((Number) s.get("rpe")).intValue());
+                        }
+                        ws.setMemo(exMemo);
+
+                        log.getSets().add(ws);
+                    }
+                }
+            }
+        }
+
+        workoutLogRepository.save(log);
+
+        // 미디어 처리: keepMediaIds에 없는 기존 미디어 삭제 + 새 미디어 추가
+        List<Long> keepIds = Collections.emptyList();
+        if (body.containsKey("keepMediaIds") && body.get("keepMediaIds") != null) {
+            keepIds = ((List<?>) body.get("keepMediaIds")).stream()
+                    .map(v -> ((Number) v).longValue())
+                    .collect(Collectors.toList());
+        }
+
+        List<WorkoutMedia> currentMedia = workoutMediaRepository.findByWorkoutLogWorkoutId(log.getWorkoutId());
+        final List<Long> finalKeepIds = keepIds;
+        for (WorkoutMedia m : currentMedia) {
+            if (!finalKeepIds.contains(m.getId())) {
+                workoutMediaRepository.delete(m);
+            }
+        }
+
+        saveMediaFiles(body, log);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "운동 로그가 수정됐어요.",
+                "workoutId", log.getWorkoutId()
+        ));
     }
 
     // ── 공통: 운동로그 생성 헬퍼 ─────────────────────────────────────────
@@ -321,117 +697,15 @@ public class WorkoutLogController {
                 .orElseThrow(() -> new RuntimeException("회원 정보를 찾을 수 없습니다."));
     }
 
+    // WorkoutLogController.java 안에 추가
+    // 위치: getMyWorkoutLogs 메서드 아래, buildLog 메서드 위 추천
+
     // 트레이너용
     private User getUserFromToken(String authorization) {
         String token = authorization.replace("Bearer ", "");
         Long userId  = jwtService.getUserIdFromToken(token);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
-    }
-
-    // WorkoutLogController.java 안에 추가
-    // 위치: getMyWorkoutLogs 메서드 아래, buildLog 메서드 위 추천
-
-    @Transactional
-    @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> updateWorkoutLog(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long id,
-            @RequestBody Map<String, Object> body) {
-
-        User user = getUserFromToken(authorization);
-
-        WorkoutLog log = workoutLogRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("운동 기록을 찾을 수 없습니다."));
-
-        boolean isMemberOwner =
-                log.getMember() != null &&
-                        log.getMember().getUser() != null &&
-                        log.getMember().getUser().getId().equals(user.getId());
-
-        boolean isTrainerOwner = false;
-        Optional<Trainer> trainerOpt = trainerRepository.findByUser(user);
-
-        if (trainerOpt.isPresent()) {
-            Trainer trainer = trainerOpt.get();
-            isTrainerOwner =
-                    log.getTrainer() != null &&
-                            log.getTrainer().getId().equals(trainer.getId());
-        }
-
-        if (!isMemberOwner && !isTrainerOwner) {
-            throw new RuntimeException("수정 권한이 없습니다.");
-        }
-
-        if (body.get("date") != null) {
-            log.setLogDate(LocalDate.parse((String) body.get("date")));
-        }
-        if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
-            log.setConditionScore(((Number) body.get("conditionScore")).intValue());
-        if (body.containsKey("painPoints"))
-            log.setPainPoints((String) body.get("painPoints"));
-        if (body.containsKey("feedback"))
-            log.setFeedback((String) body.get("feedback"));
-
-        log.getSets().clear();
-
-        List<Map<String, Object>> exercises =
-                (List<Map<String, Object>>) body.get("exercises");
-
-        if (exercises != null) {
-            for (Map<String, Object> ex : exercises) {
-                String name = (String) ex.get("name");
-                String exMemo = ex.containsKey("memo") ? (String) ex.get("memo") : null;
-                List<Map<String, Object>> exSets =
-                        (List<Map<String, Object>>) ex.get("sets");
-
-                if (exSets != null) {
-                    for (Map<String, Object> s : exSets) {
-                        WorkoutSet ws = new WorkoutSet();
-                        ws.setWorkoutLog(log);
-                        ws.setExerciseName(name);
-
-                        if (s.get("weight") != null) {
-                            ws.setWeight(new BigDecimal(s.get("weight").toString()));
-                        }
-                        if (s.get("reps") != null) {
-                            ws.setReps(((Number) s.get("reps")).intValue());
-                        }
-                        if (s.get("rpe") != null) {
-                            ws.setRpe(((Number) s.get("rpe")).intValue());
-                        }
-                        ws.setMemo(exMemo);
-
-                        log.getSets().add(ws);
-                    }
-                }
-            }
-        }
-
-        workoutLogRepository.save(log);
-
-        // 미디어 처리: keepMediaIds에 없는 기존 미디어 삭제 + 새 미디어 추가
-        List<Long> keepIds = Collections.emptyList();
-        if (body.containsKey("keepMediaIds") && body.get("keepMediaIds") != null) {
-            keepIds = ((List<?>) body.get("keepMediaIds")).stream()
-                    .map(v -> ((Number) v).longValue())
-                    .collect(Collectors.toList());
-        }
-
-        List<WorkoutMedia> currentMedia = workoutMediaRepository.findByWorkoutLogWorkoutId(log.getWorkoutId());
-        final List<Long> finalKeepIds = keepIds;
-        for (WorkoutMedia m : currentMedia) {
-            if (!finalKeepIds.contains(m.getId())) {
-                workoutMediaRepository.delete(m);
-            }
-        }
-
-        saveMediaFiles(body, log);
-
-        return ResponseEntity.ok(Map.of(
-                "message", "운동 로그가 수정됐어요.",
-                "workoutId", log.getWorkoutId()
-        ));
     }
 
 }

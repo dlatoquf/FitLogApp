@@ -39,7 +39,7 @@ public class MemberDeleteService {
         this.notificationRepository = notificationRepository;
     }
 
-    // 소프트 딜리트: user.deletedAt만 설정하고 데이터는 보존 (7일 후 스케줄러가 완전 삭제)
+    // 탈퇴 처리: deletedAt만 기록하고 데이터는 보존 (7일 후 스케줄러가 개인정보 삭제)
     @Transactional
     public void deleteMemberAccount(String authorization) {
         String token = authorization.replace("Bearer ", "");
@@ -69,11 +69,17 @@ public class MemberDeleteService {
             }
         }
 
+        // 비활성화 처리 (트레이너 목록에서 비활성으로 표시)
+        member.setStatus(Member.Status.INACTIVE);
+        member.setDisconnectedAt(java.time.LocalDate.now());
+        memberRepository.save(member);
+
+        // 탈퇴일 기록 (30일 후 개인정보 삭제 기준)
         member.getUser().setDeletedAt(LocalDateTime.now());
         userRepository.save(member.getUser());
     }
 
-    // 스케줄러가 호출하는 계정 익명화 (7일 경과 후)
+    // 스케줄러가 호출하는 개인정보 삭제 (탈퇴 후 7일 경과)
     // 운동/식단/바디로그/PT 기록은 트레이너가 계속 조회할 수 있도록 유지
     @Transactional
     public void hardDeleteMember(Member member) {
@@ -96,19 +102,18 @@ public class MemberDeleteService {
         // 2. 알림 삭제 (개인 식별 정보이므로 제거)
         notificationRepository.deleteAllByUser(user);
 
-        // 3. User 익명화: 로그인 불가 처리 + 개인정보 제거
-        //    kakaoId = null → 카카오 로그인 불가
-        //    name = "탈퇴한 회원" → 트레이너 화면에 표시될 이름
-        //    email/fcmToken 제거
+        // 3. 개인정보 삭제: 로그인 불가 처리
+        //    카카오 연동 해제 → 재로그인 불가
+        //    이름을 "탈퇴한 회원"으로 변경 → 트레이너 화면에 표시
+        //    이메일·푸시토큰 제거
         user.setKakaoId(null);
         user.setEmail("deleted_" + userId + "@fitlog.deleted");
         user.setName("탈퇴한 회원");
         user.setFcmToken(null);
-        // deletedAt은 유지 (탈퇴 처리된 계정임을 표시)
+        // 탈퇴일(deletedAt)은 유지
         userRepository.save(user);
 
-        // 4. Member 레코드 및 모든 기록 유지
-        //    (운동 기록, 식단 기록, 바디로그, PT 계약, 목표 등)
+        // 4. 운동 기록, 식단 기록, 바디로그, PT 계약, 목표 등 유지
         //    → 트레이너가 계속 조회 가능
     }
 }

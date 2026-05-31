@@ -19,6 +19,9 @@ export interface TrainerProfile {
   startTime: string;  // "09:00"
   endTime: string;    // "22:00"
   trainerCode: string;
+  gymAffiliated?: boolean;       // 제휴 헬스장 연결 여부
+  affiliatedGymName?: string;    // 제휴 헬스장명
+  gymConfirmedAt?: string;       // 마지막 제휴 확인일 (YYYY-MM-DD)
 }
 
 export interface MemberProfile {
@@ -73,49 +76,22 @@ export interface SlotRequest {
   };
 }
 
-// ── 식단 ─────────────────────────────────────────────────────────────────────
-export type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
-
-export interface FoodItem {
+// ── 식단 사진 ─────────────────────────────────────────────────────────────────
+export interface DietPhotoFeedback {
   id: number;
-  foodName: string;
-  calories: number;
-  carbs: number;
-  protein: number;
-  fat: number;
-  mealType?: MealType;
-}
-
-export interface MealGroup {
-  mealType: MealType;
-  foods: FoodItem[];
-}
-
-export interface DietResponse {
-  date: string;
-  totalCalories: number;
-  totalCarbs: number;
-  totalProtein: number;
-  totalFat: number;
-  meals: MealGroup[];
-}
-
-export interface FoodSearchResult {
-  foodId: string;
-  foodName: string;
-  calories: number;
-  carbs: number;
-  protein: number;
-  fat: number;
-  source?: "internal" | "kfood" | "fatsecret"; // 검색 출처
-}
-
-export interface DietFeedback {
-  id: number;
-  comment: string;
-  targetDate: string;
+  trainerName: string;
+  content: string;
   createdAt: string;
-  read?: boolean;
+}
+
+export interface DietPhoto {
+  id: number;
+  date: string;
+  photoUrl: string;
+  cloudinaryPublicId?: string;
+  label?: string;
+  createdAt: string;
+  feedbacks: DietPhotoFeedback[];
 }
 
 // ── 운동 / FitLog ─────────────────────────────────────────────────────────────

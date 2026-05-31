@@ -27,6 +27,31 @@ export default function SignupTrainerScreen() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [affiliateCode, setAffiliateCode] = useState("");
+  const [affiliateVerified, setAffiliateVerified] = useState(false);
+  const [affiliatedGymName, setAffiliatedGymName] = useState("");
+  const [affiliateVerifying, setAffiliateVerifying] = useState(false);
+
+  const verifyAffiliateCode = async () => {
+    if (!affiliateCode.trim()) return;
+    setAffiliateVerifying(true);
+    try {
+      const res = await fetch(`${API_URL}/api/gym/verify?code=${encodeURIComponent(affiliateCode.trim().toUpperCase())}`);
+      const data = await res.json();
+      if (data.valid) {
+        setAffiliateVerified(true);
+        setAffiliatedGymName(data.gymName);
+      } else {
+        Alert.alert("확인 실패", data.message ?? "유효하지 않은 제휴 코드예요.");
+        setAffiliateVerified(false);
+        setAffiliatedGymName("");
+      }
+    } catch {
+      Alert.alert("오류", "제휴 코드 확인 중 오류가 발생했어요.");
+    } finally {
+      setAffiliateVerifying(false);
+    }
+  };
 
   const toggleDay = (i: number) => {
     setSelectedDays((prev) =>
@@ -61,6 +86,7 @@ export default function SignupTrainerScreen() {
           workDays: selectedDays.map((i) => DAYS[i]).join(","),
           startTime,
           endTime,
+          affiliateCode: affiliateVerified ? affiliateCode.trim().toUpperCase() : null,
         }),
       });
 
@@ -130,6 +156,50 @@ export default function SignupTrainerScreen() {
             onChangeText={setGymName}
             style={inputStyle(!!gymName)}
           />
+
+          {/* 제휴 코드 (선택) */}
+          <FieldLabel label="제휴 코드 (선택)" />
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: affiliateVerified ? 8 : 20 }}>
+            <TextInput
+              placeholder="제휴 헬스장 코드 입력"
+              placeholderTextColor={Colors.textPlaceholder}
+              value={affiliateCode}
+              onChangeText={(v) => {
+                setAffiliateCode(v);
+                setAffiliateVerified(false);
+                setAffiliatedGymName("");
+              }}
+              autoCapitalize="characters"
+              style={{ flex: 1, ...inputStyle(affiliateVerified), marginBottom: 0 }}
+            />
+            <TouchableOpacity
+              onPress={verifyAffiliateCode}
+              disabled={!affiliateCode.trim() || affiliateVerifying}
+              style={{
+                backgroundColor: affiliateVerified ? Colors.green : Colors.bgSub,
+                borderWidth: 1.5,
+                borderColor: affiliateVerified ? Colors.green : Colors.border,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "700", color: affiliateVerified ? "#fff" : Colors.textMuted }}>
+                {affiliateVerifying ? "..." : affiliateVerified ? "✓" : "확인"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {affiliateVerified && (
+            <View style={{ backgroundColor: Colors.greenLight, borderRadius: 10, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: Colors.green + "44" }}>
+              <Text style={{ fontSize: 13, color: Colors.green, fontWeight: "700" }}>
+                제휴 헬스장: {affiliatedGymName}
+              </Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                제휴 회원은 월 11,900원에 이용할 수 있어요.
+              </Text>
+            </View>
+          )}
 
           {/* 근무 요일 */}
           <FieldLabel label="근무 요일" />

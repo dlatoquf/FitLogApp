@@ -3,7 +3,8 @@ package com.fitlog.fitlog.trainer.service;
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
-import com.fitlog.fitlog.diet.repository.DietFeedbackRepository;
+import com.fitlog.fitlog.diet.repository.DietDayFeedbackRepository;
+import com.fitlog.fitlog.diet.repository.DietPhotoFeedbackRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.member.repository.PtContractRepository;
@@ -29,7 +30,8 @@ public class TrainerDeleteService {
     private final ScheduleRepository scheduleRepository;
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final WorkoutLogRepository workoutLogRepository;
-    private final DietFeedbackRepository dietFeedbackRepository;
+    private final DietPhotoFeedbackRepository dietPhotoFeedbackRepository;
+    private final DietDayFeedbackRepository dietDayFeedbackRepository;
     private final NotificationRepository notificationRepository;
     private final PtContractRepository ptContractRepository;
 
@@ -40,7 +42,8 @@ public class TrainerDeleteService {
                                 ScheduleRepository scheduleRepository,
                                 ScheduleRequestRepository scheduleRequestRepository,
                                 WorkoutLogRepository workoutLogRepository,
-                                DietFeedbackRepository dietFeedbackRepository,
+                                DietPhotoFeedbackRepository dietPhotoFeedbackRepository,
+                                DietDayFeedbackRepository dietDayFeedbackRepository,
                                 NotificationRepository notificationRepository,
                                 PtContractRepository ptContractRepository) {
         this.jwtService = jwtService;
@@ -50,7 +53,8 @@ public class TrainerDeleteService {
         this.scheduleRepository = scheduleRepository;
         this.scheduleRequestRepository = scheduleRequestRepository;
         this.workoutLogRepository = workoutLogRepository;
-        this.dietFeedbackRepository = dietFeedbackRepository;
+        this.dietPhotoFeedbackRepository = dietPhotoFeedbackRepository;
+        this.dietDayFeedbackRepository = dietDayFeedbackRepository;
         this.notificationRepository = notificationRepository;
         this.ptContractRepository = ptContractRepository;
     }
@@ -90,9 +94,8 @@ public class TrainerDeleteService {
         workoutLogRepository.detachTrainerFromWorkoutLogs(trainer);
 
         // 7. 식단 피드백 삭제 (트레이너가 작성한 피드백)
-        dietFeedbackRepository.deleteAll(
-                dietFeedbackRepository.findByTrainer(trainer)
-        );
+        dietPhotoFeedbackRepository.deleteByTrainerId(trainer.getId());
+        dietDayFeedbackRepository.deleteByTrainerId(trainer.getId());
 
         // 8. 알림 삭제
         notificationRepository.deleteAllByUser(user);

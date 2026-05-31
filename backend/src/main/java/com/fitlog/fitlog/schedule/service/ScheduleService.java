@@ -6,18 +6,20 @@ import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.notification.service.NotificationService;
-import com.fitlog.fitlog.schedule.dto.ScheduleRequest;
+
+
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
-import com.fitlog.fitlog.schedule.repository.ScheduleRequestRepository;
+
+import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
+import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,227 +28,60 @@ import java.util.stream.Collectors;
 public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
-    private final ScheduleRequestRepository scheduleRequestRepository;
     private final TrainerRepository trainerRepository;
     private final MemberRepository memberRepository;
+    private final ManualMemberRepository manualMemberRepository;
     private final JwtService jwtService;
     private final UserRepository userRepository;
-    private final NotificationService notificationService; // NotificationRepository 대신 NotificationService 사용
+    private final NotificationService notificationService;
 
     public ScheduleService(ScheduleRepository scheduleRepository,
-                           ScheduleRequestRepository scheduleRequestRepository,
                            TrainerRepository trainerRepository,
                            MemberRepository memberRepository,
+                           ManualMemberRepository manualMemberRepository,
                            JwtService jwtService,
                            UserRepository userRepository,
                            NotificationService notificationService) {
         this.scheduleRepository = scheduleRepository;
-        this.scheduleRequestRepository = scheduleRequestRepository;
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
+        this.manualMemberRepository = manualMemberRepository;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
     }
 
     // 슬롯 조회 (회원용)
-    public List<Schedule> getSlotsForMember(String auth) {
-        User user = getUserFromAuth(auth);
-        Member member = memberRepository.findByUser(user)
-                .orElseThrow(() -> new RuntimeException("회원 정보 없음"));
-        Trainer trainer = member.getTrainer();
-        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
-        LocalDate nextSunday = nextMonday.plusDays(6);
-        return scheduleRepository.findByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
-    }
-
-    // 이번 주 내 확정 일정 (회원용)
-    // schedule_requests는 "회원이 신청한 예약 요청" 이력이고,
-    // 트레이너가 직접 추가한 수업은 schedules.member_id / status 기준으로 확인해야 함.
-    public List<Map<String, Object>> getMyThisWeekSchedules(String auth) {
-        User user = getUserFromAuth(auth);
-        Member member = memberRepository.findByUser(user)
-                .orElseThrow(() -> new RuntimeException("회원 정보 없음"));
-
-        LocalDate today = LocalDate.now();
-        LocalDate monday = today.with(DayOfWeek.MONDAY);
-        LocalDate sunday = monday.plusDays(6);
-
-        Trainer trainer = member.getTrainer();
-        if (trainer == null) {
-            return Collections.emptyList();
-        }
-
-        return scheduleRepository
-                .findByTrainerAndDateBetween(trainer, monday, sunday)
-                .stream()
-                .filter(s -> s.getMember() != null && Objects.equals(s.getMember().getId(), member.getId()))
-                .filter(s -> "CONFIRMED".equals(s.getStatusStr()) || "COMPLETED".equals(s.getStatusStr()))
-                .sorted(Comparator
-                        .comparing(Schedule::getDate)
-                        .thenComparing(Schedule::getStartTime))
-                .map(s -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("scheduleId", s.getId());
-                    map.put("date", s.getDate());
-                    map.put("startTime", s.getStartTime());
-                    map.put("endTime", s.getEndTime());
-                    map.put("status", s.getStatusStr());
-                    return map;
-                })
-                .collect(Collectors.toList());
-    }
-
-    // 다음 주 슬롯 조회 (회원용)
+    // 다음 주 내 확정 수업 조회 (회원용) — 트레이너가 직접 확정한 수업만 반환
     public List<Map<String, Object>> getNextWeekSlotsForMember(String auth) {
         User user = getUserFromAuth(auth);
         Member member = memberRepository.findByUser(user)
                 .orElseThrow(() -> new RuntimeException("회원 정보 없음"));
         Trainer trainer = member.getTrainer();
+        if (trainer == null) return Collections.emptyList();
 
         LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
         LocalDate nextSunday = nextMonday.plusDays(6);
 
-        List<Schedule> slots = scheduleRepository.findByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
-
-        return slots.stream()
+        return scheduleRepository.findByTrainerAndDateBetween(trainer, nextMonday, nextSunday)
+                .stream()
+                .filter(s -> s.getMember() != null && s.getMember().getId().equals(member.getId()))
+                .filter(s -> "CONFIRMED".equals(s.getStatusStr()) || "COMPLETED".equals(s.getStatusStr()))
+                .sorted(Comparator.comparing(Schedule::getDate).thenComparing(Schedule::getStartTime))
                 .map(s -> {
-                    boolean myRequest = scheduleRequestRepository.existsByScheduleAndMember(s, member);
-                    String dbStatus = s.getStatusStr();
-
-                    // 개인화된 상태: 내 시점에서만 판단
-                    String displayStatus;
-                    if ("CONFIRMED".equals(dbStatus) || "COMPLETED".equals(dbStatus)) {
-                        // 확정된 슬롯 - 내 슬롯인지 여부
-                        boolean isMine = s.getMember() != null && s.getMember().getId().equals(member.getId());
-                        displayStatus = isMine ? "MINE" : "CONFIRMED";
-                    } else if (myRequest) {
-                        displayStatus = "REQUESTED"; // 내가 신청한 상태
-                    } else {
-                        displayStatus = "OPEN"; // 남이 신청했어도 나한텐 신청 가능
-                    }
-
                     Map<String, Object> map = new HashMap<>();
                     map.put("scheduleId", s.getId());
                     map.put("date", s.getDate());
                     map.put("startTime", s.getStartTime());
                     map.put("endTime", s.getEndTime());
-                    map.put("status", displayStatus);
-                    map.put("myRequest", myRequest);
+                    map.put("status", "MINE");
                     return map;
                 })
                 .collect(Collectors.toList());
     }
 
-    // 수업 신청 (회원용)
-    @Transactional
-    public void requestSlot(String auth, Long scheduleId) {
-        User user = getUserFromAuth(auth);
-        Member member = memberRepository.findByUser(user)
-                .orElseThrow(() -> new RuntimeException("회원 정보 없음"));
+    // ── 아래 requestSlot / cancelRequest / getRequestsBySlot / confirmRequest / sendScheduleOpenNotifications / getNextWeekRequests 제거됨 (트레이너 전용 운영으로 전환) ──
 
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
-
-        if (scheduleRequestRepository.existsByScheduleAndMember(schedule, member))
-            throw new RuntimeException("이미 신청한 슬롯");
-
-        String dbStatus = schedule.getStatusStr();
-        if ("CONFIRMED".equals(dbStatus) || "COMPLETED".equals(dbStatus))
-            throw new RuntimeException("이미 확정된 슬롯입니다.");
-
-        ScheduleRequest req = new ScheduleRequest();
-        req.setSchedule(schedule);
-        req.setMember(member);
-        scheduleRequestRepository.save(req);
-
-        // 첫 신청자일 때만 REQUESTED로 변경 (이미 REQUESTED면 유지)
-        if ("OPEN".equals(dbStatus)) {
-            schedule.setStatus(Schedule.Status.REQUESTED);
-            scheduleRepository.save(schedule);
-        }
-    }
-
-    // 수업 신청 취소 (회원용)
-    @Transactional
-    public void cancelRequest(String auth, Long scheduleId) {
-        User user = getUserFromAuth(auth);
-        Member member = memberRepository.findByUser(user)
-                .orElseThrow(() -> new RuntimeException("회원 정보 없음"));
-
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
-
-        ScheduleRequest req = scheduleRequestRepository.findByScheduleAndMember(schedule, member)
-                .orElseThrow(() -> new RuntimeException("신청 없음"));
-
-        scheduleRequestRepository.delete(req);
-
-        boolean hasOtherRequests = !scheduleRequestRepository.findBySchedule(schedule).isEmpty();
-        schedule.setStatus(hasOtherRequests ? Schedule.Status.REQUESTED : Schedule.Status.OPEN);
-        scheduleRepository.save(schedule);
-    }
-
-    // 신청 목록 조회 (트레이너용)
-    public List<Map<String, Object>> getRequestsBySlot(String auth, Long scheduleId) {
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
-
-        return scheduleRequestRepository.findBySchedule(schedule).stream()
-                .map(r -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("requestId", r.getId());
-                    map.put("memberId", r.getMember().getId());
-                    map.put("memberName", r.getMember().getUser().getName());
-                    map.put("ptRemaining", r.getMember().getPtRemaining());
-                    map.put("status", r.getStatus().name());
-                    return map;
-                })
-                .collect(Collectors.toList());
-    }
-
-    // 수업 확정 (트레이너용)
-    @Transactional
-    public void confirmRequest(String auth, Long scheduleId, Long memberId) {
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
-
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new RuntimeException("회원 없음"));
-
-        // 신청 없어도 트레이너 직접 확정 가능 (OPEN 슬롯 추가 시)
-        ScheduleRequest req = scheduleRequestRepository.findByScheduleAndMember(schedule, member)
-                .orElseGet(() -> {
-                    ScheduleRequest newReq = new ScheduleRequest();
-                    newReq.setSchedule(schedule);
-                    newReq.setMember(member);
-                    return newReq;
-                });
-
-        req.setStatus(ScheduleRequest.Status.CONFIRMED);
-        scheduleRequestRepository.save(req);
-
-        schedule.setStatus(Schedule.Status.CONFIRMED);
-        schedule.setMember(member);
-        scheduleRepository.save(schedule);
-
-        // PT 횟수 차감
-        if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
-            member.setPtRemaining(member.getPtRemaining() - 1);
-            memberRepository.save(member);
-        }
-
-        // 회원에게 수업 확정 알림 + FCM 푸시
-        notificationService.sendNotification(
-                member.getUser(),
-                "SCHEDULE_CONFIRM",
-                "수업이 확정됐어요! " + schedule.getDate() + " " + schedule.getStartTime() + " · PT 잔여 " + member.getPtRemaining() + "회",
-                "SCHEDULE",
-                scheduleId
-        );
-    }
-
-    // 주간 캘린더 조회 (트레이너용)
     // 주간 캘린더 조회 (트레이너용)
     public List<Map<String, Object>> getWeeklyCalendar(String auth, LocalDate weekStart) {
 
@@ -265,58 +100,76 @@ public class ScheduleService {
                         weekEnd
                 );
 
-        // scheduleId 목록 추출
-        List<Long> scheduleIds = schedules.stream()
-                .map(Schedule::getId)
-                .toList();
-
-        // request 한번에 조회
-        List<ScheduleRequest> requests =
-                scheduleRequestRepository.findByScheduleIds(scheduleIds);
-
-        // scheduleId 기준으로 신청자 이름 그룹핑
-        Map<Long, List<String>> requestMap = requests.stream()
-                .collect(Collectors.groupingBy(
-                        r -> r.getSchedule().getId(),
-                        Collectors.mapping(
-                                r -> r.getMember().getUser().getName(),
-                                Collectors.toList()
-                        )
-                ));
-
         // 최종 응답 생성
         return schedules.stream().map(s -> {
 
             Map<String, Object> map = new HashMap<>();
-
             map.put("id", s.getId());
             map.put("scheduleId", s.getId());
-
             map.put("date", s.getDate());
             map.put("startTime", s.getStartTime());
             map.put("endTime", s.getEndTime());
-
             map.put("status", s.getStatusStr());
+            map.put("sessionType", s.getSessionType());
+            if (s.getNote() != null) map.put("note", s.getNote());
 
-            // 확정 회원
             if (s.getMember() != null) {
                 map.put("memberName", s.getMember().getUser().getName());
                 map.put("memberId", s.getMember().getId());
+                map.put("ptRemaining", s.getMember().getPtRemaining());
+                map.put("ptTotal",     s.getMember().getPtTotal());
+            } else if (s.getManualMember() != null) {
+                map.put("memberName",     s.getManualMember().getName());
+                map.put("manualMemberId", s.getManualMember().getId());
+                map.put("ptRemaining",    s.getManualMember().getPtRemaining());
+                map.put("ptTotal",        s.getManualMember().getPtTotal());
             }
-            // 신청자 이름 목록
-            map.put(
-                    "requestorNames",
-                    requestMap.getOrDefault(
-                            s.getId(),
-                            Collections.emptyList()
-                    )
-            );
             return map;
 
         }).collect(Collectors.toList());
     }
 
-    // 슬롯 생성 (트레이너용) - 슬롯 DB 저장만 담당, 알림은 컨트롤러에서 처리
+    // ─── 월간 캘린더 조회 (트레이너용) ───────────────────────────────────────
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getMonthlyCalendar(String auth, String yearMonth) {
+        User user = getUserFromAuth(auth);
+        Trainer trainer = trainerRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("트레이너 없음"));
+
+        LocalDate monthStart = LocalDate.parse(yearMonth + "-01");
+        LocalDate monthEnd   = monthStart.withDayOfMonth(monthStart.lengthOfMonth());
+
+        List<Schedule> schedules = scheduleRepository.findByTrainerIdAndDateBetweenWithMember(
+                trainer.getId(), monthStart, monthEnd);
+
+        return schedules.stream().map(s -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id",          s.getId());
+            map.put("scheduleId",  s.getId());
+            map.put("date",        s.getDate());
+            map.put("startTime",   s.getStartTime());
+            map.put("endTime",     s.getEndTime());
+            map.put("status",      s.getStatusStr());
+            map.put("sessionType", s.getSessionType());
+            if (s.getNote() != null) map.put("note", s.getNote());
+            if (s.getMember() != null) {
+                map.put("memberName",  s.getMember().getUser().getName());
+                map.put("memberId",    s.getMember().getId());
+                map.put("isManual",    false);
+                map.put("ptRemaining", s.getMember().getPtRemaining());
+                map.put("ptTotal",     s.getMember().getPtTotal());
+            } else if (s.getManualMember() != null) {
+                map.put("memberName",     s.getManualMember().getName());
+                map.put("manualMemberId", s.getManualMember().getId());
+                map.put("isManual",       true);
+                map.put("ptRemaining",    s.getManualMember().getPtRemaining());
+                map.put("ptTotal",        s.getManualMember().getPtTotal());
+            }
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    // 슬롯 생성 (트레이너용)
     @Transactional
     public List<Long> generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {
         User user = getUserFromAuth(auth);
@@ -330,41 +183,23 @@ public class ScheduleService {
         return memberRepository.findActiveMemberIdsByTrainerId(trainer.getId());
     }
 
-    // 슬롯 오픈 알림 전송 (트랜잭션 밖에서 호출)
-    public void sendScheduleOpenNotifications(List<Long> memberIds) {
-        for (Long memberId : memberIds) {
-            try {
-                // findByIdWithUser: user JOIN FETCH로 LazyInitializationException 방지
-                memberRepository.findByIdWithUser(memberId).ifPresent(member ->
-                    notificationService.sendNotification(
-                            member.getUser(),
-                            "SCHEDULE_OPEN",
-                            "다음 주 수업 신청이 오픈됐어요!",
-                            "SCHEDULE_OPEN",
-                            null
-                    )
-                );
-            } catch (Exception e) {
-                System.out.println("알림 전송 실패 (회원 " + memberId + "): " + e.getMessage());
-            }
-        }
-    }
-
     // 슬롯 직접 생성 및 확정 (트레이너용 - 직접 일정 추가)
+    // memberId: 연동 회원 / manualMemberId: 미연동 회원 (둘 중 하나만 전달)
     @Transactional
-    public void createAndConfirm(String auth, String dateStr, String startTimeStr, Long memberId) {
+    public void createAndConfirm(String auth, String dateStr, String startTimeStr,
+                                 Long memberId, Long manualMemberId, String sessionType, String note) {
+        boolean isOt = "OT".equalsIgnoreCase(sessionType);
+        boolean isPersonal = "PERSONAL_WORKOUT".equalsIgnoreCase(sessionType)
+                          || "PERSONAL_SCHEDULE".equalsIgnoreCase(sessionType);
         User user = getUserFromAuth(auth);
         Trainer trainer = trainerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
-
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new RuntimeException("회원 없음"));
 
         LocalDate date = LocalDate.parse(dateStr);
         LocalTime startTime = LocalTime.parse(startTimeStr);
         LocalTime endTime = startTime.plusHours(1);
 
-        // 기존 OPEN 슬롯이 있으면 재사용, 없으면 새로 생성 (중복 방지)
+        // 기존 OPEN 슬롯 재사용 or 신규 생성
         Schedule schedule = scheduleRepository
                 .findByTrainerAndDateAndStatus(trainer, date, "OPEN")
                 .stream()
@@ -380,23 +215,50 @@ public class ScheduleService {
                 });
 
         schedule.setStatus(Schedule.Status.CONFIRMED);
-        schedule.setMember(member);
-        scheduleRepository.save(schedule);
+        schedule.setSessionType(sessionType != null ? sessionType.toUpperCase() : "PT");
+        if (note != null && !note.isBlank()) schedule.setNote(note.trim());
 
-        // PT 횟수 차감
-        if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
-            member.setPtRemaining(member.getPtRemaining() - 1);
-            memberRepository.save(member);
+        // ── 개인운동 / 개인일정: 회원 없이 바로 저장 ──
+        if (isPersonal) {
+            schedule.setMember(null);
+            schedule.setManualMember(null);
+            scheduleRepository.save(schedule);
+            return;
         }
 
-        // 회원에게 수업 확정 알림 + FCM 푸시
-        notificationService.sendNotification(
-                member.getUser(),
-                "SCHEDULE_CONFIRM",
-                "수업이 확정됐어요! " + date + " " + startTime + " · PT 잔여 " + member.getPtRemaining() + "회",
-                "SCHEDULE",
-                schedule.getId()
-        );
+        if (manualMemberId != null) {
+            // ── 미연동 회원 ──
+            ManualMember manual = manualMemberRepository.findById(manualMemberId)
+                    .orElseThrow(() -> new RuntimeException("미연동 회원 없음"));
+            schedule.setManualMember(manual);
+            schedule.setMember(null);
+            scheduleRepository.save(schedule);
+            // OT는 PT 차감 없음
+            if (!isOt && manual.getPtRemaining() != null && manual.getPtRemaining() > 0) {
+                manual.setPtRemaining(manual.getPtRemaining() - 1);
+                manualMemberRepository.save(manual);
+            }
+            // (SOLAPI 제거 — 카카오 공유하기로 대체)
+        } else {
+            // ── 연동 회원 ──
+            Member member = memberRepository.findById(memberId)
+                    .orElseThrow(() -> new RuntimeException("회원 없음"));
+            schedule.setMember(member);
+            schedule.setManualMember(null);
+            scheduleRepository.save(schedule);
+
+            if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
+                member.setPtRemaining(member.getPtRemaining() - 1);
+                memberRepository.save(member);
+            }
+            notificationService.sendNotification(
+                    member.getUser(),
+                    "SCHEDULE_CONFIRM",
+                    "수업이 확정됐어요. " + date + " " + startTime + " · PT 잔여 " + member.getPtRemaining() + "회.",
+                    "SCHEDULE",
+                    schedule.getId()
+            );
+        }
     }
 
     // 확정 수업 취소 (트레이너용)
@@ -408,29 +270,32 @@ public class ScheduleService {
                 .orElseThrow(() -> new RuntimeException("슬롯 없음"));
 
         Member member = schedule.getMember();
+        ManualMember manualMember = schedule.getManualMember();
 
         schedule.setStatus(Schedule.Status.OPEN);
         schedule.setMember(null);
+        schedule.setManualMember(null);
         scheduleRepository.save(schedule);
 
-        scheduleRequestRepository.findByScheduleAndMember(schedule, member)
-                .ifPresent(scheduleRequestRepository::delete);
-
-        // PT 횟수 복구
-        if (member != null && member.getPtRemaining() != null) {
-            member.setPtRemaining(member.getPtRemaining() + 1);
-            memberRepository.save(member);
-        }
-
-        // 회원에게 수업 취소 알림 + FCM 푸시
         if (member != null) {
+            // PT 횟수 복구
+            if (member.getPtRemaining() != null) {
+                member.setPtRemaining(member.getPtRemaining() + 1);
+                memberRepository.save(member);
+            }
+            // FCM 알림
             notificationService.sendNotification(
                     member.getUser(),
                     "SCHEDULE_CANCEL",
-                    "수업이 취소됐어요. " + schedule.getDate() + " " + schedule.getStartTime() + " · PT 잔여 " + member.getPtRemaining() + "회",
+                    "수업이 취소됐어요. " + schedule.getDate() + " " + schedule.getStartTime() + " · PT 잔여 " + member.getPtRemaining() + "회.",
                     "SCHEDULE",
                     scheduleId
             );
+        }
+        // 미연동 회원 PT 복구
+        if (manualMember != null && manualMember.getPtRemaining() != null) {
+            manualMember.setPtRemaining(manualMember.getPtRemaining() + 1);
+            manualMemberRepository.save(manualMember);
         }
     }
 
@@ -486,7 +351,6 @@ public class ScheduleService {
         }
 
         Trainer managedTrainer = trainerRepository.getReferenceById(trainer.getId());
-        LocalDateTime now = LocalDateTime.now();
         List<Schedule> slots = new ArrayList<>();
         for (LocalDate date = monday; !date.isAfter(sunday); date = date.plusDays(1)) {
             LocalTime[] range = dayTimeMap.get(date.getDayOfWeek());
@@ -498,7 +362,6 @@ public class ScheduleService {
                 s.setDate(date);
                 s.setStartTime(cur);
                 s.setEndTime(cur.plusHours(1));
-                s.setOpenedAt(now);
                 slots.add(s);
                 cur = cur.plusHours(1);
             }
@@ -515,11 +378,6 @@ public class ScheduleService {
                 .findIdsByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
 
         if (!existingIds.isEmpty()) {
-            int batchSize = 500;
-            for (int i = 0; i < existingIds.size(); i += batchSize) {
-                List<Long> batch = existingIds.subList(i, Math.min(i + batchSize, existingIds.size()));
-                scheduleRequestRepository.deleteByScheduleIds(batch);
-            }
             scheduleRepository.deleteOpenSlotsByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
         }
 
@@ -551,27 +409,53 @@ public class ScheduleService {
         // @Modifying(clearAutomatically=true)가 PC를 클리어하므로, saveAll 전에 proxy로 재획득
         Trainer managedTrainer = trainerRepository.getReferenceById(trainer.getId());
 
-        LocalDateTime now = LocalDateTime.now();
+        // slotOffset: 0=정각(:00), 30=30분(:30), null=기본(정각)
+        int offset = trainer.getSlotOffset() != null ? trainer.getSlotOffset() : 0;
+
         List<Schedule> slots = new ArrayList<>();
         for (LocalDate date = nextMonday; !date.isAfter(nextSunday); date = date.plusDays(1)) {
             DayOfWeek dow = date.getDayOfWeek();
             List<LocalTime[]> timeRanges = dayTimeMap.get(dow);
             if (timeRanges == null) continue;
             for (LocalTime[] range : timeRanges) {
-                LocalTime cur = range[0];
+                // 시작 시간의 시(hour)를 기준으로 offset 분 적용
+                // 예) startTime=10:00, offset=30 → 첫 슬롯 10:30
+                // 예) startTime=10:30, offset=30 → 첫 슬롯 10:30 (이미 맞음)
+                LocalTime first = range[0].withMinute(offset).withSecond(0).withNano(0);
+                if (first.isBefore(range[0])) first = first.plusHours(1);
+                LocalTime cur = first;
                 while (cur.isBefore(range[1])) {
                     Schedule s = new Schedule();
                     s.setTrainer(managedTrainer);
                     s.setDate(date);
                     s.setStartTime(cur);
                     s.setEndTime(cur.plusHours(1));
-                    s.setOpenedAt(now);
                     slots.add(s);
                     cur = cur.plusHours(1);
                 }
             }
         }
         scheduleRepository.saveAll(slots);
+    }
+
+    // ── 자동 오픈 cron 용 ─────────────────────────────────────────────────────
+    // 다음 주 OPEN 슬롯이 없을 때만 트레이너 기본 설정으로 생성, 회원 ID 반환
+    @Transactional
+    public List<Long> autoOpenNextWeekIfNotOpen(Trainer trainer) {
+        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
+        LocalDate nextSunday = nextMonday.plusDays(6);
+
+        // 이미 OPEN 슬롯 있으면 스킵 (수동 오픈 또는 이전 cron 실행)
+        if (scheduleRepository.existsOpenSlotsByTrainerAndDateBetween(trainer, nextMonday, nextSunday)) {
+            return Collections.emptyList();
+        }
+        // 근무 시간 설정 없으면 스킵
+        if (trainer.getWorkDays() == null || trainer.getStartTime() == null || trainer.getEndTime() == null) {
+            return Collections.emptyList();
+        }
+
+        generateNextWeekSlots(trainer, null);
+        return memberRepository.findActiveMemberIdsByTrainerId(trainer.getId());
     }
 
     private DayOfWeek parseDayOfWeek(String day) {
@@ -587,34 +471,6 @@ public class ScheduleService {
         };
     }
 
-    public List<Map<String, Object>> getNextWeekRequests(String auth) {
-        User user = getUserFromAuth(auth);
-        Trainer trainer = trainerRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("트레이너 없음"));
-
-        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
-        LocalDate nextSunday = nextMonday.plusDays(6);
-
-        List<Schedule> schedules = scheduleRepository.findByTrainerAndDateBetween(trainer, nextMonday, nextSunday);
-        List<Long> scheduleIds = schedules.stream().map(Schedule::getId).collect(Collectors.toList());
-        if (scheduleIds.isEmpty()) return Collections.emptyList();
-
-        List<ScheduleRequest> requests = scheduleRequestRepository.findPendingRequests(
-                scheduleIds, ScheduleRequest.Status.PENDING);
-
-        return requests.stream().map(r -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("requestId", r.getId());
-            map.put("scheduleId", r.getSchedule().getId());
-            map.put("memberId", r.getMember().getId());
-            map.put("memberName", r.getMember().getUser().getName());
-            map.put("date", r.getSchedule().getDate());
-            map.put("startTime", r.getSchedule().getStartTime());
-            map.put("endTime", r.getSchedule().getEndTime());
-            map.put("status", r.getStatus().name());
-            return map;
-        }).collect(Collectors.toList());
-    }
 
     private User getUserFromAuth(String auth) {
         String token = auth.replace("Bearer ", "");

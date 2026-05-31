@@ -2,6 +2,7 @@ package com.fitlog.fitlog.trainer.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fitlog.fitlog.auth.entity.User;
+import com.fitlog.fitlog.gym.entity.Gym;
 import com.fitlog.fitlog.member.entity.Member;
 import jakarta.persistence.*;
 import java.util.List;
@@ -49,6 +50,32 @@ public class Trainer {
     @Column(name = "goal_revenue")
     private Long goalRevenue;
 
+    @Column(name = "notif_birthday")
+    private Boolean notifBirthday = true;
+
+    @Column(name = "notif_mission_done")
+    private Boolean notifMissionDone = true;
+
+    @Column(name = "notif_personal_workout")
+    private Boolean notifPersonalWorkout = true;
+
+    // 슬롯 시작 분 오프셋: null=미설정, 0=정각(:00), 30=30분(:30)
+    @Column(name = "slot_offset")
+    private Integer slotOffset;
+
+    // 1개월 무료 체험 종료일 (이 날까지 PRO 기능 사용 가능)
+    @Column(name = "trial_end_date")
+    private java.time.LocalDate trialEndDate;
+
+    // 제휴 헬스장
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gym_id")
+    private Gym gym;
+
+    // 제휴 코드 마지막 확인일 (1년마다 갱신)
+    @Column(name = "gym_confirmed_at")
+    private java.time.LocalDate gymConfirmedAt;
+
     public Long getId() { return id; }
     public User getUser() { return user; }
     public String getGymName() { return gymName; }
@@ -60,7 +87,9 @@ public class Trainer {
     public List<Member> getMembers() { return members; }
     public Integer getGoalSessions() { return goalSessions; }
     public Long getGoalRevenue() { return goalRevenue; }
-
+    public Boolean getNotifBirthday() { return notifBirthday == null || notifBirthday; }
+    public Boolean getNotifMissionDone() { return notifMissionDone == null || notifMissionDone; }
+    public Boolean getNotifPersonalWorkout() { return notifPersonalWorkout == null || notifPersonalWorkout; }
     public void setUser(User user) { this.user = user; }
     public void setGymName(String gymName) { this.gymName = gymName; }
     public void setWorkDays(String workDays) { this.workDays = workDays; }
@@ -71,4 +100,29 @@ public class Trainer {
     public void setMembers(List<Member> members) { this.members = members; }
     public void setGoalSessions(Integer goalSessions) { this.goalSessions = goalSessions; }
     public void setGoalRevenue(Long goalRevenue) { this.goalRevenue = goalRevenue; }
+    public void setNotifBirthday(Boolean notifBirthday) { this.notifBirthday = notifBirthday; }
+    public void setNotifMissionDone(Boolean notifMissionDone) { this.notifMissionDone = notifMissionDone; }
+    public void setNotifPersonalWorkout(Boolean notifPersonalWorkout) { this.notifPersonalWorkout = notifPersonalWorkout; }
+    public Integer getSlotOffset() { return slotOffset; }
+    public void setSlotOffset(Integer slotOffset) { this.slotOffset = slotOffset; }
+    public java.time.LocalDate getTrialEndDate() { return trialEndDate; }
+    public void setTrialEndDate(java.time.LocalDate trialEndDate) { this.trialEndDate = trialEndDate; }
+    public Gym getGym() { return gym; }
+    public void setGym(Gym gym) { this.gym = gym; }
+    public java.time.LocalDate getGymConfirmedAt() { return gymConfirmedAt; }
+    public void setGymConfirmedAt(java.time.LocalDate gymConfirmedAt) { this.gymConfirmedAt = gymConfirmedAt; }
+
+    /** 제휴 헬스장이 유효하면 true (올해 1월 1일 이후에 확인한 경우) */
+    public boolean isGymAffiliationActive() {
+        if (gym == null || gymConfirmedAt == null) return false;
+        java.time.LocalDate jan1 = java.time.LocalDate.of(java.time.LocalDate.now().getYear(), 1, 1);
+        return !gymConfirmedAt.isBefore(jan1);
+    }
+
+    /** 무료 체험 또는 구독 중이면 true */
+    public boolean isProEffective() {
+        if ("PRO".equals(plan)) return true;
+        if (trialEndDate != null && !java.time.LocalDate.now().isAfter(trialEndDate)) return true;
+        return false;
+    }
 }

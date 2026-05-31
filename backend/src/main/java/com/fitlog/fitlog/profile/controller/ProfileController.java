@@ -6,6 +6,7 @@ import com.fitlog.fitlog.trainer.dto.TrainerProfileResponse;
 import com.fitlog.fitlog.profile.service.ProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -29,12 +30,18 @@ public class ProfileController {
 
     // POST /api/profile/member
     @PostMapping("/member")
-    public ResponseEntity<Void> setupMember(
+    public ResponseEntity<?> setupMember(
             @RequestHeader("Authorization") String authorization,
             @RequestBody MemberProfileRequest request
     ) {
-        profileService.setupMemberProfile(authorization, request);
-        return ResponseEntity.ok().build();
+        try {
+            profileService.setupMemberProfile(authorization, request);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "프로필 저장 중 오류가 발생했어요. 다시 시도해주세요."));
+        }
     }
 
     // 조회
