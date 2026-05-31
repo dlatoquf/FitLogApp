@@ -1,6 +1,20 @@
 # Firebase 보안 파일
 src/main/resources/firebase-service-account.json
 
-# 환경설정
+# 환경설정 (민감 정보 포함 - 절대 커밋 금지)
+application-dev.properties
 application-prod.properties
 application-local.properties
+
+# 빌드 결과물
+build/
+bin/
+.gradle/
+
+# OS 파일
+.DS_Store
+**/.DS_Store
+
+# 테스트 데이터
+*.sql
+!sql/
