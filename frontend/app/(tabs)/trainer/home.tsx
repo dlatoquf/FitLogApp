@@ -1241,32 +1241,20 @@ export default function TrainerHomeScreen() {
             {(data?.noShowCount ?? 0) > 0 && (
               <View
                 style={{
-                  backgroundColor: "#FFF1F2",
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: "#FECDD3",
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  marginBottom: 12,
                   flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  gap: 6,
+                  backgroundColor: "#FFF1F2",
+                  borderRadius: 8,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  marginBottom: 10,
+                  alignSelf: "flex-start",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 16 }}>⚠️</Text>
-                  <View>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#BE123C" }}>
-                      이번 달 노쇼
-                    </Text>
-                    <Text style={{ fontSize: 11, color: "#9F1239", marginTop: 1 }}>
-                      미출석 처리된 수업
-                    </Text>
-                  </View>
-                </View>
-                <Text style={{ fontSize: 24, fontWeight: "900", color: "#EF4444" }}>
-                  {data?.noShowCount ?? 0}
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#F87171" }}>회</Text>
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: "#EF4444" }} />
+                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "500" }}>
+                  이번달 노쇼 {data?.noShowCount ?? 0}회
                 </Text>
               </View>
             )}

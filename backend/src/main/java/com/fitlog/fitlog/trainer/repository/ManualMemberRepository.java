@@ -12,14 +12,14 @@ public interface ManualMemberRepository extends JpaRepository<ManualMember, Long
     List<ManualMember> findByTrainerOrderByPtRemainingAsc(Trainer trainer);
     List<ManualMember> findByTrainer(Trainer trainer);
 
-    // OT 회원 제외한 미연동 회원 목록 (회원관리 탭용)
+    // PT 등록된 미연동 회원 목록 (회원관리 탭용) — ptTotal IS NOT NULL 기준
     @Query("SELECT m FROM ManualMember m WHERE m.trainer = :trainer " +
-           "AND (m.memo IS NULL OR m.memo <> 'OT') ORDER BY m.ptRemaining ASC")
+           "AND m.ptTotal IS NOT NULL ORDER BY m.ptRemaining ASC")
     List<ManualMember> findNonOtByTrainer(@Param("trainer") Trainer trainer);
 
-    // OT 회원 제외한 미연동 회원 수 (총 회원 수 계산용)
+    // PT 등록된 미연동 회원 수 (총 회원 수 계산용)
     @Query("SELECT COUNT(m) FROM ManualMember m WHERE m.trainer = :trainer " +
-           "AND (m.memo IS NULL OR m.memo <> 'OT')")
+           "AND m.ptTotal IS NOT NULL")
     long countNonOtByTrainer(@Param("trainer") Trainer trainer);
 
     // 전체 미연동 회원 수 (OT 포함)

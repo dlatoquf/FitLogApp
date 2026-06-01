@@ -130,7 +130,6 @@ public class ManualMemberController {
                 ManualMember ot = otMatch.get();
                 int otSessions = (int) workoutLogRepository.countByManualMember(ot);
                 ot.setOtCount(otSessions > 0 ? otSessions : null);
-                ot.setMemo(null); // OT 태그 제거 → 회원관리에 노출
                 int ptTotal = 0;
                 if (body.get("ptTotal") != null) {
                     ptTotal = ((Number) body.get("ptTotal")).intValue();
