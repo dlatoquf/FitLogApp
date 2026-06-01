@@ -18,7 +18,7 @@ export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINA
 /*export const API_URL = "http://192.168.219.129:8080";*/
 /*export const ANALYTICS_URL = "http://192.168.219.129:8001";*/
 /*테스트 서버 (TestFlight)*/
-export const API_URL = "http://52.78.154.44:8080";
+export const API_URL = "https://fitlog-api.duckdns.org";
 export const ANALYTICS_URL = "http://52.78.154.44:8001";
 /*운영 서버*/
 /*export const API_URL = "https://fitlog-api.duckdns.org";*/
