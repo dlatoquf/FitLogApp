@@ -525,7 +525,7 @@ export default function TrainerScheduleScreen() {
 
   const doAddOtSchedule = async () => {
     const name = otName.trim();
-    const phone = otPhone.trim().replace(/[^0-9]/g, "");
+    const phone = otPhone.trim();
     setAddingOt(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");

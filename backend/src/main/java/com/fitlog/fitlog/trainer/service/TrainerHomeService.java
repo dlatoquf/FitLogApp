@@ -143,6 +143,9 @@ public class TrainerHomeService {
                             ? (s.getManualMember().getPtRemaining() != null ? s.getManualMember().getPtRemaining() : 0)
                             : (s.getMember().getPtRemaining() != null ? s.getMember().getPtRemaining() : 0);
                     String sessionType = s.getSessionType() != null ? s.getSessionType() : "PT";
+                    int otSessionCount = "OT".equals(sessionType) && isManual && s.getManualMember() != null
+                            ? scheduleRepository.countOtSessionsByManualMember(s.getManualMember())
+                            : 0;
                     return new TrainerHomeResponse.TodayPt(
                             s.getId(), id, name,
                             s.getStartTime() != null ? s.getStartTime().format(fmt) : "",
@@ -150,7 +153,8 @@ public class TrainerHomeService {
                             "COMPLETED".equals(s.getStatusStr()),
                             isManual,
                             sessionType,
-                            "NO_SHOW".equals(s.getStatusStr())
+                            "NO_SHOW".equals(s.getStatusStr()),
+                            otSessionCount
                     );
                 })
                 .collect(Collectors.toList());

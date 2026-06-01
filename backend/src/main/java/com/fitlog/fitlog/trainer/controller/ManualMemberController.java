@@ -88,10 +88,38 @@ public class ManualMemberController {
         String incomingName  = body.get("name")  != null ? ((String) body.get("name")).trim()  : null;
         boolean isNewOtMember = "OT".equals(body.get("memo")); // isOtNew와 동일 — 아래 로직에서 사용
 
+        // OT 중복 방지: 동일 전화번호/이름의 OT 회원이 이미 존재하면 그대로 반환 (2회차 OT 지원)
+        if (isNewOtMember) {
+            java.util.Optional<ManualMember> existingOt = java.util.Optional.empty();
+            if (incomingPhone != null && !incomingPhone.isBlank()) {
+                existingOt = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", incomingPhone);
+                if (existingOt.isEmpty()) {
+                    String digitsOnly = incomingPhone.replaceAll("[^0-9]", "");
+                    if (!digitsOnly.equals(incomingPhone)) {
+                        existingOt = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", digitsOnly);
+                    }
+                }
+            }
+            if (existingOt.isEmpty() && incomingName != null && !incomingName.isBlank()) {
+                existingOt = manualMemberRepository.findByTrainerAndMemoAndName(trainer, "OT", incomingName);
+            }
+            if (existingOt.isPresent()) {
+                return ResponseEntity.ok(existingOt.get());
+            }
+        }
+
         if (!isNewOtMember && (incomingPhone != null || incomingName != null)) {
             java.util.Optional<ManualMember> otMatch = java.util.Optional.empty();
             if (incomingPhone != null && !incomingPhone.isBlank()) {
+                // 1차: 포맷 그대로 매칭 (010-0000-0000)
                 otMatch = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", incomingPhone);
+                // 2차: 숫자만으로 폴백 (기존에 digits-only로 저장된 OT 회원 대응)
+                if (otMatch.isEmpty()) {
+                    String digitsOnly = incomingPhone.replaceAll("[^0-9]", "");
+                    if (!digitsOnly.equals(incomingPhone)) {
+                        otMatch = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", digitsOnly);
+                    }
+                }
             }
             if (otMatch.isEmpty() && incomingName != null && !incomingName.isBlank()) {
                 otMatch = manualMemberRepository.findByTrainerAndMemoAndName(trainer, "OT", incomingName);

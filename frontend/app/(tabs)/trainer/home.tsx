@@ -22,8 +22,9 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Purchases from "react-native-purchases";
+import { shareTextTemplate } from "@react-native-kakao/share";
 import { Colors } from "../../../constants/Colors";
-import { API_URL } from "../../../constants/api";
+import { API_URL, APP_STORE_URL, PLAY_STORE_URL } from "../../../constants/api";
 
 interface TodayPt {
   scheduleId?: number;
@@ -35,6 +36,7 @@ interface TodayPt {
   isManual?: boolean;
   sessionType?: string; // "PT" | "OT"
   isNoShow?: boolean;   // 명시적 NO_SHOW 처리됨
+  otSessionCount?: number; // OT 누적 횟수
 }
 
 interface HomeData {
@@ -773,15 +775,27 @@ export default function TrainerHomeScreen() {
   const handleKakaoShare = async () => {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
+    const installUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
     try {
-      await Share.share({
-        message: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
+      await shareTextTemplate({
+        template: {
+          text: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
+          link: {
+            mobileWebUrl: installUrl,
+            webUrl: APP_STORE_URL,
+          },
+          buttonTitle: "FitLog 앱 설치하기",
+        },
       });
     } catch {
-      Alert.alert("공유 실패", "코드를 복사해서 공유해주세요.", [
-        { text: "코드 복사", onPress: handleCopy },
-        { text: "닫기" },
-      ]);
+      await Share.share({
+        message: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}\n\n📱 앱 설치: ${installUrl}`,
+      }).catch(() => {
+        Alert.alert("공유 실패", "코드를 복사해서 공유해주세요.", [
+          { text: "코드 복사", onPress: handleCopy },
+          { text: "닫기" },
+        ]);
+      });
     }
   };
 
@@ -1823,13 +1837,13 @@ export default function TrainerHomeScreen() {
                               color: "#F97316",
                             }}
                           >
-                            OT
+                            {`OT${(item.otSessionCount ?? 0) > 0 ? ` ${item.otSessionCount}회` : ""}`}
                           </Text>
                         </View>
                       )}
                     </View>
                     <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                      {isOt ? "체험 수업" : `잔여 ${item.ptRemaining}회`}
+                      {isOt ? `체험 수업` : `잔여 ${item.ptRemaining}회`}
                     </Text>
                   </View>
 

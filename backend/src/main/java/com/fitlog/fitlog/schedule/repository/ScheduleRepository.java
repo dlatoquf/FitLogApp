@@ -218,4 +218,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     boolean existsOpenSlotsByTrainerAndDateBetween(@Param("trainer") Trainer trainer,
                                                    @Param("from") LocalDate from,
                                                    @Param("to") LocalDate to);
+
+    // OT 회원의 누적 OT 수업 횟수 (확정/완료 포함 전체)
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.manualMember = :manualMember AND s.sessionType = 'OT'")
+    int countOtSessionsByManualMember(@Param("manualMember") ManualMember manualMember);
 }

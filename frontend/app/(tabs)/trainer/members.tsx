@@ -778,28 +778,6 @@ export default function TrainerMembersScreen() {
                         </Text>
                       </View>
                     )}
-                    {m.otCount != null && m.otCount > 0 && (
-                      <View
-                        style={{
-                          paddingHorizontal: 5,
-                          paddingVertical: 2,
-                          borderRadius: 5,
-                          backgroundColor: "#FFF7ED",
-                          borderWidth: 1,
-                          borderColor: "#F9731644",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 9,
-                            fontWeight: "700",
-                            color: "#F97316",
-                          }}
-                        >
-                          OT {m.otCount}회
-                        </Text>
-                      </View>
-                    )}
                   </View>
                   {/* 메모 버튼 */}
                   <TouchableOpacity
