@@ -822,52 +822,114 @@ export default function WorkoutScreen() {
 
               <View
                 style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 7,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  marginTop: 4,
                 }}
               >
+                {/* 헤더 */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    backgroundColor: "#f6f7f6",
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                  }}
+                >
+                  {[
+                    { label: "SET", flex: 0.7 },
+                    { label: "KG", flex: 1 },
+                    { label: "REP", flex: 1 },
+                  ].map((col, idx) => (
+                    <View
+                      key={col.label}
+                      style={{
+                        flex: col.flex,
+                        alignItems: "center",
+                        paddingVertical: 5,
+                        borderRightWidth: idx < 2 ? 1 : 0,
+                        borderRightColor: Colors.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: "800",
+                          color: Colors.textMuted,
+                        }}
+                      >
+                        {col.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {/* 세트 rows */}
                 {sets.map((set: any, setIdx: number) => (
                   <View
                     key={`${setIdx}-${set.weight}-${set.reps}`}
                     style={{
-                      width: "30.7%",
                       flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "#fff",
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      borderRadius: 999,
-                      paddingHorizontal: 7,
-                      paddingVertical: 6,
+                      borderTopWidth: setIdx === 0 ? 0 : 1,
+                      borderTopColor: "#edf0ed",
                     }}
                   >
-                    <Text
+                    <View
                       style={{
-                        fontSize: 12,
-                        fontWeight: "900",
-                        color,
-                        marginRight: 5,
+                        flex: 0.7,
+                        alignItems: "center",
+                        paddingVertical: 6,
+                        borderRightWidth: 1,
+                        borderRightColor: Colors.border,
                       }}
                     >
-                      {setIdx + 1}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "800",
+                          color: Colors.textSub,
+                        }}
+                      >
+                        {setIdx + 1}
+                      </Text>
+                    </View>
+                    <View
                       style={{
-                        fontSize: 12,
-                        fontWeight: "800",
-                        color: Colors.text,
+                        flex: 1,
+                        alignItems: "center",
+                        paddingVertical: 6,
+                        borderRightWidth: 1,
+                        borderRightColor: Colors.border,
                       }}
                     >
-                      {set.weight === "0" || Number(set.weight) === 0
-                        ? "맨몸 × "
-                        : set.weight
-                          ? `${set.weight}kg × `
-                          : ""}
-                      {set.reps}회
-                    </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "900",
+                          color,
+                        }}
+                      >
+                        {Number(set.weight) > 0 ? set.weight : "맨몸"}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        flex: 1,
+                        alignItems: "center",
+                        paddingVertical: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "900",
+                          color,
+                        }}
+                      >
+                        {set.reps}
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
