@@ -1638,7 +1638,7 @@ export default function TrainerScheduleScreen() {
         visible={showOffsetModal}
         transparent
         animationType="fade"
-        onRequestClose={() => {}}
+        onRequestClose={() => setShowOffsetModal(false)}
       >
         <View
           style={{
@@ -1657,6 +1657,12 @@ export default function TrainerScheduleScreen() {
               width: "85%",
             }}
           >
+            <TouchableOpacity
+              onPress={() => setShowOffsetModal(false)}
+              style={{ position: "absolute", top: 12, right: 12, padding: 4, zIndex: 1 }}
+            >
+              <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
+            </TouchableOpacity>
             <Text
               style={{
                 fontSize: 16,
