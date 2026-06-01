@@ -1,12 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
-  Animated,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   ScrollView,
   Switch,
@@ -62,33 +60,6 @@ export default function TrainerMoreScreen() {
   const [termsVisible, setTermsVisible] = useState(false);
   const [termsContent, setTermsContent] = useState({ title: "", text: "" });
 
-  // 문의 모달 스와이프 다운
-  const inquiryModalY = useRef(new Animated.Value(0)).current;
-  const inquiryPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 5,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) inquiryModalY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 80) {
-          Animated.timing(inquiryModalY, {
-            toValue: 600,
-            duration: 220,
-            useNativeDriver: true,
-          }).start(() => {
-            setInquiryVisible(false);
-            inquiryModalY.setValue(0);
-          });
-        } else {
-          Animated.spring(inquiryModalY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    }),
-  ).current;
 
   // 문의하기
   const [inquiryVisible, setInquiryVisible] = useState(false);
@@ -930,15 +901,6 @@ export default function TrainerMoreScreen() {
           }}
         >
           <SwitchRow
-            label="운동 기록 (PT)"
-            desc="트레이너가 PT 기록 등록 시 회원에게 알림"
-            value={notifWorkout}
-            onValueChange={handleNotifWorkout}
-            color={Colors.green}
-            disabled={!notifPush}
-          />
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <SwitchRow
             label="개인 운동 기록"
             desc="회원이 개인 운동을 기록하면 트레이너에게 알림"
             value={notifPersonalWorkout}
@@ -1102,6 +1064,16 @@ export default function TrainerMoreScreen() {
             }}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => setShowEditModal(false)}
+            />
+            <GestureDetector
+              gesture={Gesture.Pan().onEnd((e) => {
+                if (e.translationY > 60) setShowEditModal(false);
+              })}
+            >
             <View
               style={{
                 backgroundColor: "#fff",
@@ -1377,6 +1349,7 @@ export default function TrainerMoreScreen() {
                 </View>
               </ScrollView>
             </View>
+            </GestureDetector>
           </KeyboardAvoidingView>
         </Modal>
 
@@ -1610,7 +1583,6 @@ export default function TrainerMoreScreen() {
           transparent
           animationType="slide"
           onRequestClose={() => {
-            inquiryModalY.setValue(0);
             setInquiryVisible(false);
           }}
         >
@@ -1622,7 +1594,17 @@ export default function TrainerMoreScreen() {
               justifyContent: "flex-end",
             }}
           >
-            <Animated.View
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => setInquiryVisible(false)}
+            />
+            <GestureDetector
+              gesture={Gesture.Pan().onEnd((e) => {
+                if (e.translationY > 60) setInquiryVisible(false);
+              })}
+            >
+            <View
               style={{
                 backgroundColor: "#fff",
                 borderTopLeftRadius: 24,
@@ -1630,18 +1612,9 @@ export default function TrainerMoreScreen() {
                 padding: 24,
                 paddingBottom: 40,
                 maxHeight: "90%",
-                transform: [{ translateY: inquiryModalY }],
               }}
             >
-              {/* 핸들 — 드래그 다운으로 닫기 */}
-              <View
-                {...inquiryPanResponder.panHandlers}
-                style={{
-                  paddingVertical: 8,
-                  marginTop: -8,
-                  alignItems: "center",
-                }}
-              >
+              <View style={{ alignItems: "center", paddingBottom: 8 }}>
                 <View
                   style={{
                     width: 40,
@@ -1942,7 +1915,8 @@ export default function TrainerMoreScreen() {
                   </TouchableOpacity>
                 </ScrollView>
               )}
-            </Animated.View>
+            </View>
+            </GestureDetector>
           </KeyboardAvoidingView>
         </Modal>
       </ScrollView>

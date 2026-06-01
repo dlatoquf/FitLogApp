@@ -60,6 +60,7 @@ export default function MemberMoreScreen() {
   const [notifSchedule, setNotifSchedule] = useState(true);
   const [notifPtPayment, setNotifPtPayment] = useState(true);
   const [notifFeedback, setNotifFeedback] = useState(true);
+  const [notifWorkout, setNotifWorkout] = useState(true);
   const [ptContracts, setPtContracts] = useState<
     {
       contractId: number;
@@ -78,11 +79,13 @@ export default function MemberMoreScreen() {
       "notif_schedule_member",
       "notif_pt_payment",
       "notif_feedback",
+      "notif_workout_member",
     ]);
     if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
     if (pairs[1][1] !== null) setNotifSchedule(pairs[1][1] === "true");
     if (pairs[2][1] !== null) setNotifPtPayment(pairs[2][1] === "true");
     if (pairs[3][1] !== null) setNotifFeedback(pairs[3][1] === "true");
+    if (pairs[4][1] !== null) setNotifWorkout(pairs[4][1] === "true");
 
     try {
       const data = await apiGet<MemberProfile>(ENDPOINTS.member.me);
@@ -354,22 +357,31 @@ export default function MemberMoreScreen() {
       setNotifSchedule(false);
       setNotifPtPayment(false);
       setNotifFeedback(false);
+      setNotifWorkout(false);
       await AsyncStorage.multiSet([
         ["notif_schedule_member", "false"],
         ["notif_pt_payment", "false"],
         ["notif_feedback", "false"],
+        ["notif_workout_member", "false"],
       ]);
     } else {
       // 전체 켜면 세부 항목도 모두 켬
       setNotifSchedule(true);
       setNotifPtPayment(true);
       setNotifFeedback(true);
+      setNotifWorkout(true);
       await AsyncStorage.multiSet([
         ["notif_schedule_member", "true"],
         ["notif_pt_payment", "true"],
         ["notif_feedback", "true"],
+        ["notif_workout_member", "true"],
       ]);
     }
+  };
+  const handleWorkoutToggle = async (value: boolean) => {
+    setNotifWorkout(value);
+    await AsyncStorage.setItem("notif_workout_member", String(value));
+    if (value && !notifPush) handlePushToggle(true);
   };
   const handleScheduleToggle = async (value: boolean) => {
     setNotifSchedule(value);
@@ -877,6 +889,14 @@ export default function MemberMoreScreen() {
             description="트레이너 운동·식단 피드백 알림"
             value={notifFeedback}
             onValueChange={handleFeedbackToggle}
+            disabled={!notifPush}
+          />
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
+          <SwitchRow
+            label="운동 기록 (PT)"
+            description="트레이너가 PT 기록 등록 시 알림"
+            value={notifWorkout}
+            onValueChange={handleWorkoutToggle}
             disabled={!notifPush}
           />
         </View>

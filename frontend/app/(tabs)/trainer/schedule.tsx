@@ -1354,41 +1354,68 @@ export default function TrainerScheduleScreen() {
         <View
           style={{
             flexDirection: "row",
-            backgroundColor: Colors.bgSub,
-            borderRadius: 10,
-            padding: 3,
+            alignItems: "center",
+            justifyContent: "center",
             marginBottom: 16,
-            alignSelf: "center",
-            borderWidth: 1,
-            borderColor: Colors.border,
+            gap: 8,
           }}
         >
-          {(["month", "week"] as const).map((mode) => (
-            <TouchableOpacity
-              key={mode}
-              onPress={() => setViewMode(mode)}
-              style={{
-                paddingHorizontal: 28,
-                paddingVertical: 7,
-                borderRadius: 8,
-                backgroundColor: viewMode === mode ? "#fff" : "transparent",
-                shadowColor: "#000",
-                shadowOpacity: viewMode === mode ? 0.07 : 0,
-                shadowRadius: viewMode === mode ? 4 : 0,
-                elevation: viewMode === mode ? 2 : 0,
-              }}
-            >
-              <Text
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: Colors.bgSub,
+              borderRadius: 10,
+              padding: 3,
+              borderWidth: 1,
+              borderColor: Colors.border,
+            }}
+          >
+            {(["month", "week"] as const).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                onPress={() => setViewMode(mode)}
                 style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: viewMode === mode ? Colors.text : Colors.textMuted,
+                  paddingHorizontal: 28,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  backgroundColor: viewMode === mode ? "#fff" : "transparent",
+                  shadowColor: "#000",
+                  shadowOpacity: viewMode === mode ? 0.07 : 0,
+                  shadowRadius: viewMode === mode ? 4 : 0,
+                  elevation: viewMode === mode ? 2 : 0,
                 }}
               >
-                {mode === "month" ? "월간" : "주간"}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: viewMode === mode ? Colors.text : Colors.textMuted,
+                  }}
+                >
+                  {mode === "month" ? "월간" : "주간"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowOffsetModal(true)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: Colors.bgSub,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+              {slotOffset === 30 ? "30분" : "정각"}
+            </Text>
+            <Text style={{ fontSize: 13 }}>⚙️</Text>
+          </TouchableOpacity>
         </View>
 
         {viewMode === "month" ? (
