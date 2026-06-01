@@ -5,10 +5,13 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import org.springframework.context.annotation.Configuration;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
+import java.io.FileInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 
 @Configuration
@@ -21,17 +24,17 @@ public class FirebaseConfig {
 
         InputStream serviceAccount = null;
 
-        // 1순위: 환경변수 FIREBASE_SERVICE_ACCOUNT_JSON (Railway 배포용)
-        String envJson = System.getenv("FIREBASE_SERVICE_ACCOUNT_JSON");
-        if (envJson != null && !envJson.isBlank()) {
-            serviceAccount = new ByteArrayInputStream(envJson.getBytes(StandardCharsets.UTF_8));
-            System.out.println("Firebase: 환경변수에서 서비스 계정 로드");
+        // 1순위: 파일 경로 환경변수 FIREBASE_SERVICE_ACCOUNT_PATH (서버 배포용)
+        String filePath = System.getenv("FIREBASE_SERVICE_ACCOUNT_PATH");
+        if (filePath != null && !filePath.isBlank() && Files.exists(Paths.get(filePath))) {
+            serviceAccount = new FileInputStream(filePath);
+            System.out.println("Firebase: 파일 경로에서 서비스 계정 로드 - " + filePath);
         } else {
             // 2순위: 클래스패스의 firebase-service-account.json (로컬 개발용)
             serviceAccount = getClass().getClassLoader()
                     .getResourceAsStream("firebase-service-account.json");
             if (serviceAccount != null) {
-                System.out.println("Firebase: 파일에서 서비스 계정 로드");
+                System.out.println("Firebase: 클래스패스 파일에서 서비스 계정 로드");
             }
         }
 
