@@ -16,10 +16,13 @@ async function initFCM() {
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
+    Alert.alert("FCM 권한 상태", `status: ${authStatus}, enabled: ${enabled}`);
+
     if (!enabled) return;
 
     const token = await messaging().getToken();
     console.log("FCM Token:", token);
+    Alert.alert("FCM 토큰", token ? `저장 시도: ${token.slice(0, 30)}...` : "토큰 없음");
     await saveFcmToken(token);
 
     messaging().onTokenRefresh(async (newToken) => {
