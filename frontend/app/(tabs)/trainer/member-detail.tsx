@@ -144,12 +144,12 @@ function buildDateGroups(logs: FitLog[]): DateGroup[] {
     mediaList?: any[];
   };
   const dateMap = new Map<string, Map<string, TypeData>>();
-  const dateTypeOrder = new Map<string, ("PT" | "개인")[]>();
+  const dateTypeOrder = new Map<string, ("PT" | "OT" | "개인")[]>();
 
   for (const log of sorted) {
     const la = log as any;
     const date = String(la.date ?? la.logDate ?? "").slice(0, 10);
-    const type: "PT" | "개인" = la.workoutType === "PT" ? "PT" : "개인";
+    const type: "PT" | "OT" | "개인" = la.workoutType === "PT" ? "PT" : la.workoutType === "OT" ? "OT" : "개인";
     if (!dateMap.has(date)) {
       dateMap.set(date, new Map());
       dateTypeOrder.set(date, []);
@@ -443,8 +443,8 @@ function HistoryTable({
                       height={ROW_H * tg.totalRows}
                       bold
                       center
-                      color={tg.type === "PT" ? Colors.green : Colors.textMuted}
-                      bg={tg.type === "PT" ? "#f0fff4" : "#fafafa"}
+                      color={tg.type === "PT" ? Colors.green : tg.type === "OT" ? "#F97316" : Colors.textMuted}
+                      bg={tg.type === "PT" ? "#f0fff4" : tg.type === "OT" ? "#FFF7ED" : "#fafafa"}
                     />
                     <MergedCell
                       value={tg.painPoints ?? ""}
@@ -1915,6 +1915,7 @@ export default function MemberDetailScreen() {
     (l: any) => String(l.date ?? l.logDate).slice(0, 10) === selectedDateKey,
   );
   const dayPtLogs = dayFitLogs.filter((l: any) => l.workoutType === "PT");
+  const dayOtLogs = dayFitLogs.filter((l: any) => l.workoutType === "OT");
   const dayPersonalLogs = dayFitLogs.filter(
     (l: any) => l.workoutType === "PERSONAL",
   );
@@ -4300,6 +4301,46 @@ export default function MemberDetailScreen() {
                         log,
                         isOt ? "#F97316" : Colors.green,
                         isOt ? "OT 수업 완료" : "PT 수업 완료",
+                        () => startEditFitLog(log),
+                      ),
+                    )}
+                  </View>
+                )}
+
+                {/* OT 수업 (PT 전환 후에도 과거 OT 기록 표시) */}
+                {dayOtLogs.length > 0 && (
+                  <View style={{ marginBottom: 14 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: "#F97316",
+                        }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: "900",
+                          color: Colors.text,
+                        }}
+                      >
+                        OT 수업
+                      </Text>
+                    </View>
+                    {dayOtLogs.map((log: any) =>
+                      renderFitLogCard(
+                        log,
+                        "#F97316",
+                        "OT 수업 완료",
                         () => startEditFitLog(log),
                       ),
                     )}
