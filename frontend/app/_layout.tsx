@@ -25,8 +25,9 @@ async function initFCM() {
     messaging().onTokenRefresh(async (newToken) => {
       await saveFcmToken(newToken);
     });
-  } catch (e) {
+  } catch (e: any) {
     console.log("FCM 초기화 실패", e);
+    Alert.alert("FCM 오류", e?.message ?? String(e));
   }
 }
 

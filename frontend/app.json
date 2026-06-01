@@ -14,6 +14,9 @@
       "buildNumber": "2",
       "bundleIdentifier": "com.anonymous.FitLogApp",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
         "KAKAO_APP_KEY": "e889ccffb6096521a6b49b9774f4d9ab",
         "KAKAO_APP_SCHEME": "kakaoe889ccffb6096521a6b49b9774f4d9ab",
