@@ -3277,17 +3277,16 @@ export default function TrainerHomeScreen() {
                       }
                       const offerings = await Purchases.getOfferings();
                       const pkg =
-                        offerings.current?.availablePackages.find(
-                          (p: any) => p.identifier === "pro_monthly",
-                        ) ?? offerings.current?.availablePackages[0];
+                        offerings.current?.monthly ??
+                        offerings.current?.availablePackages[0];
                       if (!pkg) {
                         Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
                         return;
                       }
                       await Purchases.purchasePackage(pkg);
                       setPaymentVisible(false);
-                      fetchHome();
                       Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                      setTimeout(() => fetchHome(), 3000);
                     } catch (e: any) {
                       if (!e.userCancelled)
                         Alert.alert(
@@ -3312,7 +3311,36 @@ export default function TrainerHomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity onPress={() => setPaymentVisible(false)}>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    const customerInfo = await Purchases.restorePurchases();
+                    if (customerInfo.entitlements.active["FitLogApp Pro"]) {
+                      setPaymentVisible(false);
+                      Alert.alert("복원 완료", "구독이 복원됐어요.");
+                      setTimeout(() => fetchHome(), 2000);
+                    } else {
+                      Alert.alert("복원 없음", "복원할 구독이 없어요.");
+                    }
+                  } catch (e: any) {
+                    Alert.alert("오류", e?.message ?? "복원에 실패했어요.");
+                  }
+                }}
+              >
+                <Text
+                  style={{
+                    textAlign: "center",
+                    fontSize: 14,
+                    color: Colors.textMuted,
+                  }}
+                >
+                  구독 복원하기
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ marginTop: 12 }}
+                onPress={() => setPaymentVisible(false)}
+              >
                 <Text
                   style={{
                     textAlign: "center",

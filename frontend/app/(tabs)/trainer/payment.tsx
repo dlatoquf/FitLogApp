@@ -38,22 +38,8 @@ export default function TrainerPaymentScreen() {
       setMembers(membersData);
       setPackages(packagesData);
       setHistory(historyData);
-    } catch {
-      // 더미 데이터
-      setMembers([
-        { id: 1, user: { id: 1, name: "김지수" }, ptRemaining: 12, ptTotal: 20, status: "ACTIVE" },
-        { id: 2, user: { id: 2, name: "이준호" }, ptRemaining: 18, ptTotal: 30, status: "ACTIVE" },
-        { id: 3, user: { id: 3, name: "박민지" }, ptRemaining: 3, ptTotal: 10, status: "ACTIVE" },
-      ]);
-      setPackages([
-        { id: 1, name: "10회 패키지", sessions: 10, price: 500000 },
-        { id: 2, name: "20회 패키지", sessions: 20, price: 900000, recommended: true },
-        { id: 3, name: "30회 패키지", sessions: 30, price: 1200000 },
-      ]);
-      setHistory([
-        { id: 1, packageName: "20회 패키지", sessions: 20, amount: 900000, paidAt: "2025-03-01", status: "PAID" },
-        { id: 2, packageName: "10회 패키지", sessions: 10, amount: 500000, paidAt: "2025-04-15", status: "PAID" },
-      ]);
+    } catch (e: any) {
+      Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
     } finally {
       setLoading(false);
       setRefreshing(false);
