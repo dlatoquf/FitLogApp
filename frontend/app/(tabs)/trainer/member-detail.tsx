@@ -1186,15 +1186,21 @@ function HistoryTable({
 }
 
 export default function MemberDetailScreen() {
-  const { id, initialTab, openPtAdd, type, readOnlyUntil, date: notifDate } =
-    useLocalSearchParams<{
-      id: string;
-      initialTab?: string;
-      openPtAdd?: string;
-      type?: string; // "manual" = 미연동 회원
-      readOnlyUntil?: string; // 이동된 회원: 해제일까지만 기록 열람
-      date?: string; // 알림에서 진입 시 특정 날짜로 이동 (YYYY-MM-DD)
-    }>();
+  const {
+    id,
+    initialTab,
+    openPtAdd,
+    type,
+    readOnlyUntil,
+    date: notifDate,
+  } = useLocalSearchParams<{
+    id: string;
+    initialTab?: string;
+    openPtAdd?: string;
+    type?: string; // "manual" = 미연동 회원
+    readOnlyUntil?: string; // 이동된 회원: 해제일까지만 기록 열람
+    date?: string; // 알림에서 진입 시 특정 날짜로 이동 (YYYY-MM-DD)
+  }>();
   const memberId = Number(id);
   const isManual = type === "manual"; // 미연동 회원 여부
   const isReadOnly = !!readOnlyUntil; // 이동된 전 회원 — 기록 제한 모드
@@ -1206,12 +1212,18 @@ export default function MemberDetailScreen() {
   const calcWeekOffset = (target: Date): number => {
     const today = new Date();
     const todayMon = new Date(today);
-    todayMon.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+    todayMon.setDate(
+      today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1),
+    );
     todayMon.setHours(0, 0, 0, 0);
     const targetMon = new Date(target);
-    targetMon.setDate(target.getDate() - (target.getDay() === 0 ? 6 : target.getDay() - 1));
+    targetMon.setDate(
+      target.getDate() - (target.getDay() === 0 ? 6 : target.getDay() - 1),
+    );
     targetMon.setHours(0, 0, 0, 0);
-    return Math.round((targetMon.getTime() - todayMon.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return Math.round(
+      (targetMon.getTime() - todayMon.getTime()) / (7 * 24 * 60 * 60 * 1000),
+    );
   };
 
   const [member, setMember] = useState<Member | null>(null);
@@ -1222,10 +1234,10 @@ export default function MemberDetailScreen() {
     initialTab ? Number(initialTab) : type === "manual" ? 1 : 0,
   );
   const [selectedDate, setSelectedDate] = useState(() =>
-    notifDate ? parseDateStr(notifDate) : new Date()
+    notifDate ? parseDateStr(notifDate) : new Date(),
   );
   const [weekOffset, setWeekOffset] = useState(() =>
-    notifDate ? calcWeekOffset(parseDateStr(notifDate)) : 0
+    notifDate ? calcWeekOffset(parseDateStr(notifDate)) : 0,
   );
   const weekDates = getWeekDates(weekOffset);
   const isToday = toDateKey(selectedDate) === toDateKey(new Date());
@@ -2192,7 +2204,11 @@ export default function MemberDetailScreen() {
     const filename = uploadUri.split("/").pop() ?? "upload";
     const mimeType = type === "video" ? "video/mp4" : "image/jpeg";
 
-    formData.append("file", { uri: uploadUri, name: filename, type: mimeType } as any);
+    formData.append("file", {
+      uri: uploadUri,
+      name: filename,
+      type: mimeType,
+    } as any);
     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
     formData.append("folder", "fitlog");
 
@@ -3824,7 +3840,7 @@ export default function MemberDetailScreen() {
             >
               <View>
                 <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                  PT 신청가능
+                  잔여 PT
                 </Text>
                 <Text
                   style={{ fontSize: 28, fontWeight: "900", color: "#4A90FF" }}
@@ -4265,7 +4281,7 @@ export default function MemberDetailScreen() {
                           width: 8,
                           height: 8,
                           borderRadius: 4,
-                          backgroundColor: Colors.green,
+                          backgroundColor: isOt ? "#F97316" : Colors.green,
                         }}
                       />
                       <Text
@@ -4282,7 +4298,7 @@ export default function MemberDetailScreen() {
                     {dayPtLogs.map((log: any) =>
                       renderFitLogCard(
                         log,
-                        Colors.green,
+                        isOt ? "#F97316" : Colors.green,
                         isOt ? "OT 수업 완료" : "PT 수업 완료",
                         () => startEditFitLog(log),
                       ),

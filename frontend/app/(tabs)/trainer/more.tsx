@@ -825,20 +825,6 @@ export default function TrainerMoreScreen() {
                   체험 종료 후 무료 플랜(회원 5명)으로 전환돼요.{"\n"}구독하면
                   계속 무제한으로 사용할 수 있어요.
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setPaymentVisible(true)}
-                  style={{
-                    marginTop: 10,
-                    backgroundColor: "#F59E0B",
-                    borderRadius: 10,
-                    paddingVertical: 10,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>
-                    PRO 구독하기 · 월 14,900원
-                  </Text>
-                </TouchableOpacity>
               </View>
             );
           })()

@@ -186,6 +186,16 @@ public class ScheduleService {
         Trainer trainer = trainerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
+        // 첫 가입(슬롯이 전혀 없음): 이번 주 슬롯도 함께 생성
+        LocalDate thisMonday = LocalDate.now().with(DayOfWeek.MONDAY);
+        LocalDate thisSunday = thisMonday.plusDays(6);
+        boolean noSlotsAtAll = scheduleRepository
+                .findIdsByTrainerAndDateBetween(trainer, thisMonday, thisSunday)
+                .isEmpty();
+        if (noSlotsAtAll) {
+            generateCurrentWeekSlotsIfAbsent(trainer);
+        }
+
         generateNextWeekSlots(trainer, customDayTimes);
 
         // 트랜잭션 커밋 전에 ID만 조회 (member/user 엔티티를 컨텍스트에 올리지 않음)
@@ -352,6 +362,7 @@ public class ScheduleService {
 
         LocalTime startTime = LocalTime.parse(startTimeStr);
         LocalTime endTime   = LocalTime.parse(endTimeStr);
+        int offset = trainer.getSlotOffset() != null ? trainer.getSlotOffset() : 0;
 
         Map<DayOfWeek, LocalTime[]> dayTimeMap = new LinkedHashMap<>();
         for (String day : workDays.split(",")) {
@@ -364,7 +375,9 @@ public class ScheduleService {
         for (LocalDate date = monday; !date.isAfter(sunday); date = date.plusDays(1)) {
             LocalTime[] range = dayTimeMap.get(date.getDayOfWeek());
             if (range == null) continue;
-            LocalTime cur = range[0];
+            LocalTime first = range[0].withMinute(offset).withSecond(0).withNano(0);
+            if (first.isBefore(range[0])) first = first.plusHours(1);
+            LocalTime cur = first;
             while (cur.isBefore(range[1])) {
                 Schedule s = new Schedule();
                 s.setTrainer(managedTrainer);

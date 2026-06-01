@@ -191,7 +191,8 @@ public class WorkoutLogController {
         log.setMember(null);
         log.setTrainer(trainer);
         log.setLogDate(java.time.LocalDate.parse((String) body.get("date")));
-        log.setWorkoutType("PT");
+        boolean isOtMember = "OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "");
+        log.setWorkoutType(isOtMember ? "OT" : "PT");
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());
         if (body.containsKey("painPoints"))

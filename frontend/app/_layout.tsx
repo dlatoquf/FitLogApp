@@ -19,8 +19,6 @@ async function initFCM() {
     if (!enabled) return;
 
     const token = await messaging().getToken();
-    console.log("FCM Token:", token);
-    Alert.alert("FCM 토큰", token ? `저장 시도: ${token.slice(0, 30)}...` : "토큰 없음");
     await saveFcmToken(token);
 
     messaging().onTokenRefresh(async (newToken) => {
@@ -28,7 +26,6 @@ async function initFCM() {
     });
   } catch (e: any) {
     console.log("FCM 초기화 실패", e);
-    Alert.alert("FCM 오류", e?.message ?? String(e));
   }
 }
 

@@ -1,11 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import KakaoShare from "@react-native-kakao/share";
 import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +14,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   TextInput,
   TouchableOpacity,
@@ -419,6 +419,8 @@ export default function TrainerHomeScreen() {
     .onEnd((e) => {
       if (e.translationY > 60) setInviteVisible(false);
     });
+  const payScrollRef = useRef<ScrollView>(null);
+
   const payAddDragGesture = Gesture.Pan()
     .runOnJS(true)
     .onEnd((e) => {
@@ -772,17 +774,11 @@ export default function TrainerHomeScreen() {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
     try {
-      await KakaoShare.shareTextTemplate({
-        template: {
-          text: `안녕하세요! ${trainerName} 트레이너입니다 💪\n\nFitlog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
-          link: {
-            mobileWebUrl: "https://fitlog.app",
-            webUrl: "https://fitlog.app",
-          },
-        },
+      await Share.share({
+        message: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
       });
     } catch {
-      Alert.alert("카카오톡 공유 실패", "코드를 복사해서 공유해주세요.", [
+      Alert.alert("공유 실패", "코드를 복사해서 공유해주세요.", [
         { text: "코드 복사", onPress: handleCopy },
         { text: "닫기" },
       ]);
@@ -1069,10 +1065,10 @@ export default function TrainerHomeScreen() {
             }}
           >
             <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
-              {data?.todaySchedules ?? 0}
+              {data?.todayPtList?.filter(item => item.sessionType === "PT" || item.sessionType === "OT").length ?? 0}
             </Text>
             <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
-              오늘 PT
+              오늘 수업
             </Text>
           </View>
         </View>
@@ -1105,7 +1101,7 @@ export default function TrainerHomeScreen() {
                   marginBottom: 4,
                 }}
               >
-                이번 달 목표를 설정해주세요
+                목표를 설정해주세요
               </Text>
               <Text style={{ fontSize: 12, color: Colors.textMuted }}>
                 목표 수업 수와 목표 매출을 입력하면 진행률을 볼 수 있어요
@@ -1681,8 +1677,8 @@ export default function TrainerHomeScreen() {
           </>
         )}
 
-        {/* 오늘 PT 일정 */}
-        <SectionTitle title="오늘 PT 일정" />
+        {/* 오늘 수업 일정 */}
+        <SectionTitle title="오늘 수업 일정" />
         {data?.todayPtList && data.todayPtList.length > 0 && (
           <Text
             style={{
@@ -2310,25 +2306,14 @@ export default function TrainerHomeScreen() {
             >
               <Text
                 style={{
-                  fontSize: 16,
-                  fontWeight: "800",
+                  fontSize: 15,
+                  fontWeight: "700",
                   color: Colors.text,
-                  marginBottom: 6,
                   textAlign: "center",
-                }}
-              >
-                이번 달 목표가 없어요
-              </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textMuted,
-                  textAlign: "center",
-                  lineHeight: 20,
                   marginBottom: 20,
                 }}
               >
-                목표를 설정하면 수업·매출 진행률을{"\n"}한눈에 볼 수 있어요
+                목표가 없어요 · 설정하면 수업·매출 진행률을 한눈에 볼 수 있어요
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -2414,7 +2399,7 @@ export default function TrainerHomeScreen() {
                 marginBottom: 4,
               }}
             >
-              이번 달 목표 설정
+              목표 설정
             </Text>
             <Text
               style={{
@@ -2559,8 +2544,8 @@ export default function TrainerHomeScreen() {
             </GestureDetector>
 
             <ScrollView
+              ref={payScrollRef}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingHorizontal: 24,
@@ -2595,7 +2580,13 @@ export default function TrainerHomeScreen() {
                   return (
                     <TouchableOpacity
                       key={type}
-                      onPress={() => setPayMemberType(type)}
+                      onPress={() => {
+                        setPayMemberType(type);
+                        if (type === "existing") {
+                          setPayNewName("");
+                          setPayNewPhone("");
+                        }
+                      }}
                       style={{
                         flex: 1,
                         paddingVertical: 9,
@@ -2847,7 +2838,13 @@ export default function TrainerHomeScreen() {
                   </Text>
                   <TextInput
                     value={payNewPhone}
-                    onChangeText={setPayNewPhone}
+                    onChangeText={(text) => {
+                      const digits = text.replace(/[^0-9]/g, "").slice(0, 11);
+                      let formatted = digits;
+                      if (digits.length > 3) formatted = digits.slice(0, 3) + "-" + digits.slice(3);
+                      if (digits.length > 7) formatted = digits.slice(0, 3) + "-" + digits.slice(3, 7) + "-" + digits.slice(7);
+                      setPayNewPhone(formatted);
+                    }}
                     placeholder="예: 010-1234-5678"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="phone-pad"
@@ -2981,6 +2978,7 @@ export default function TrainerHomeScreen() {
               <TextInput
                 value={payMemoInput}
                 onChangeText={setPayMemoInput}
+                onFocus={() => setTimeout(() => payScrollRef.current?.scrollToEnd({ animated: true }), 150)}
                 placeholder="결제 관련 메모를 입력해주세요"
                 placeholderTextColor={Colors.textMuted}
                 multiline
