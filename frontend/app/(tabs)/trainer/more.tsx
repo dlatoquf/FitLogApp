@@ -240,6 +240,7 @@ export default function TrainerMoreScreen() {
       setNotifWorkout(false);
       setNotifDiet(false);
       setNotifNewMember(false);
+      setNotifPersonalWorkout(false);
       AsyncStorage.multiSet([
         ["notif_workout", "false"],
         ["notif_diet", "false"],
@@ -249,6 +250,7 @@ export default function TrainerMoreScreen() {
         notifWorkout: false,
         notifDiet: false,
         notifNewMember: false,
+        notifPersonalWorkout: false,
       });
       handleNotifBirthday(false, false);
       handleNotifMissionDone(false, false);
@@ -257,6 +259,7 @@ export default function TrainerMoreScreen() {
       setNotifWorkout(true);
       setNotifDiet(true);
       setNotifNewMember(true);
+      setNotifPersonalWorkout(true);
       AsyncStorage.multiSet([
         ["notif_workout", "true"],
         ["notif_diet", "true"],
@@ -266,6 +269,7 @@ export default function TrainerMoreScreen() {
         notifWorkout: true,
         notifDiet: true,
         notifNewMember: true,
+        notifPersonalWorkout: true,
       });
       handleNotifBirthday(true, false);
       handleNotifMissionDone(true, false);
@@ -774,38 +778,67 @@ export default function TrainerMoreScreen() {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 8,
+                    justifyContent: "space-between",
                     marginBottom: 6,
                   }}
                 >
-                  <View
-                    style={{
-                      backgroundColor: "#F59E0B",
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                    }}
-                  >
-                    <Text
-                      style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View
+                      style={{
+                        backgroundColor: "#F59E0B",
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                      }}
                     >
-                      무료체험
+                      <Text
+                        style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}
+                      >
+                        무료체험
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: "#92400E",
+                      }}
+                    >
+                      {daysLeft}일 남았어요 · 회원 무제한 이용 중
                     </Text>
                   </View>
-                  <Text
+                  <TouchableOpacity
+                    onPress={() => setPaymentVisible(true)}
                     style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: "#92400E",
+                      backgroundColor: "#F59E0B",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 8,
                     }}
                   >
-                    {daysLeft}일 남았어요 · 회원 무제한 이용 중
-                  </Text>
+                    <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
+                      PRO 구독
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 <Text style={{ fontSize: 11, color: "#B45309" }}>
                   체험 종료 후 무료 플랜(회원 5명)으로 전환돼요.{"\n"}구독하면
                   계속 무제한으로 사용할 수 있어요.
                 </Text>
+                <TouchableOpacity
+                  onPress={() => setPaymentVisible(true)}
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: "#F59E0B",
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>
+                    PRO 구독하기 · 월 14,900원
+                  </Text>
+                </TouchableOpacity>
               </View>
             );
           })()
@@ -861,7 +894,7 @@ export default function TrainerMoreScreen() {
                 <Text
                   style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}
                 >
-                  업그레이드
+                  PRO 구독
                 </Text>
               </TouchableOpacity>
             </View>

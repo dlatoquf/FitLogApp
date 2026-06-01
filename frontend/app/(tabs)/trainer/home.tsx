@@ -114,6 +114,8 @@ export default function TrainerHomeScreen() {
   const [goalSessionsInput, setGoalSessionsInput] = useState("");
   const [goalRevenueInput, setGoalRevenueInput] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
+  const [goalNudgeVisible, setGoalNudgeVisible] = useState(false);
+  const [pendingPayAfterGoal, setPendingPayAfterGoal] = useState(false);
 
   // 메모 확인/수정 팝업 (contractId가 null이면 읽기 전용)
   const [memoPopup, setMemoPopup] = useState<{
@@ -521,6 +523,10 @@ export default function TrainerHomeScreen() {
       });
       if (!res.ok) throw new Error("저장 실패");
       setGoalModal(false);
+      if (pendingPayAfterGoal) {
+        setPendingPayAfterGoal(false);
+        openPayModal();
+      }
       fetchHome();
     } catch (e: any) {
       Alert.alert("오류", e.message);
@@ -598,6 +604,14 @@ export default function TrainerHomeScreen() {
     } catch {
     } finally {
       setPayMembersLoading(false);
+    }
+  };
+
+  const handlePayButtonPress = () => {
+    if (data?.goalSessions == null && data?.goalRevenue == null) {
+      setGoalNudgeVisible(true);
+    } else {
+      openPayModal();
     }
   };
 
@@ -1098,9 +1112,7 @@ export default function TrainerHomeScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => {
-                openPayModal();
-              }}
+              onPress={handlePayButtonPress}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -1386,9 +1398,7 @@ export default function TrainerHomeScreen() {
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity
-                            onPress={() => {
-                              openPayModal();
-                            }}
+                            onPress={handlePayButtonPress}
                             style={{
                               backgroundColor: Colors.green,
                               paddingHorizontal: 12,
@@ -2268,6 +2278,82 @@ export default function TrainerHomeScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 목표 미설정 넛지 팝업 ──────────────────────────────────────── */}
+      <Modal
+        visible={goalNudgeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGoalNudgeVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 32,
+          }}
+          activeOpacity={1}
+          onPress={() => setGoalNudgeVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderRadius: 20,
+                padding: 24,
+                width: "100%",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "800",
+                  color: Colors.text,
+                  marginBottom: 6,
+                  textAlign: "center",
+                }}
+              >
+                이번 달 목표가 없어요
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textMuted,
+                  textAlign: "center",
+                  lineHeight: 20,
+                  marginBottom: 20,
+                }}
+              >
+                목표를 설정하면 수업·매출 진행률을{"\n"}한눈에 볼 수 있어요
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setGoalNudgeVisible(false);
+                  setPendingPayAfterGoal(true);
+                  setGoalSessionsInput("");
+                  setGoalRevenueInput("");
+                  setGoalModal(true);
+                }}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 12,
+                  paddingVertical: 13,
+                  paddingHorizontal: 32,
+                  width: "100%",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>
+                  설정하기
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* ── 목표 설정 모달 ──────────────────────────────────────────────── */}
