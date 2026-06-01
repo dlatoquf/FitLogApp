@@ -77,9 +77,7 @@ public class ProfileService {
 
         Trainer saved = trainerRepository.save(trainer);
 
-        if (isNew) {
-            scheduleService.generateCurrentWeekSlotsIfAbsent(saved);
-        }
+        // 슬롯 생성은 트레이너가 스케줄 탭에서 직접 offset 선택 후 진행
     }
 
     // 트레이너 조회

@@ -1639,7 +1639,7 @@ export default function TrainerScheduleScreen() {
                 marginBottom: 6,
               }}
             >
-              수업이 몇 분에 시작하나요?
+              수업 시작 시간을 알려주세요
             </Text>
             <Text
               style={{
@@ -1649,7 +1649,7 @@ export default function TrainerScheduleScreen() {
                 marginBottom: 28,
               }}
             >
-              슬롯 생성 기준이 돼요. 나중에 설정에서 변경 가능해요.
+              슬롯이 정각 또는 30분 단위로 생성돼요.{"\n"}변경 시 다음 주부터 적용돼요.
             </Text>
             <View style={{ gap: 12 }}>
               {(
@@ -1681,6 +1681,16 @@ export default function TrainerScheduleScreen() {
                       });
                       setSlotOffset(opt.value);
                       setShowOffsetModal(false);
+                      // 이번 주 슬롯 자동 생성
+                      await fetch(`${API_URL}/api/schedule/generate`, {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${jwt}`,
+                        },
+                        body: JSON.stringify([]),
+                      });
+                      fetchAll();
                     } catch (e) {
                       Alert.alert("오류", "설정 저장에 실패했어요.");
                     }
