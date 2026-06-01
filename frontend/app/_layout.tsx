@@ -16,8 +16,6 @@ async function initFCM() {
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-    Alert.alert("FCM 권한 상태", `status: ${authStatus}, enabled: ${enabled}`);
-
     if (!enabled) return;
 
     const token = await messaging().getToken();

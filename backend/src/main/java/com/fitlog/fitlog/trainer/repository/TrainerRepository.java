@@ -43,4 +43,8 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
     // 제휴 만료 대상 (gymConfirmedAt이 기준일 이전인 경우 — 1월 1일 기준으로 사용)
     @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.gymConfirmedAt IS NOT NULL AND t.gymConfirmedAt < :expiredBefore")
     List<Trainer> findTrainersWithExpiredGymConfirmation(@Param("expiredBefore") LocalDate expiredBefore);
+
+    // 무료 체험 D-1 알림 대상 (trialEndDate = 내일)
+    @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.trialEndDate = :tomorrow AND t.plan = 'FREE'")
+    List<Trainer> findTrialExpiringTomorrow(@Param("tomorrow") LocalDate tomorrow);
 }

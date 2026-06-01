@@ -169,6 +169,15 @@ public class ScheduleService {
         }).collect(Collectors.toList());
     }
 
+    // 이번 주 슬롯 생성 (최초 진입 시)
+    @Transactional
+    public void generateCurrentWeekSlotsForTrainer(String auth) {
+        User user = getUserFromAuth(auth);
+        Trainer trainer = trainerRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("트레이너 없음"));
+        generateCurrentWeekSlotsIfAbsent(trainer);
+    }
+
     // 슬롯 생성 (트레이너용)
     @Transactional
     public List<Long> generateSlotsForTrainer(String auth, List<Map<String, String>> customDayTimes) {

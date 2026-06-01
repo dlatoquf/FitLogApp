@@ -843,11 +843,11 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(data?.plan ?? "FREE").toUpperCase() === "PRO" &&
-                (() => {
-                  const isTrial = !!data?.trialEndDate;
-                  if (isTrial) {
-                    const ended = new Date(data!.trialEndDate!);
+              {(() => {
+                  const plan = (data?.plan ?? "FREE").toUpperCase();
+                  const trialEndDate = data?.trialEndDate;
+                  if (trialEndDate) {
+                    const ended = new Date(trialEndDate);
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     ended.setHours(0, 0, 0, 0);
@@ -858,7 +858,7 @@ export default function TrainerHomeScreen() {
                           (1000 * 60 * 60 * 24),
                       ),
                     );
-                    return (
+                    if (daysLeft > 0) return (
                       <View
                         style={{
                           backgroundColor: "#FEF3C7",
@@ -881,7 +881,7 @@ export default function TrainerHomeScreen() {
                       </View>
                     );
                   }
-                  return (
+                  if (plan === "PRO") return (
                     <View
                       style={{
                         backgroundColor: Colors.greenLight,
@@ -892,14 +892,24 @@ export default function TrainerHomeScreen() {
                         paddingVertical: 3,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: "900",
-                          color: Colors.green,
-                        }}
-                      >
+                      <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>
                         PRO
+                      </Text>
+                    </View>
+                  );
+                  return (
+                    <View
+                      style={{
+                        backgroundColor: Colors.bgSub,
+                        borderWidth: 1,
+                        borderColor: Colors.border,
+                        borderRadius: 999,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>
+                        FREE
                       </Text>
                     </View>
                   );
@@ -1052,72 +1062,6 @@ export default function TrainerHomeScreen() {
             </Text>
           </View>
         </View>
-
-        {/* 무료 체험 배너 */}
-        {data?.trialEndDate &&
-          (() => {
-            const ended = new Date(data.trialEndDate!);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            ended.setHours(0, 0, 0, 0);
-            const daysLeft = Math.max(
-              0,
-              Math.ceil(
-                (ended.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-              ),
-            );
-            return (
-              <TouchableOpacity
-                onPress={() => setPaymentVisible(true)}
-                activeOpacity={0.85}
-                style={{
-                  backgroundColor: "#FFFBEB",
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#FCD34D",
-                  paddingHorizontal: 14,
-                  paddingVertical: 9,
-                  marginBottom: 16,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "900",
-                      color: "#92400E",
-                    }}
-                  >
-                    무료 체험 {daysLeft}일 남았어요
-                  </Text>
-                  <Text
-                    style={{ fontSize: 11, color: "#B45309", marginTop: 3 }}
-                  >
-                    종료 후 회원 5명 제한으로 전환돼요.{"\n"}지금 구독하면 계속
-                    무제한으로 사용할 수 있어요.
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    backgroundColor: "#F59E0B",
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 11, fontWeight: "900", color: "#fff" }}
-                  >
-                    PRO{"\n"}구독
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })()}
 
         {/* 목표 미설정 시 입력 유도 */}
         {data?.goalSessions == null && data?.goalRevenue == null ? (

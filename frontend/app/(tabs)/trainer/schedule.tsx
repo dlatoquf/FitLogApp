@@ -1625,33 +1625,33 @@ export default function TrainerScheduleScreen() {
           <View
             style={{
               backgroundColor: "#fff",
-              borderRadius: 20,
-              padding: 28,
-              width: "100%",
+              borderRadius: 16,
+              padding: 20,
+              width: "85%",
             }}
           >
             <Text
               style={{
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: "800",
                 color: Colors.text,
                 textAlign: "center",
-                marginBottom: 6,
+                marginBottom: 4,
               }}
             >
               수업 시작 시간을 알려주세요
             </Text>
             <Text
               style={{
-                fontSize: 13,
+                fontSize: 12,
                 color: Colors.textMuted,
                 textAlign: "center",
-                marginBottom: 28,
+                marginBottom: 20,
               }}
             >
               슬롯이 정각 또는 30분 단위로 생성돼요.{"\n"}변경 시 다음 주부터 적용돼요.
             </Text>
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 10 }}>
               {(
                 [
                   {
@@ -1682,13 +1682,12 @@ export default function TrainerScheduleScreen() {
                       setSlotOffset(opt.value);
                       setShowOffsetModal(false);
                       // 이번 주 슬롯 자동 생성
-                      await fetch(`${API_URL}/api/schedule/generate`, {
+                      await fetch(`${API_URL}/api/schedule/generate/current-week`, {
                         method: "POST",
                         headers: {
                           "Content-Type": "application/json",
                           Authorization: `Bearer ${jwt}`,
                         },
-                        body: JSON.stringify([]),
                       });
                       fetchAll();
                     } catch (e) {
@@ -1696,17 +1695,17 @@ export default function TrainerScheduleScreen() {
                     }
                   }}
                   style={{
-                    borderWidth: 2,
+                    borderWidth: 1.5,
                     borderColor: Colors.green,
-                    borderRadius: 14,
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
                     alignItems: "center",
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 17,
+                      fontSize: 15,
                       fontWeight: "800",
                       color: Colors.text,
                     }}
@@ -1715,9 +1714,9 @@ export default function TrainerScheduleScreen() {
                   </Text>
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       color: Colors.textMuted,
-                      marginTop: 4,
+                      marginTop: 2,
                     }}
                   >
                     {opt.sub}

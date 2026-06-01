@@ -150,7 +150,33 @@ public class NotificationScheduler {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 5. 12월 31일 오전 9시(KST) – 제휴 코드 교체 사전 안내
+    // 5. 매일 오전 9시(KST) – 무료 체험 D-1 알림
+    //    trialEndDate = 내일인 FREE 플랜 트레이너에게 알림
+    // ─────────────────────────────────────────────────────────
+    @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
+    public void sendTrialExpiryWarning() {
+        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1);
+        List<com.fitlog.fitlog.trainer.entity.Trainer> trainers =
+            trainerRepository.findTrialExpiringTomorrow(tomorrow);
+
+        for (com.fitlog.fitlog.trainer.entity.Trainer trainer : trainers) {
+            try {
+                if (trainer.getUser() == null) continue;
+                notificationService.sendNotification(
+                    trainer.getUser(),
+                    "TRIAL_EXPIRY_WARNING",
+                    "무료 체험이 내일 종료돼요. PRO로 구독하면 회원 무제한으로 계속 사용할 수 있어요.",
+                    "GENERAL",
+                    null
+                );
+            } catch (Exception e) {
+                System.err.println("[체험만료경고] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 6. 12월 31일 오전 9시(KST) – 제휴 코드 교체 사전 안내
     //    "내일(1월 1일)부터 새 제휴 코드가 필요해요."
     // ─────────────────────────────────────────────────────────
     @Scheduled(cron = "0 0 9 31 12 *", zone = "Asia/Seoul")

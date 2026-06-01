@@ -64,6 +64,18 @@ public class ScheduleController {
         return scheduleService.getWeeklyCalendar(auth, weekStart);
     }
 
+    // ─── 트레이너: 이번 주 슬롯 생성 (최초 1회, 없을 때만) ──────────────────
+    @PostMapping("/generate/current-week")
+    public ResponseEntity<Map<String, Object>> generateCurrentWeekSlots(
+            @RequestHeader("Authorization") String auth) {
+        try {
+            scheduleService.generateCurrentWeekSlotsForTrainer(auth);
+            return ResponseEntity.ok(Map.of("success", true, "message", "이번 주 일정이 생성됐어요."));
+        } catch (Throwable t) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", t.getMessage()));
+        }
+    }
+
     // ─── 트레이너: 다음 주 슬롯 수동 생성 ────────────────────────────────────
     @PostMapping("/generate")
     public ResponseEntity<Map<String, Object>> generateSlots(
