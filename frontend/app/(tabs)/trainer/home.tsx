@@ -1072,18 +1072,17 @@ export default function TrainerHomeScreen() {
                 activeOpacity={0.85}
                 style={{
                   backgroundColor: "#FFFBEB",
-                  borderRadius: 14,
+                  borderRadius: 12,
                   borderWidth: 1,
                   borderColor: "#FCD34D",
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
                   marginBottom: 16,
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 12,
+                  gap: 10,
                 }}
               >
-                <Text style={{ fontSize: 26 }}>🎁</Text>
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
@@ -3242,7 +3241,7 @@ export default function TrainerHomeScreen() {
                         color: Colors.green,
                       }}
                     >
-                      15,900
+                      14,900
                     </Text>
                     <Text
                       style={{
@@ -3263,7 +3262,7 @@ export default function TrainerHomeScreen() {
                     lineHeight: 22,
                   }}
                 >
-                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 3명)
+                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 5명)
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {

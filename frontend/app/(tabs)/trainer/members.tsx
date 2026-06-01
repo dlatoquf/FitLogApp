@@ -1695,7 +1695,7 @@ export default function TrainerMembersScreen() {
                   lineHeight: 20,
                 }}
               >
-                무료 플랜은 회원을 최대 3명까지 등록할 수 있어요.{"\n"}PRO로
+                무료 플랜은 회원을 최대 5명까지 등록할 수 있어요.{"\n"}PRO로
                 업그레이드하면 회원 수 제한이 없어져요.
               </Text>
               <View
@@ -1739,7 +1739,7 @@ export default function TrainerMembersScreen() {
                         color: Colors.green,
                       }}
                     >
-                      15,900
+                      14,900
                     </Text>
                     <Text
                       style={{
@@ -1760,7 +1760,7 @@ export default function TrainerMembersScreen() {
                     lineHeight: 22,
                   }}
                 >
-                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 3명)
+                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 5명)
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {

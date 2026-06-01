@@ -846,7 +846,7 @@ export default function TrainerMoreScreen() {
                     marginTop: 2,
                   }}
                 >
-                  회원 무제한 · 월 15,900원 · 첫 가입 1개월 무료
+                  회원 무제한 · 월 14,900원 · 첫 가입 1개월 무료
                 </Text>
               </View>
               <TouchableOpacity
