@@ -108,6 +108,7 @@ export default function TrainerHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(false);
+  const [actionModal, setActionModal] = useState<{ visible: boolean; item: TodayPt | null }>({ visible: false, item: null });
   const [notifications, setNotifications] = useState<Noti[]>([]);
   const [paymentVisible, setPaymentVisible] = useState(false);
 
@@ -783,6 +784,8 @@ export default function TrainerHomeScreen() {
           link: {
             mobileWebUrl: installUrl,
             webUrl: APP_STORE_URL,
+            iosExecutionParams: { code },
+            androidExecutionParams: { code },
           },
           buttonTitle: "FitLog 앱 설치하기",
         },
@@ -1228,6 +1231,11 @@ export default function TrainerHomeScreen() {
                     %
                   </Text>
                 </View>
+                {(data?.noShowCount ?? 0) > 0 && (
+                  <Text style={{ fontSize: 11, color: "#EF4444", marginBottom: 8 }}>
+                    노쇼 {data?.noShowCount}회
+                  </Text>
+                )}
                 <ProgressBar
                   pct={Math.round(
                     ((data?.monthSessions ?? 0) / data.goalSessions) * 100,
@@ -1237,27 +1245,6 @@ export default function TrainerHomeScreen() {
               </View>
             )}
 
-            {/* 이번 달 노쇼 */}
-            {(data?.noShowCount ?? 0) > 0 && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  backgroundColor: "#FFF1F2",
-                  borderRadius: 8,
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  marginBottom: 10,
-                  alignSelf: "flex-start",
-                }}
-              >
-                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: "#EF4444" }} />
-                <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "500" }}>
-                  이번달 노쇼 {data?.noShowCount ?? 0}회
-                </Text>
-              </View>
-            )}
 
             {/* 이번 달 매출 — 월별 네비게이션 포함 */}
             {(() => {
@@ -1724,18 +1711,12 @@ export default function TrainerHomeScreen() {
               return aStartTime.getTime() - bStartTime.getTime();
             })
             .map((item) => {
-              // 수업 시작 +1시간 지나고 아직 COMPLETED 아니면 → 노쇼
-              const [h, m] = item.time.split(":").map(Number);
-              const sessionEnd = new Date();
-              sessionEnd.setHours(h + 1, m, 0, 0);
-              const isNoShow = !item.completed && new Date() > sessionEnd;
               const isOt = item.sessionType === "OT";
+              const isActualNoShow = item.isNoShow; // 명시적 노쇼 처리만
 
-              // 아바타 색상: OT=오렌지, PT=초록 (노쇼도 초록 유지)
-              const avatarColor = isOt ? "#F97316" : Colors.green;
-              // 배경 색상: OT=연오렌지, PT/노쇼=기본
-              const bgColor = isOt ? "#FFF7ED" : Colors.bgSub;
-              const borderColor = isOt ? "#F9731644" : Colors.border;
+              const avatarColor = isActualNoShow ? "#9CA3AF" : isOt ? "#F97316" : Colors.green;
+              const bgColor = isActualNoShow ? "#F3F4F6" : isOt ? "#FFF7ED" : Colors.bgSub;
+              const borderColor = isActualNoShow ? "#D1D5DB" : isOt ? "#F9731644" : Colors.border;
 
               return (
                 <TouchableOpacity
@@ -1769,7 +1750,7 @@ export default function TrainerHomeScreen() {
                     marginBottom: 6,
                     borderWidth: 1,
                     borderColor: borderColor,
-                    opacity: item.completed ? 0.65 : 1,
+                    opacity: item.completed || isActualNoShow ? 0.65 : 1,
                   }}
                 >
                   {/* 성 이니셜 아바타 */}
@@ -1825,7 +1806,7 @@ export default function TrainerHomeScreen() {
                               color: "#F97316",
                             }}
                           >
-                            {`OT${(item.otSessionCount ?? 0) > 0 ? ` ${item.otSessionCount}회` : ""}`}
+                            {`OT ${item.otSessionCount ?? 1}회차`}
                           </Text>
                         </View>
                       )}
@@ -1851,46 +1832,43 @@ export default function TrainerHomeScreen() {
                       <View style={{ backgroundColor: Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
                         <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.green }}>완료 ✓</Text>
                       </View>
-                    ) : item.isNoShow || isNoShow ? (
-                      // 노쇼 (명시적 or 시간 지남 자동)
-                      <View style={{ backgroundColor: Colors.textMuted + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.textMuted }}>노쇼</Text>
-                      </View>
-                    ) : (
-                      // 확정 → 탭해서 완료 / 노쇼 / 취소
+                    ) : item.isNoShow ? (
+                      // 노쇼 — 명시적 노쇼만 취소 가능
                       <TouchableOpacity
+                        disabled={!item.isNoShow || !item.scheduleId}
                         onPress={() => {
-                          if (!item.scheduleId) return;
                           Alert.alert(
                             `${item.memberName}님 ${item.time} 수업`,
-                            "수업 처리를 선택해주세요.",
+                            "수업을 취소하면 PT 잔여 횟수가 복구돼요.",
                             [
                               {
-                                text: "완료 처리",
-                                onPress: async () => {
-                                  const jwt = await AsyncStorage.getItem("jwt");
-                                  await fetch(`${API_URL}/api/schedule/${item.scheduleId}/complete`, {
-                                    method: "PATCH",
-                                    headers: { Authorization: `Bearer ${jwt}` },
-                                  });
-                                  fetchHome();
-                                },
-                              },
-                              {
-                                text: "노쇼 처리",
+                                text: "수업 취소",
                                 style: "destructive",
                                 onPress: async () => {
                                   const jwt = await AsyncStorage.getItem("jwt");
-                                  await fetch(`${API_URL}/api/schedule/${item.scheduleId}/no-show`, {
-                                    method: "PATCH",
+                                  await fetch(`${API_URL}/api/schedule/confirm/${item.scheduleId}`, {
+                                    method: "DELETE",
                                     headers: { Authorization: `Bearer ${jwt}` },
                                   });
                                   fetchHome();
                                 },
                               },
-                              { text: "취소", style: "cancel" },
+                              { text: "닫기", style: "cancel" },
                             ],
                           );
+                        }}
+                        style={{ backgroundColor: Colors.textMuted + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.textMuted }}>
+                          {item.isNoShow ? "노쇼 ›" : "노쇼"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      // 확정 → 탭해서 바텀시트 모달 오픈
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!item.scheduleId) return;
+                          setActionModal({ visible: true, item });
                         }}
                         style={{ backgroundColor: isOt ? "#F9731618" : Colors.blue + "18", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
                       >
@@ -2303,19 +2281,13 @@ export default function TrainerHomeScreen() {
                 borderRadius: 20,
                 padding: 24,
                 width: "100%",
-                alignItems: "center",
               }}
             >
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "700",
-                  color: Colors.text,
-                  textAlign: "center",
-                  marginBottom: 20,
-                }}
-              >
-                목표가 없어요 · 설정하면 수업·매출 진행률을 한눈에 볼 수 있어요
+              <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+                목표를 설정해보세요
+              </Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>
+                수업·매출 진행률을 한눈에 확인할 수 있어요
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -2329,14 +2301,10 @@ export default function TrainerHomeScreen() {
                   backgroundColor: Colors.green,
                   borderRadius: 12,
                   paddingVertical: 13,
-                  paddingHorizontal: 32,
-                  width: "100%",
                   alignItems: "center",
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>
-                  설정하기
-                </Text>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>목표 설정하기</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -2393,16 +2361,14 @@ export default function TrainerHomeScreen() {
               </TouchableOpacity>
             </GestureDetector>
 
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "800",
-                color: Colors.text,
-                marginBottom: 4,
-              }}
-            >
-              목표 설정
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>
+                목표 설정
+              </Text>
+              <View style={{ backgroundColor: Colors.greenLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.green + "44" }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>월 단위</Text>
+              </View>
+            </View>
             <Text
               style={{
                 fontSize: 13,
@@ -2410,7 +2376,7 @@ export default function TrainerHomeScreen() {
                 marginBottom: 24,
               }}
             >
-              목표 수업 수와 목표 매출을 입력해주세요
+              매달 초기화돼요 · 목표 수업 수와 목표 매출을 입력해주세요
             </Text>
 
             {/* 목표 수업 수 */}
@@ -2422,7 +2388,7 @@ export default function TrainerHomeScreen() {
                 marginBottom: 8,
               }}
             >
-              목표 수업 수 (회)
+              월 목표 수업 수 (회)
             </Text>
             <TextInput
               value={goalSessionsInput}
@@ -2451,7 +2417,7 @@ export default function TrainerHomeScreen() {
                 marginBottom: 8,
               }}
             >
-              목표 매출 (원)
+              월 목표 매출 (원)
             </Text>
             <TextInput
               value={goalRevenueInput}
@@ -3024,6 +2990,110 @@ export default function TrainerHomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* 수업 처리 모달 */}
+      <Modal
+        visible={actionModal.visible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActionModal({ visible: false, item: null })}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setActionModal({ visible: false, item: null })}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: Platform.OS === "ios" ? 40 : 28,
+              }}
+            >
+              {/* 드래그 핸들 */}
+              <TouchableOpacity
+                onPress={() => setActionModal({ visible: false, item: null })}
+                activeOpacity={0.8}
+                style={{ alignItems: "center", paddingBottom: 12, marginTop: -8 }}
+              >
+                <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99 }} />
+              </TouchableOpacity>
+
+              {/* 헤더 */}
+              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+                {actionModal.item?.memberName}님 수업
+              </Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
+                {actionModal.item?.time} · PT 잔여 {actionModal.item?.ptRemaining ?? 0}회
+              </Text>
+
+              {/* 완료 처리 */}
+              <TouchableOpacity
+                onPress={async () => {
+                  const jwt = await AsyncStorage.getItem("jwt");
+                  await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/complete`, {
+                    method: "PATCH",
+                    headers: { Authorization: `Bearer ${jwt}` },
+                  });
+                  setActionModal({ visible: false, item: null });
+                  fetchHome();
+                }}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>완료 처리</Text>
+              </TouchableOpacity>
+
+              {/* 노쇼 처리 */}
+              <TouchableOpacity
+                onPress={async () => {
+                  const jwt = await AsyncStorage.getItem("jwt");
+                  await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/no-show`, {
+                    method: "PATCH",
+                    headers: { Authorization: `Bearer ${jwt}` },
+                  });
+                  setActionModal({ visible: false, item: null });
+                  fetchHome();
+                }}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#FECACA",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#EF4444" }}>노쇼 처리</Text>
+              </TouchableOpacity>
+
+              {/* 닫기 */}
+              <TouchableOpacity
+                onPress={() => setActionModal({ visible: false, item: null })}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "600", color: Colors.textMuted }}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* 초대 모달 */}
       <Modal
         visible={inviteVisible}
@@ -3444,13 +3514,7 @@ function AttendanceCard({ todayPtList }: { todayPtList: TodayPt[] }) {
   const now = new Date();
   const total = todayPtList.length;
   const completed = todayPtList.filter((item) => item.completed).length;
-  const noShow = todayPtList.filter((item) => {
-    if (item.completed) return false;
-    const [h, m] = item.time.split(":").map(Number);
-    const scheduleEnd = new Date();
-    scheduleEnd.setHours(h + 1, m, 0, 0);
-    return now > scheduleEnd;
-  }).length;
+  const noShow = todayPtList.filter((item) => item.isNoShow).length;
   const attendancePct = total > 0 ? Math.round((completed / total) * 100) : 0;
   if (total === 0) return null;
   return (

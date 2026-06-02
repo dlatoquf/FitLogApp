@@ -3,6 +3,7 @@ package com.fitlog.fitlog.schedule.controller;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.entity.TrainerScheduleMemo;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
@@ -32,6 +33,7 @@ public class ScheduleController {
     private final ScheduleRepository scheduleRepository;
     private final MemberRepository memberRepository;
     private final ManualMemberRepository manualMemberRepository;
+    private final NotificationService notificationService;
 
     public ScheduleController(ScheduleService scheduleService,
                               TrainerScheduleMemoRepository memoRepository,
@@ -39,7 +41,8 @@ public class ScheduleController {
                               JwtService jwtService,
                               ScheduleRepository scheduleRepository,
                               MemberRepository memberRepository,
-                              ManualMemberRepository manualMemberRepository) {
+                              ManualMemberRepository manualMemberRepository,
+                              NotificationService notificationService) {
         this.scheduleService = scheduleService;
         this.memoRepository = memoRepository;
         this.trainerRepository = trainerRepository;
@@ -47,6 +50,7 @@ public class ScheduleController {
         this.scheduleRepository = scheduleRepository;
         this.memberRepository = memberRepository;
         this.manualMemberRepository = manualMemberRepository;
+        this.notificationService = notificationService;
     }
 
     // ─── 회원: 다음 주 확정 수업 조회 ────────────────────────────────────────
@@ -129,6 +133,35 @@ public class ScheduleController {
 
         schedule.setStatusStr("NO_SHOW");
         scheduleRepository.save(schedule);
+
+        // PT 차감
+        if (schedule.getMember() != null) {
+            Member member = schedule.getMember();
+            if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
+                int newRemaining = member.getPtRemaining() - 1;
+                member.setPtRemaining(newRemaining);
+                if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
+                memberRepository.save(member);
+            }
+            if (member.getNotifSchedule()) {
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "SCHEDULE_CANCEL",
+                        "오늘 " + schedule.getStartTime() + " 수업이 노쇼 처리됐어요.",
+                        "SCHEDULE",
+                        schedule.getId()
+                );
+            }
+        } else if (schedule.getManualMember() != null) {
+            ManualMember mm = schedule.getManualMember();
+            if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
+                int newRemaining = mm.getPtRemaining() - 1;
+                mm.setPtRemaining(newRemaining);
+                if (newRemaining == 0) mm.setPtEndedAt(java.time.LocalDate.now());
+                manualMemberRepository.save(mm);
+            }
+        }
+
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -170,10 +203,22 @@ public class ScheduleController {
                 if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
                 memberRepository.save(member);
             }
+            if (member.getNotifSchedule()) {
+                String ptMsg = member.getPtRemaining() != null ? " · PT 잔여 " + member.getPtRemaining() + "회" : "";
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "WORKOUT_LOG",
+                        "오늘 " + schedule.getStartTime() + " 수업이 완료 처리됐어요." + ptMsg,
+                        "SCHEDULE",
+                        schedule.getId()
+                );
+            }
         } else if (schedule.getManualMember() != null) {
             ManualMember mm = schedule.getManualMember();
             if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
-                mm.setPtRemaining(mm.getPtRemaining() - 1);
+                int newRemaining = mm.getPtRemaining() - 1;
+                mm.setPtRemaining(newRemaining);
+                if (newRemaining == 0) mm.setPtEndedAt(java.time.LocalDate.now());
                 manualMemberRepository.save(mm);
             }
         }

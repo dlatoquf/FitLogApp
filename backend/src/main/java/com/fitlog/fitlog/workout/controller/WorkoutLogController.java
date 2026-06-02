@@ -113,16 +113,24 @@ public class WorkoutLogController {
                 ? (List<String>) body.get("missions") : null;
         missionService.createMissions(log.getWorkoutId(), missions, trainer, member);
 
-        // 운동 저장 후 COMPLETED 처리 + 스케줄 없는 경우 PT 차감
+        // 운동일지 등록 시 CONFIRMED 상태인 스케줄만 COMPLETED + PT -1 처리
         boolean scheduleFound = false;
 
         if (body.containsKey("scheduleId") && body.get("scheduleId") != null) {
             Long scheduleId = ((Number) body.get("scheduleId")).longValue();
             Optional<com.fitlog.fitlog.schedule.entity.Schedule> scheduleOpt = scheduleRepository.findById(scheduleId);
             if (scheduleOpt.isPresent()) {
-                scheduleOpt.get().setStatusStr("COMPLETED");
-                scheduleRepository.save(scheduleOpt.get());
+                com.fitlog.fitlog.schedule.entity.Schedule sch = scheduleOpt.get();
+                boolean wasConfirmed = "CONFIRMED".equals(sch.getStatusStr());
+                sch.setStatusStr("COMPLETED");
+                scheduleRepository.save(sch);
                 scheduleFound = true;
+                if (wasConfirmed && member.getPtRemaining() != null && member.getPtRemaining() > 0) {
+                    int newRemaining = member.getPtRemaining() - 1;
+                    member.setPtRemaining(newRemaining);
+                    if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
+                    memberRepository.save(member);
+                }
             }
         } else {
             // scheduleId 없으면 로그 날짜 + 해당 회원 CONFIRMED 스케줄 자동 완료 처리
@@ -137,22 +145,17 @@ public class WorkoutLogController {
                 matchedSchedule.get().setStatusStr("COMPLETED");
                 scheduleRepository.save(matchedSchedule.get());
                 scheduleFound = true;
+                if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
+                    int newRemaining = member.getPtRemaining() - 1;
+                    member.setPtRemaining(newRemaining);
+                    if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
+                    memberRepository.save(member);
+                }
             }
         }
 
-        // 스케줄 없이 직접 등록한 경우 PT 차감
-        String notiContent;
-        if (!scheduleFound && member.getPtRemaining() != null && member.getPtRemaining() > 0) {
-            member.setPtRemaining(member.getPtRemaining() - 1);
-            // PT 잔여 0이 되면 종료일 기록 (7일 유예 후 비활성화 기준)
-            if (member.getPtRemaining() == 0 && member.getPtEndedAt() == null) {
-                member.setPtEndedAt(java.time.LocalDate.now());
-            }
-            memberRepository.save(member);
-            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요. PT 1회 차감 · 잔여 " + member.getPtRemaining() + "회.";
-        } else {
-            notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요.";
-        }
+        String ptRemainingStr = member.getPtRemaining() != null ? " · PT 잔여 " + member.getPtRemaining() + "회" : "";
+        String notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요." + ptRemainingStr;
 
         // 미션이 있으면 알림 내용 추가
         if (missions != null && !missions.isEmpty()) {
@@ -160,13 +163,15 @@ public class WorkoutLogController {
         }
 
         // FCM 푸시 + 인앱 알림
-        notificationService.sendNotification(
-                member.getUser(),
-                "WORKOUT_LOG",
-                notiContent,
-                "WORKOUT_LOG",
-                log.getWorkoutId()
-        );
+        if (member.getNotifWorkout()) {
+            notificationService.sendNotification(
+                    member.getUser(),
+                    "WORKOUT_LOG",
+                    notiContent,
+                    "WORKOUT_LOG",
+                    log.getWorkoutId()
+            );
+        }
 
         return ResponseEntity.ok(Map.of("message", "운동 로그가 저장됐어요.", "workoutId", log.getWorkoutId()));
     }
@@ -226,7 +231,7 @@ public class WorkoutLogController {
         workoutLogRepository.save(log);
         saveMediaFiles(body, log);
 
-        // 해당 날짜 CONFIRMED 스케줄 → COMPLETED 처리 (노쇼 카운트 방지)
+        // 해당 날짜 CONFIRMED 스케줄 → COMPLETED 처리 + PT -1
         scheduleRepository.findByTrainerAndDateAndStatus(trainer, log.getLogDate(), "CONFIRMED")
                 .stream()
                 .filter(s -> s.getManualMember() != null && s.getManualMember().getId().equals(mm.getId()))
@@ -234,17 +239,13 @@ public class WorkoutLogController {
                 .ifPresent(s -> {
                     s.setStatusStr("COMPLETED");
                     scheduleRepository.save(s);
+                    if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
+                        int newRemaining = mm.getPtRemaining() - 1;
+                        mm.setPtRemaining(newRemaining);
+                        if (newRemaining == 0) mm.setPtEndedAt(java.time.LocalDate.now());
+                        manualMemberRepository.save(mm);
+                    }
                 });
-
-        // PT 차감 (잔여 있을 때)
-        if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
-            mm.setPtRemaining(mm.getPtRemaining() - 1);
-            // 잔여 0회가 된 날짜 기록 (7일 후 비활성화 기준)
-            if (mm.getPtRemaining() == 0) {
-                mm.setPtEndedAt(java.time.LocalDate.now());
-            }
-            manualMemberRepository.save(mm);
-        }
 
         // 미션 저장
         List<String> missions = body.containsKey("missions")
@@ -395,10 +396,11 @@ public class WorkoutLogController {
 
         String feedback = body.get("feedback");
         log.setFeedback(feedback);
+        if (log.getTrainer() == null) log.setTrainer(trainer);
         workoutLogRepository.save(log);
 
         // 회원에게 알림
-        if (feedback != null && !feedback.isBlank()) {
+        if (feedback != null && !feedback.isBlank() && log.getMember() != null && log.getMember().getNotifFeedback()) {
             notificationService.sendNotification(
                 log.getMember().getUser(),
                 "FEEDBACK",
@@ -433,6 +435,7 @@ public class WorkoutLogController {
     }
 
     // ── 회원: 내 운동로그 조회 ────────────────────────────────────────────
+    @Transactional(readOnly = true)
     @GetMapping("/me")
     public ResponseEntity<List<Map<String, Object>>> getMyWorkoutLogs(
             @RequestHeader("Authorization") String authorization,
@@ -488,6 +491,7 @@ public class WorkoutLogController {
             log.setFeedback((String) body.get("feedback"));
 
         log.getSets().clear();
+        workoutLogRepository.saveAndFlush(log); // 기존 세트 orphan 삭제를 즉시 flush
 
         List<Map<String, Object>> exercises =
                 (List<Map<String, Object>>) body.get("exercises");
@@ -603,18 +607,18 @@ public class WorkoutLogController {
                                 .add(ws);
                     }
 
-                    // 운동별 미디어 맵: exerciseName → media
+                    // 운동별 미디어 맵: exerciseName → mediaList (여러 개 지원)
                     List<com.fitlog.fitlog.workout.entity.WorkoutMedia> allMedia =
                             workoutMediaRepository.findByWorkoutLogWorkoutId(log.getWorkoutId());
-                    Map<String, com.fitlog.fitlog.workout.entity.WorkoutMedia> mediaByExercise = new HashMap<>();
+                    Map<String, List<Map<String, Object>>> mediaByExercise = new LinkedHashMap<>();
                     List<Map<String, Object>> logLevelMedia = new ArrayList<>();
                     for (com.fitlog.fitlog.workout.entity.WorkoutMedia m : allMedia) {
+                        Map<String, Object> mm = new HashMap<>();
+                        mm.put("id", m.getId()); mm.put("url", m.getUrl());
+                        mm.put("publicId", m.getPublicId()); mm.put("mediaType", m.getMediaType());
                         if (m.getExerciseName() != null) {
-                            mediaByExercise.put(m.getExerciseName(), m);
+                            mediaByExercise.computeIfAbsent(m.getExerciseName(), k -> new ArrayList<>()).add(mm);
                         } else {
-                            Map<String, Object> mm = new HashMap<>();
-                            mm.put("id", m.getId()); mm.put("url", m.getUrl());
-                            mm.put("publicId", m.getPublicId()); mm.put("mediaType", m.getMediaType());
                             logLevelMedia.add(mm);
                         }
                     }
@@ -639,16 +643,11 @@ public class WorkoutLogController {
                                     return sm;
                                 }).collect(Collectors.toList()));
 
-                                // 운동별 미디어
-                                com.fitlog.fitlog.workout.entity.WorkoutMedia exMedia = mediaByExercise.get(ex.getKey());
-                                if (exMedia != null) {
-                                    Map<String, Object> mm = new HashMap<>();
-                                    mm.put("id", exMedia.getId()); mm.put("url", exMedia.getUrl());
-                                    mm.put("publicId", exMedia.getPublicId()); mm.put("mediaType", exMedia.getMediaType());
-                                    exMap.put("media", mm);
-                                } else {
-                                    exMap.put("media", null);
-                                }
+                                // 운동별 미디어 (여러 개)
+                                List<Map<String, Object>> exMediaList = mediaByExercise.getOrDefault(ex.getKey(), new ArrayList<>());
+                                exMap.put("mediaList", exMediaList);
+                                // 하위 호환: 첫 번째 미디어를 media 단일 필드로도 제공
+                                exMap.put("media", exMediaList.isEmpty() ? null : exMediaList.get(0));
 
                                 return exMap;
                             })
@@ -661,6 +660,12 @@ public class WorkoutLogController {
                     map.put("conditionScore", log.getConditionScore());
                     map.put("painPoints", log.getPainPoints());
                     map.put("feedback", log.getFeedback());
+                    try {
+                        map.put("trainerName", log.getTrainer() != null && log.getTrainer().getUser() != null
+                                ? log.getTrainer().getUser().getName() : null);
+                    } catch (Exception e) {
+                        map.put("trainerName", null);
+                    }
                     map.put("exercises", exercises);
                     map.put("mediaList", logLevelMedia);
 
@@ -669,13 +674,29 @@ public class WorkoutLogController {
                 .collect(Collectors.toList());
     }
 
-    // ── 미디어 저장 헬퍼 (운동별 1개) ─────────────────────────────────────
+    // ── 미디어 저장 헬퍼 (운동별 최대 3개) ─────────────────────────────────
     @SuppressWarnings("unchecked")
     private void saveMediaFiles(Map<String, Object> body, WorkoutLog log) {
         List<Map<String, Object>> exercises = (List<Map<String, Object>>) body.get("exercises");
-        if (exercises != null) {
-            for (Map<String, Object> ex : exercises) {
-                if (!ex.containsKey("mediaUrl") || ex.get("mediaUrl") == null) continue;
+        if (exercises == null) return;
+        for (Map<String, Object> ex : exercises) {
+            String exerciseName = (String) ex.get("name");
+            // 배열 mediaUrls 우선 처리
+            if (ex.containsKey("mediaUrls") && ex.get("mediaUrls") != null) {
+                List<Map<String, Object>> mediaUrls = (List<Map<String, Object>>) ex.get("mediaUrls");
+                for (Map<String, Object> m : mediaUrls) {
+                    String url = (String) m.get("url");
+                    if (url == null || url.isEmpty()) continue;
+                    WorkoutMedia media = new WorkoutMedia();
+                    media.setWorkoutLog(log);
+                    media.setUrl(url);
+                    media.setPublicId((String) m.getOrDefault("publicId", ""));
+                    media.setMediaType(((String) m.getOrDefault("mediaType", "IMAGE")).toUpperCase());
+                    media.setExerciseName(exerciseName);
+                    workoutMediaRepository.save(media);
+                }
+            } else if (ex.containsKey("mediaUrl") && ex.get("mediaUrl") != null) {
+                // 레거시 단일 mediaUrl 호환
                 Map<String, Object> m = (Map<String, Object>) ex.get("mediaUrl");
                 String url = (String) m.get("url");
                 if (url == null || url.isEmpty()) continue;
@@ -684,7 +705,7 @@ public class WorkoutLogController {
                 media.setUrl(url);
                 media.setPublicId((String) m.getOrDefault("publicId", ""));
                 media.setMediaType(((String) m.getOrDefault("mediaType", "IMAGE")).toUpperCase());
-                media.setExerciseName((String) ex.get("name"));
+                media.setExerciseName(exerciseName);
                 workoutMediaRepository.save(media);
             }
         }

@@ -252,11 +252,6 @@ public class ScheduleService {
             schedule.setManualMember(manual);
             schedule.setMember(null);
             scheduleRepository.save(schedule);
-            // OT는 PT 차감 없음
-            if (!isOt && manual.getPtRemaining() != null && manual.getPtRemaining() > 0) {
-                manual.setPtRemaining(manual.getPtRemaining() - 1);
-                manualMemberRepository.save(manual);
-            }
             // (SOLAPI 제거 — 카카오 공유하기로 대체)
         } else {
             // ── 연동 회원 ──
@@ -266,17 +261,15 @@ public class ScheduleService {
             schedule.setManualMember(null);
             scheduleRepository.save(schedule);
 
-            if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
-                member.setPtRemaining(member.getPtRemaining() - 1);
-                memberRepository.save(member);
+            if (member.getNotifSchedule()) {
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "SCHEDULE_CONFIRM",
+                        "수업이 확정됐어요. " + date + " " + startTime,
+                        "SCHEDULE",
+                        schedule.getId()
+                );
             }
-            notificationService.sendNotification(
-                    member.getUser(),
-                    "SCHEDULE_CONFIRM",
-                    "수업이 확정됐어요. " + date + " " + startTime + " · PT 잔여 " + member.getPtRemaining() + "회.",
-                    "SCHEDULE",
-                    schedule.getId()
-            );
         }
     }
 
@@ -290,6 +283,7 @@ public class ScheduleService {
 
         Member member = schedule.getMember();
         ManualMember manualMember = schedule.getManualMember();
+        boolean wasNoShow = "NO_SHOW".equals(schedule.getStatusStr());
 
         schedule.setStatus(Schedule.Status.OPEN);
         schedule.setMember(null);
@@ -297,23 +291,27 @@ public class ScheduleService {
         scheduleRepository.save(schedule);
 
         if (member != null) {
-            // PT 횟수 복구
-            if (member.getPtRemaining() != null) {
+            // 노쇼 취소 시 PT 복구
+            if (wasNoShow && member.getPtRemaining() != null) {
                 member.setPtRemaining(member.getPtRemaining() + 1);
+                member.setPtEndedAt(null);
                 memberRepository.save(member);
             }
             // FCM 알림
-            notificationService.sendNotification(
-                    member.getUser(),
-                    "SCHEDULE_CANCEL",
-                    "수업이 취소됐어요. " + schedule.getDate() + " " + schedule.getStartTime() + " · PT 잔여 " + member.getPtRemaining() + "회.",
-                    "SCHEDULE",
-                    scheduleId
-            );
+            if (member.getNotifSchedule()) {
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "SCHEDULE_CANCEL",
+                        "수업이 취소됐어요. " + schedule.getDate() + " " + schedule.getStartTime(),
+                        "SCHEDULE",
+                        scheduleId
+                );
+            }
         }
-        // 미연동 회원 PT 복구
-        if (manualMember != null && manualMember.getPtRemaining() != null) {
+        // 미연동 회원 노쇼 취소 시 PT 복구
+        if (manualMember != null && wasNoShow && manualMember.getPtRemaining() != null) {
             manualMember.setPtRemaining(manualMember.getPtRemaining() + 1);
+            manualMember.setPtEndedAt(null);
             manualMemberRepository.save(manualMember);
         }
     }
