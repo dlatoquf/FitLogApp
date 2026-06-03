@@ -109,17 +109,24 @@ public class DietPhotoController {
 
         DietPhoto saved = dietPhotoRepository.save(photo);
 
-        // 트레이너에게 알림 전송 (targetId=memberId, content에 날짜 포함)
+        // 트레이너에게 알림 전송 — notifDiet ON + 새 업로드 세션일 때만 (5분 이내 연속 업로드는 같은 세션)
         if (member.getTrainer() != null) {
             Trainer trainer = member.getTrainer();
-            String dateStr = saved.getDate().toString(); // YYYY-MM-DD
-            notificationService.sendNotification(
-                trainer.getUser(),
-                "DIET_PHOTO",
-                member.getUser().getName() + "님이 " + dateStr + " 식단 로그를 등록했어요.",
-                "MEMBER",
-                member.getId()
-            );
+            if (Boolean.TRUE.equals(trainer.getNotifDiet())) {
+                // 방금 저장한 사진 제외하고 5분 이내에 다른 사진이 없으면 새 세션 → 알림 1회
+                java.time.LocalDateTime fiveMinutesAgo = java.time.LocalDateTime.now().minusMinutes(5);
+                int recentCount = dietPhotoRepository.countByMemberAndDateAndCreatedAtAfter(
+                    member, saved.getDate(), fiveMinutesAgo);
+                if (recentCount == 1) { // 현재 사진만 있으면 새 세션
+                    notificationService.sendNotification(
+                        trainer.getUser(),
+                        "DIET_PHOTO",
+                        member.getUser().getName() + "님이 " + saved.getDate() + " 식단 로그를 등록했어요.",
+                        "MEMBER",
+                        member.getId()
+                    );
+                }
+            }
         }
 
         Map<String, Object> res = new HashMap<>();
@@ -175,13 +182,15 @@ public class DietPhotoController {
         DietDayFeedback saved = dayFeedbackRepository.save(feedback);
 
         // 회원에게 알림 전송
-        notificationService.sendNotification(
-            member.getUser(),
-            "DIET_FEEDBACK",
-            trainer.getUser().getName() + " 트레이너가 식단 피드백을 남겼어요.",
-            "DIET_FEEDBACK",
-            saved.getId()
-        );
+        if (member.getNotifFeedback()) {
+            notificationService.sendNotification(
+                member.getUser(),
+                "DIET_FEEDBACK",
+                trainer.getUser().getName() + " 트레이너가 식단 피드백을 남겼어요.",
+                "DIET_FEEDBACK",
+                saved.getId()
+            );
+        }
 
         Map<String, Object> res = new HashMap<>();
         res.put("id", saved.getId());

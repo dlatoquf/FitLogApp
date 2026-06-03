@@ -89,6 +89,11 @@ export default function MemberHomeScreen() {
     content: string;
     date: string;
   } | null>(null);
+  const [latestWorkoutFeedback, setLatestWorkoutFeedback] = useState<{
+    content: string;
+    date: string;
+    trainerName: string;
+  } | null>(null);
   const [missions, setMissions] = useState<
     { id: number; content: string; isDone: boolean; trainerName: string }[]
   >([]);
@@ -104,7 +109,10 @@ export default function MemberHomeScreen() {
         fetch(`${API_URL}/api/member/schedule/this-week`, { headers }),
         fetch(`${API_URL}/api/notifications`, { headers }),
       ]);
-      if (!homeRes.ok) throw new Error();
+      if (!homeRes.ok) {
+        const errText = await homeRes.text().catch(() => "");
+        throw new Error(`서버 오류 (${homeRes.status})${errText ? ": " + errText.slice(0, 120) : ""}`);
+      }
       const homeData = await homeRes.json();
       setData(homeData);
 
@@ -132,6 +140,17 @@ export default function MemberHomeScreen() {
               ),
             );
             setWeekWorkoutDates(dates);
+            // 오늘 운동 피드백만 표시
+            const todayStr = toDateKey(new Date());
+            const todayFeedback = logs.find((l: any) =>
+              l.feedback && String(l.feedback).trim() &&
+              String(l.date ?? l.logDate ?? "").slice(0, 10) === todayStr
+            );
+            setLatestWorkoutFeedback(todayFeedback ? {
+              content: todayFeedback.feedback,
+              date: todayStr,
+              trainerName: todayFeedback.trainerName ?? "",
+            } : null);
           } catch {}
         }
         if (bodylogRes.ok) {
@@ -150,13 +169,10 @@ export default function MemberHomeScreen() {
         if (feedbackRes.ok && feedbackRes.status !== 204) {
           try {
             const fb = await feedbackRes.json();
+            const todayStr = toDateKey(new Date());
             setLatestFeedback(
-              fb
-                ? {
-                    trainerName: fb.trainerName,
-                    content: fb.content,
-                    date: fb.date,
-                  }
+              fb && fb.date === todayStr
+                ? { trainerName: fb.trainerName, content: fb.content, date: fb.date }
                 : null,
             );
           } catch {}
@@ -178,6 +194,7 @@ export default function MemberHomeScreen() {
       if (weekRes.ok) setThisWeek(await weekRes.json());
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
+      console.error("[MemberHome] fetchHome 오류:", e);
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
     } finally {
       setLoading(false);
@@ -275,6 +292,14 @@ export default function MemberHomeScreen() {
   const weightDiff =
     lastBodyLog?.weight != null && prevBodyLog?.weight != null
       ? Math.round((lastBodyLog.weight - prevBodyLog.weight) * 10) / 10
+      : null;
+  const bodyFatDiff =
+    lastBodyLog?.bodyFat != null && prevBodyLog?.bodyFat != null
+      ? Math.round((lastBodyLog.bodyFat - prevBodyLog.bodyFat) * 10) / 10
+      : null;
+  const muscleMassDiff =
+    lastBodyLog?.muscleMass != null && prevBodyLog?.muscleMass != null
+      ? Math.round((lastBodyLog.muscleMass - prevBodyLog.muscleMass) * 10) / 10
       : null;
 
   // 현재 시간이 수업 종료시간을 지나면 홈의 "이번 주 내 수업"에서 숨김
@@ -491,9 +516,7 @@ export default function MemberHomeScreen() {
               marginBottom: 8,
             }}
           >
-            <Text style={{ fontSize: 14, color: Colors.textSub }}>
-              PT 신청가능 횟수
-            </Text>
+            <Text style={{ fontSize: 14, color: Colors.textSub }}>잔여 PT</Text>
             <View
               style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}
             >
@@ -629,11 +652,11 @@ export default function MemberHomeScreen() {
           style={{
             backgroundColor: "#fff7ed",
             borderRadius: 14,
-            padding: 14,
+            paddingVertical: 8,
+            paddingHorizontal: 14,
             borderWidth: 1,
             borderColor: "#f9731644",
             marginBottom: 12,
-            minHeight: 60,
           }}
         >
           <View
@@ -752,6 +775,54 @@ export default function MemberHomeScreen() {
             </>
           )}
         </View>
+
+        {/* 운동 피드백 — 챌린지 바로 아래 */}
+        {latestWorkoutFeedback && (
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/member/workout" as any)}
+            style={{
+              backgroundColor: Colors.greenLight,
+              borderRadius: 14,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderWidth: 1,
+              borderColor: Colors.green + "44",
+              marginBottom: 10,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 운동 피드백</Text>
+              <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestWorkoutFeedback.date}</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }} numberOfLines={2}>
+              {latestWorkoutFeedback.content}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 식단 피드백 — 챌린지 바로 아래 */}
+        {latestFeedback && (
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/member/diet")}
+            style={{
+              backgroundColor: Colors.greenLight,
+              borderRadius: 14,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderWidth: 1,
+              borderColor: Colors.green + "44",
+              marginBottom: 10,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 식단 피드백</Text>
+              <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestFeedback.date}</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }} numberOfLines={2}>
+              {latestFeedback.content}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* 바디 로그 */}
         <TouchableOpacity
@@ -887,6 +958,18 @@ export default function MemberHomeScreen() {
                     %
                   </Text>
                 </Text>
+                {bodyFatDiff !== null && bodyFatDiff !== 0 && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "800",
+                      color: bodyFatDiff > 0 ? Colors.red : Colors.green,
+                      marginTop: 2,
+                    }}
+                  >
+                    {bodyFatDiff > 0 ? `+${bodyFatDiff}` : bodyFatDiff}
+                  </Text>
+                )}
               </View>
               {/* 근육량 */}
               <View
@@ -927,6 +1010,18 @@ export default function MemberHomeScreen() {
                     kg
                   </Text>
                 </Text>
+                {muscleMassDiff !== null && muscleMassDiff !== 0 && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "800",
+                      color: muscleMassDiff > 0 ? Colors.green : Colors.red,
+                      marginTop: 2,
+                    }}
+                  >
+                    {muscleMassDiff > 0 ? `+${muscleMassDiff}` : muscleMassDiff}
+                  </Text>
+                )}
               </View>
             </View>
           ) : (
@@ -1023,53 +1118,6 @@ export default function MemberHomeScreen() {
           )}
         </View>
 
-        {/* 최근 트레이너 피드백 */}
-        {latestFeedback && (
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/member/diet")}
-            style={{
-              backgroundColor: Colors.greenLight,
-              borderRadius: 14,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: Colors.green + "44",
-              marginBottom: 12,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 8,
-              }}
-            >
-              <Text
-                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
-              >
-                💬 {latestFeedback.trainerName} 트레이너 식단 피드백
-              </Text>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: Colors.textMuted,
-                  marginLeft: "auto",
-                }}
-              >
-                {latestFeedback.date}
-              </Text>
-            </View>
-            <Text
-              style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
-              numberOfLines={2}
-            >
-              {latestFeedback.content}
-            </Text>
-            <Text style={{ fontSize: 11, color: Colors.green, marginTop: 6 }}>
-              탭하여 식단 보기 →
-            </Text>
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
       {/* 트레이너 코드 입력 모달 */}

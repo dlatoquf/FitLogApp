@@ -102,6 +102,11 @@ import { API_URL } from "../../../constants/api";
                 return;
             }
 
+            if (n.type === "NEW_MEMBER") {
+                router.push("/(tabs)/trainer/members" as any);
+                return;
+            }
+
             if (n.targetType === "MEMBER") {
                 router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any);
                 return;

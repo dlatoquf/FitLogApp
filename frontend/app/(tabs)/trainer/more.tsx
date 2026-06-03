@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Clipboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -394,11 +395,10 @@ export default function TrainerMoreScreen() {
     ]);
   };
 
-  const copyCode = () =>
-    Alert.alert(
-      "복사 완료",
-      `트레이너 코드 ${profile?.trainerCode}가 복사됐어요.`,
-    );
+  const copyCode = () => {
+    Clipboard.setString(profile?.trainerCode ?? "");
+    Alert.alert("복사 완료", `트레이너 코드 ${profile?.trainerCode}가 복사됐어요.`);
+  };
 
   return (
     <>

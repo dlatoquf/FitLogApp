@@ -7,7 +7,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
@@ -99,7 +100,7 @@ interface SimpleEx {
   memo?: string;
 }
 interface TypeGroup {
-  type: "PT" | "개인";
+  type: "PT" | "OT" | "개인";
   exercises: SimpleEx[];
   totalRows: number;
   conditionScore?: number;
@@ -114,7 +115,7 @@ interface DateGroup {
 }
 interface ExAllEntry {
   date: string;
-  type: "PT" | "개인";
+  type: "PT" | "OT" | "개인";
   sets: SetRow[];
   memo?: string;
   conditionScore?: number;
@@ -591,7 +592,7 @@ function HistoryTable({
                               fontWeight: "700",
                             }}
                           >
-                            📷{(tg.mediaList ?? []).length}
+                            사진/영상 {(tg.mediaList ?? []).length}
                           </Text>
                         </TouchableOpacity>
                       ) : (
@@ -796,7 +797,7 @@ function HistoryTable({
                               fontWeight: "700",
                             }}
                           >
-                            📷{(en.mediaList ?? []).length}
+                            사진/영상 {(en.mediaList ?? []).length}
                           </Text>
                         </TouchableOpacity>
                       ) : (
@@ -1227,7 +1228,8 @@ export default function MemberDetailScreen() {
   };
 
   const [member, setMember] = useState<Member | null>(null);
-  const isOt = isManual && member?.memo === "OT"; // OT(체험) 회원 여부
+  // OT 회원: memo="OT" 이면서 ptTotal이 없거나 0인 경우 (addPt로 PT 등록된 경우는 PT 회원으로 취급)
+  const isOt = isManual && member?.memo === "OT" && (!member?.ptTotal || member?.ptTotal === 0);
   const [loading, setLoading] = useState(true);
   // 미연동 회원은 운동로그 탭(1)에서 시작
   const [tab, setTab] = useState(
@@ -1298,21 +1300,21 @@ export default function MemberDetailScreen() {
       name: string;
       sets: { setId?: number; weight: string; reps: string }[];
       memo: string;
-      mediaFile: { uri: string; type: "image" | "video" } | null;
-      existingMedia: {
+      mediaFiles: { uri: string; type: "image" | "video" }[];
+      existingMediaList: {
         id: number;
         url: string;
         publicId: string;
         mediaType: string;
-      } | null;
+      }[];
     }[]
   >([
     {
       name: "",
       sets: [{ setId: undefined, weight: "", reps: "" }],
       memo: "",
-      mediaFile: null,
-      existingMedia: null,
+      mediaFiles: [],
+      existingMediaList: [],
     },
   ]);
   const [ptBodyParts, setPtBodyParts] = useState<string[]>([]);
@@ -1564,8 +1566,7 @@ export default function MemberDetailScreen() {
         const data = await res.json();
         setDietPhotos(data.photos ?? []);
         setDayFeedback(data.feedback ?? null);
-        if (data.feedback) setDayFeedbackInput(data.feedback.content ?? "");
-        else setDayFeedbackInput("");
+        setDayFeedbackInput("");
       } else {
         setDietPhotos([]);
         setDayFeedback(null);
@@ -1605,6 +1606,7 @@ export default function MemberDetailScreen() {
   const sendDayFeedback = async () => {
     const content = dayFeedbackInput.trim();
     if (!content) return;
+    Keyboard.dismiss();
     setSendingDayFeedback(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
@@ -1646,7 +1648,7 @@ export default function MemberDetailScreen() {
 
       const url = isManual
         ? `${API_URL}${ENDPOINTS.bodylog.manual(memberId)}`
-        : `${API_URL}${ENDPOINTS.bodylog.create}`;
+        : `${API_URL}${ENDPOINTS.bodylog.member(memberId)}`;
 
       const res = await fetch(url, {
         method: "POST",
@@ -2026,12 +2028,22 @@ export default function MemberDetailScreen() {
     }
   };
 
-  // 알림에서 initialTab param이 오면 해당 탭으로 이동
-  useEffect(() => {
-    if (initialTab !== undefined) {
-      setTab(Number(initialTab));
-    }
-  }, [initialTab]);
+  // 화면 진입할 때마다 initialTab으로 리셋 (홈 오늘수업 → 항상 운동로그 탭)
+  useFocusEffect(
+    useCallback(() => {
+      if (initialTab !== undefined) {
+        setTab(Number(initialTab));
+      } else {
+        // 화면 복귀 시 기본 탭으로 초기화: 미연동=운동로그(1), 연동=식단로그(0)
+        setTab(isManual ? 1 : 0);
+      }
+      // 화면 복귀 시 운동로그 캘린더 날짜를 오늘로 리셋
+      setSelectedDate(new Date());
+      setWeekOffset(0);
+      // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
+      fetchMember();
+    }, [initialTab, isManual]),
+  );
 
   // PT 미등록 뱃지에서 진입 시 PT 추가 모달 자동 오픈
   useEffect(() => {
@@ -2133,8 +2145,8 @@ export default function MemberDetailScreen() {
         name: "",
         sets: [{ setId: undefined, weight: "", reps: "" }],
         memo: "",
-        mediaFile: null,
-        existingMedia: null,
+        mediaFiles: [],
+        existingMediaList: [],
       },
     ]);
     setPtBodyParts([]);
@@ -2151,16 +2163,13 @@ export default function MemberDetailScreen() {
       (log.exercises ?? []).map((ex: any) => ({
         name: ex.name ?? "",
         memo: ex.memo ?? "",
-        mediaFile: null,
-        existingMedia:
-          ex.media ??
-          (log.mediaList ?? []).find(
-            (media: any) =>
-              media.exerciseName === ex.name ||
-              media.exercise === ex.name ||
-              media.name === ex.name,
-          ) ??
-          null,
+        mediaFiles: [],
+        existingMediaList: (ex.mediaList ?? (ex.media ? [ex.media] : [])).map((m: any) => ({
+          id: m.id,
+          url: m.url ?? m.mediaUrl ?? m.secureUrl,
+          publicId: m.publicId ?? "",
+          mediaType: m.mediaType ?? "IMAGE",
+        })),
         sets: (ex.sets ?? []).map((s: any) => ({
           setId: s.setId ?? s.id ?? undefined,
           weight: s.weight != null ? String(s.weight) : "",
@@ -2229,11 +2238,27 @@ export default function MemberDetailScreen() {
   };
 
   const handlePickMedia = async (exerciseIndex: number) => {
+    const ex = exercises[exerciseIndex];
+    const totalCount = ex.mediaFiles.length + ex.existingMediaList.length;
+    if (totalCount >= 3) {
+      Alert.alert("최대 3개", "운동당 사진/영상은 최대 3개까지 추가할 수 있어요.");
+      return;
+    }
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("권한 필요", "사진/영상 접근 권한이 필요해요.");
       return;
     }
+
+    const addAsset = (asset: any) => {
+      const u = [...exercises];
+      u[exerciseIndex].mediaFiles = [
+        ...u[exerciseIndex].mediaFiles,
+        { uri: asset.uri, type: asset.type === "video" ? "video" : "image" },
+      ];
+      setExercises(u);
+    };
 
     Alert.alert("사진/영상 추가", "어떤 방식으로 추가할까요?", [
       {
@@ -2249,35 +2274,22 @@ export default function MemberDetailScreen() {
             quality: 0.8,
             videoMaxDuration: 120,
           });
-          if (!result.canceled && result.assets.length > 0) {
-            const asset = result.assets[0];
-            const u = [...exercises];
-            u[exerciseIndex].mediaFile = {
-              uri: asset.uri,
-              type: asset.type === "video" ? "video" : "image",
-            };
-            setExercises(u);
-          }
+          if (!result.canceled && result.assets.length > 0) addAsset(result.assets[0]);
         },
       },
       {
         text: "갤러리에서 선택",
         onPress: async () => {
+          const remaining = 3 - totalCount;
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.All,
             quality: 0.8,
             videoMaxDuration: 120,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
           });
           if (!result.canceled && result.assets.length > 0) {
-            const asset = result.assets[0];
-            const u = [...exercises];
-            u[exerciseIndex].mediaFile = {
-              uri: asset.uri,
-              type: (asset.type === "video" ? "video" : "image") as
-                | "image"
-                | "video",
-            };
-            setExercises(u);
+            result.assets.forEach((asset) => addAsset(asset));
           }
         },
       },
@@ -2285,9 +2297,13 @@ export default function MemberDetailScreen() {
     ]);
   };
 
-  const removeMedia = (exerciseIndex: number) => {
+  const removeMedia = (exerciseIndex: number, type: "new" | "existing", fileIndex: number) => {
     const u = [...exercises];
-    u[exerciseIndex].mediaFile = null;
+    if (type === "new") {
+      u[exerciseIndex].mediaFiles = u[exerciseIndex].mediaFiles.filter((_, i) => i !== fileIndex);
+    } else {
+      u[exerciseIndex].existingMediaList = u[exerciseIndex].existingMediaList.filter((_, i) => i !== fileIndex);
+    }
     setExercises(u);
   };
 
@@ -2348,23 +2364,13 @@ export default function MemberDetailScreen() {
       // 운동별 Cloudinary 업로드
       const exercisesWithMedia = await Promise.all(
         valid.map(async (ex) => {
-          let mediaUrl:
-            | { url: string; publicId: string; mediaType: string }
-            | undefined;
-          if (ex.mediaFile) {
-            mediaUrl = await uploadToCloudinary(
-              ex.mediaFile.uri,
-              ex.mediaFile.type,
-            );
-          }
+          const uploadedUrls = await Promise.all(
+            (ex.mediaFiles ?? []).map((f) => uploadToCloudinary(f.uri, f.type))
+          );
           return {
             name: ex.name,
             memo: ex.memo?.trim() || undefined,
-            mediaUrl: mediaUrl ?? undefined,
-            keepMediaId:
-              editingFitLogId && ex.existingMedia
-                ? ex.existingMedia.id
-                : undefined,
+            mediaUrls: uploadedUrls.filter(Boolean),
             sets: ex.sets
               .filter((s) => s.weight || s.reps)
               .map((s, i) => ({
@@ -2387,9 +2393,7 @@ export default function MemberDetailScreen() {
 
       // 수정 시 기존 미디어 유지할 ID 목록 수집 (없으면 서버에서 전부 삭제됨)
       const keepMediaIds = editingFitLogId
-        ? exercisesWithMedia
-            .map((ex: any) => ex.keepMediaId)
-            .filter((id: any) => id !== undefined)
+        ? valid.flatMap((ex) => (ex.existingMediaList ?? []).map((m) => m.id))
         : [];
 
       const body: any = {
@@ -2507,10 +2511,6 @@ export default function MemberDetailScreen() {
 
   const buildManualWorkoutShareText = (data: typeof smsPromptData) => {
     const memberName = member?.user?.name ?? "회원";
-    const code = trainerInviteCode.trim();
-    const inviteUrl = code
-      ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
-      : "https://fitlog.app/download";
 
     const exerciseNames = Array.from(
       new Set((data.exercises ?? []).map((ex) => ex.name).filter(Boolean)),
@@ -2520,27 +2520,34 @@ export default function MemberDetailScreen() {
       ? exerciseNames.map((name) => `- ${name}`).join("\n")
       : "- 오늘 운동 기록";
 
-    return `${memberName}님, 오늘 운동로그가 작성되었습니다.\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은\nFitLog 앱에서 확인할 수 있어요.\n\n앱 설치 후 회원가입 시 아래 트레이너 코드를 입력해주세요.\n\n트레이너 코드: ${code || "트레이너에게 확인해주세요"}\n\n앱 설치하기\n${inviteUrl}\n\n링크로 가입하면 트레이너 코드가 자동 입력될 수 있어요.\n자동 입력이 안 되면 위 코드를 직접 입력해주세요.`;
+    return `${memberName}님, 오늘 운동로그가 작성되었습니다.\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은\nFitLog 앱에서 확인할 수 있어요.`;
   };
 
   // OT 체험 수업 카카오 공유 메시지 빌드
   const buildOtShareText = () => {
     const memberName = member?.user?.name ?? "회원";
-    const code = trainerInviteCode.trim();
-    const inviteUrl = code
-      ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
-      : "https://fitlog.app/download";
-    return `${memberName}님, 오늘 체험 수업 수고하셨어요! 💪\n\n체험 수업이 완료됐어요.\n세트, 무게, 횟수는 FitLog 앱에서 확인할 수 있어요.\n\n앱 설치 후 회원가입 시 트레이너 코드를 입력해주세요.\n\n트레이너 코드: ${code || "트레이너에게 확인해주세요"}\n\n앱 설치하기\n${inviteUrl}\n\n링크로 가입하면 트레이너 코드가 자동 입력될 수 있어요.`;
+
+    const exerciseNames = Array.from(
+      new Set((smsPromptData.exercises ?? []).map((ex) => ex.name).filter(Boolean)),
+    );
+    const exerciseText = exerciseNames.length
+      ? exerciseNames.map((name) => `- ${name}`).join("\n")
+      : "- 오늘 운동 기록";
+
+    return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요! 💪\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.\n\n운동 기록·식단·일정을 한 곳에서 관리할 수 있는 FitLog 앱도 함께 활용해보세요.`;
   };
 
   const shareManualWorkoutLog = async () => {
     const text = isOt
       ? buildOtShareText()
       : buildManualWorkoutShareText(smsPromptData);
+    // OT는 앱 설치 안내 없음 — PT 미연동만 앱 링크 포함
     const code = trainerInviteCode.trim();
-    const inviteUrl = code
-      ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
-      : "https://fitlog.app/download";
+    const inviteUrl = isOt
+      ? "https://fitlog.app"
+      : (code
+          ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
+          : "https://fitlog.app/download");
     setSmsPromptData((p) => ({ ...p, visible: false }));
     try {
       await KakaoShare.shareTextTemplate({
@@ -3095,10 +3102,10 @@ export default function MemberDetailScreen() {
   };
 
   const getExerciseMediaList = (exercise: any) => {
-    const single = exercise?.media ? [exercise.media] : [];
+    // mediaList(배열) 우선, 없으면 media(단일) 폴백
     const list = exercise?.mediaList ?? exercise?.medias ?? [];
-
-    return [...single, ...list]
+    const items = list.length > 0 ? list : (exercise?.media ? [exercise.media] : []);
+    return items
       .filter(Boolean)
       .map((media: any) => ({
         id: media.id,
@@ -3597,7 +3604,7 @@ export default function MemberDetailScreen() {
                 <Text
                   style={{ fontSize: 12, fontWeight: "700", color: "#f97316" }}
                 >
-                  🔥 챌린지
+                  챌린지
                 </Text>
                 <Text
                   style={{
@@ -3632,7 +3639,7 @@ export default function MemberDetailScreen() {
                             : "#f97316",
                       }}
                     >
-                      {isDone ? "✅" : isFailed ? "❌" : "⏳"}
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDone ? "#22c55e" : isFailed ? "#ef4444" : "#f97316" }} />
                     </Text>
                     <Text
                       style={{
@@ -4417,11 +4424,7 @@ export default function MemberDetailScreen() {
                               }}
                             >
                               <TextInput
-                                value={
-                                  personalFeedbackInputs[wid] ??
-                                  log.feedback ??
-                                  ""
-                                }
+                                value={personalFeedbackInputs[wid] ?? ""}
                                 onChangeText={(text) =>
                                   setPersonalFeedbackInputs((prev) => ({
                                     ...prev,
@@ -5452,140 +5455,72 @@ export default function MemberDetailScreen() {
                     }}
                   />
 
-                  {/* 운동별 미디어 */}
+                  {/* 운동별 미디어 (최대 3개) */}
                   <View style={{ marginTop: 8 }}>
-                    {ex.existingMedia && !ex.mediaFile && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() =>
-                            setSelectedMedia(ex.existingMedia as any)
-                          }
-                        >
-                          <Image
-                            source={{
-                              uri:
-                                ex.existingMedia.mediaType === "VIDEO"
-                                  ? ex.existingMedia.url.replace(
-                                      /\.(mp4|mov|avi|webm)(\?.*)?$/i,
-                                      ".jpg",
-                                    )
-                                  : ex.existingMedia.url,
-                            }}
-                            style={{
-                              width: 60,
-                              height: 60,
-                              borderRadius: 8,
-                              backgroundColor: Colors.bgSub,
-                            }}
-                            resizeMode="cover"
-                          />
-                          {ex.existingMedia.mediaType === "VIDEO" && (
-                            <View
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                justifyContent: "center",
-                                alignItems: "center",
-                                backgroundColor: "rgba(0,0,0,0.3)",
-                                borderRadius: 8,
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                      {/* 기존 미디어 */}
+                      {(ex.existingMediaList ?? []).map((m, mIdx) => (
+                        <View key={`existing-${mIdx}`} style={{ position: "relative" }}>
+                          <TouchableOpacity onPress={() => setSelectedMedia(m as any)}>
+                            <Image
+                              source={{
+                                uri: m.mediaType === "VIDEO"
+                                  ? m.url.replace(/\.(mp4|mov|avi|webm)(\?.*)?$/i, ".jpg")
+                                  : m.url,
                               }}
-                            >
-                              <Text style={{ color: "#fff", fontSize: 16 }}>
-                                ▶
-                              </Text>
+                              style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: Colors.bgSub }}
+                              resizeMode="cover"
+                            />
+                            {m.mediaType === "VIDEO" && (
+                              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 8 }}>
+                                <Text style={{ color: "#fff", fontSize: 16 }}>▶</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => removeMedia(ei, "existing", mIdx)}
+                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: Colors.red, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center" }}
+                          >
+                            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>×</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {/* 새로 추가한 미디어 */}
+                      {(ex.mediaFiles ?? []).map((f, fIdx) => (
+                        <View key={`new-${fIdx}`} style={{ position: "relative" }}>
+                          {f.type === "image" ? (
+                            <Image source={{ uri: f.uri }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
+                          ) : (
+                            <View style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: "#1a1a2e", justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 20 }}>🎬</Text>
                             </View>
                           )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => {
-                            const u = [...exercises];
-                            u[ei].existingMedia = null;
-                            setExercises(u);
-                          }}
-                          style={{ padding: 4 }}
-                        >
-                          <Text style={{ fontSize: 12, color: Colors.red }}>
-                            삭제
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {ex.mediaFile && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 6,
-                        }}
-                      >
-                        {ex.mediaFile.type === "image" ? (
-                          <Image
-                            source={{ uri: ex.mediaFile.uri }}
-                            style={{ width: 60, height: 60, borderRadius: 8 }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View
-                            style={{
-                              width: 60,
-                              height: 60,
-                              borderRadius: 8,
-                              backgroundColor: "#1a1a2e",
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}
+                          <TouchableOpacity
+                            onPress={() => removeMedia(ei, "new", fIdx)}
+                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: Colors.red, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center" }}
                           >
-                            <Text style={{ fontSize: 20 }}>🎬</Text>
-                          </View>
-                        )}
+                            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>×</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {/* 추가 버튼 (3개 미만일 때만) */}
+                      {(ex.mediaFiles ?? []).length + (ex.existingMediaList ?? []).length < 3 && (
                         <TouchableOpacity
-                          onPress={() => removeMedia(ei)}
-                          style={{ padding: 4 }}
-                        >
-                          <Text style={{ fontSize: 12, color: Colors.red }}>
-                            삭제
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    {!ex.mediaFile && !ex.existingMedia && (
-                      <TouchableOpacity
-                        onPress={() => handlePickMedia(ei)}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 5,
-                          paddingVertical: 7,
-                          paddingHorizontal: 10,
-                          borderWidth: 1,
-                          borderStyle: "dashed",
-                          borderColor: Colors.green + "66",
-                          borderRadius: 8,
-                          backgroundColor: Colors.greenLight,
-                        }}
-                      >
-                        <Text
+                          onPress={() => handlePickMedia(ei)}
                           style={{
-                            fontSize: 12,
-                            color: Colors.green,
-                            fontWeight: "700",
+                            width: 64, height: 64,
+                            borderWidth: 1, borderStyle: "dashed",
+                            borderColor: Colors.green + "66",
+                            borderRadius: 8,
+                            backgroundColor: Colors.greenLight,
+                            justifyContent: "center", alignItems: "center",
                           }}
                         >
-                          + 사진/영상
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                          <Text style={{ fontSize: 20, color: Colors.green }}>+</Text>
+                          <Text style={{ fontSize: 9, color: Colors.green, marginTop: 2 }}>사진/영상</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
 
                   {/* 이전 기록 힌트 */}
@@ -5693,8 +5628,8 @@ export default function MemberDetailScreen() {
                       name: "",
                       sets: [{ setId: undefined, weight: "", reps: "" }],
                       memo: "",
-                      mediaFile: null,
-                      existingMedia: null,
+                      mediaFiles: [],
+                      existingMediaList: [],
                     },
                   ])
                 }

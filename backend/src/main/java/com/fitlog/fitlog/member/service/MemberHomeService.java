@@ -69,6 +69,7 @@ public class MemberHomeService {
                     );
 
             thisWeekSchedules = confirmedRequests.stream()
+                    .filter(r -> r.getSchedule() != null)
                     .map(r -> {
                         Schedule s = r.getSchedule();
 

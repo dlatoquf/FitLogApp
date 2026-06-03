@@ -85,13 +85,15 @@ public class PtContractService {
 
         ptContractRepository.save(contract);
 
-        notificationService.sendNotification(
-                member.getUser(),
-                "PT_ADD",
-                "트레이너가 PT " + request.getSessions() + "회를 추가했어요. 현재 잔여 " + member.getPtRemaining() + "회.",
-                "PT",
-                member.getId()
-        );
+        if (member.getNotifPtPayment()) {
+            notificationService.sendNotification(
+                    member.getUser(),
+                    "PT_ADD",
+                    "트레이너가 PT " + request.getSessions() + "회를 추가했어요. 현재 잔여 " + member.getPtRemaining() + "회.",
+                    "PT",
+                    member.getId()
+            );
+        }
 
         // members 테이블 누적 업데이트
         int prevTotal = member.getPtTotal() != null ? member.getPtTotal() : 0;
@@ -100,9 +102,12 @@ public class PtContractService {
         member.setPtTotal(prevTotal + request.getSessions());
         member.setPtRemaining(prevRemaining + request.getSessions());
 
-        // 시작일: 기존에 없으면 세팅, 있으면 유지
+        // PT 추가 시 만료 카운트다운 초기화 (7일 비활성화 방지)
+        member.setPtEndedAt(null);
+
+        // 시작일: 기존에 없으면 세팅, 있으면 유지 (없으면 결제일로 자동 설정)
         if (member.getPtStartDate() == null || member.getPtStartDate().isEmpty()) {
-            member.setPtStartDate(request.getStartDate());
+            member.setPtStartDate(startDate);
         }
 
         // 만료일: 새로 입력한 값으로 업데이트

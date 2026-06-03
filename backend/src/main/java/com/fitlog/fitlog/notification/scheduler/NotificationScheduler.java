@@ -67,13 +67,15 @@ public class NotificationScheduler {
             // 이미 알림 보낸 수업이면 스킵
             if (reminderSentIds.contains(schedule.getId())) continue;
 
-            notificationService.sendNotification(
-                    member.getUser(),
-                    "SCHEDULE_REMINDER",
-                    "30분 후 PT 수업이 시작돼요. 준비하세요.",
-                    "SCHEDULE",
-                    schedule.getId()
-            );
+            if (member.getNotifSchedule()) {
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "SCHEDULE_REMINDER",
+                        "30분 후 PT 수업이 시작돼요. 준비하세요.",
+                        "SCHEDULE",
+                        schedule.getId()
+                );
+            }
 
             reminderSentIds.add(schedule.getId());
         }

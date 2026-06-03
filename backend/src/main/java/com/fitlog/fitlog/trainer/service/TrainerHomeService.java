@@ -144,7 +144,7 @@ public class TrainerHomeService {
                             : (s.getMember().getPtRemaining() != null ? s.getMember().getPtRemaining() : 0);
                     String sessionType = s.getSessionType() != null ? s.getSessionType() : "PT";
                     int otSessionCount = "OT".equals(sessionType) && isManual && s.getManualMember() != null
-                            ? scheduleRepository.countOtSessionsByManualMember(s.getManualMember())
+                            ? scheduleRepository.countOtSessionsBefore(s.getManualMember(), s.getDate(), s.getStartTime()) + 1
                             : 0;
                     return new TrainerHomeResponse.TodayPt(
                             s.getId(), id, name,

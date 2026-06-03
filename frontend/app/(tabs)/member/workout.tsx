@@ -91,6 +91,39 @@ export default function WorkoutScreen() {
   const [mediaGallery, setMediaGallery] = useState<MediaItem[]>([]);
   const [mediaGalleryIndex, setMediaGalleryIndex] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [missions, setMissions] = useState<{
+    id: number;
+    content: string;
+    status: string;
+    workoutLogId: number | null;
+  }[]>([]);
+  const [expandedExerciseMediaKeys, setExpandedExerciseMediaKeys] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  const getExerciseMediaList = (exercise: any) => {
+    const list = exercise?.mediaList ?? exercise?.medias ?? [];
+    const items = list.length > 0 ? list : (exercise?.media ? [exercise.media] : []);
+    return items
+      .filter(Boolean)
+      .map((m: any) => ({
+        id: m.id,
+        url: m.url ?? m.mediaUrl ?? m.secureUrl,
+        publicId: m.publicId,
+        mediaType: m.mediaType ?? m.type ?? "IMAGE",
+      }))
+      .filter((m: any) => !!m.url);
+  };
+
+  const getExerciseMediaKey = (log: any, exercise: any, exIdx: number) =>
+    `${log.workoutId ?? log.id ?? "log"}-${exercise.name ?? "exercise"}-${exIdx}`;
+
+  const getExerciseMediaToggleLabel = (mediaList: any[], isOpen: boolean) => {
+    const hasImage = mediaList.some((m) => String(m.mediaType).toUpperCase() !== "VIDEO");
+    const hasVideo = mediaList.some((m) => String(m.mediaType).toUpperCase() === "VIDEO");
+    const label = hasImage && hasVideo ? "사진/영상" : hasVideo ? "영상" : "사진";
+    return `${label} ${isOpen ? "접기" : "보기"}`;
+  };
   const [mediaSaving, setMediaSaving] = useState(false);
 
   // ── 전체보기 모달 ──
@@ -374,6 +407,13 @@ export default function WorkoutScreen() {
       // 운동 로그 안에 PT/PERSONAL이 같이 오므로
       // /api/member/schedule/this-week 별도 호출은 제거해서 중복 조회를 줄임
       await fetchLogs(jwt, weekOffset);
+      // 챌린지 fetch
+      try {
+        const mRes = await fetch(`${API_URL}/api/missions/my`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        if (mRes.ok) setMissions(await mRes.json());
+      } catch {}
     } catch (e: any) {
       console.log("운동로그 오류:", e?.message);
     } finally {
@@ -787,6 +827,9 @@ export default function WorkoutScreen() {
 
         {exercises.map((exercise: any, exIdx: number) => {
           const sets = exercise.sets ?? [];
+          const mediaList = getExerciseMediaList(exercise);
+          const mediaKey = getExerciseMediaKey(log, exercise, exIdx);
+          const isMediaOpen = !!expandedExerciseMediaKeys[mediaKey];
 
           return (
             <View
@@ -811,13 +854,26 @@ export default function WorkoutScreen() {
                     fontSize: 15,
                     fontWeight: "900",
                     color: Colors.text,
+                    flex: 1,
                   }}
                 >
                   {exercise.name}
                 </Text>
-                <Text style={{ fontSize: 12, fontWeight: "900", color }}>
-                  {sets.length}세트
-                </Text>
+                {mediaList.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      setExpandedExerciseMediaKeys((prev) => ({
+                        ...prev,
+                        [mediaKey]: !prev[mediaKey],
+                      }))
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "800", color }}>
+                      {getExerciseMediaToggleLabel(mediaList, isMediaOpen)}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
               <View
@@ -953,6 +1009,47 @@ export default function WorkoutScreen() {
                   </Text>
                 </View>
               ) : null}
+
+              {isMediaOpen && mediaList.length > 0 ? (
+                <View style={{ marginTop: 9, gap: 8 }}>
+                  {mediaList.map((media: any, mediaIdx: number) => {
+                    const isVideo = String(media.mediaType).toUpperCase() === "VIDEO";
+                    return (
+                      <TouchableOpacity
+                        key={`${media.url}-${mediaIdx}`}
+                        activeOpacity={0.9}
+                        onPress={() => {
+                          setMediaGallery(mediaList);
+                          setMediaGalleryIndex(mediaIdx);
+                        }}
+                        style={{
+                          overflow: "hidden",
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: Colors.border,
+                          backgroundColor: "#fff",
+                        }}
+                      >
+                        {isVideo ? (
+                          <Video
+                            source={{ uri: media.url }}
+                            style={{ width: "100%", height: 220 }}
+                            resizeMode={ResizeMode.CONTAIN}
+                            useNativeControls
+                            shouldPlay={false}
+                          />
+                        ) : (
+                          <Image
+                            source={{ uri: media.url }}
+                            style={{ width: "100%", height: 220 }}
+                            resizeMode="contain"
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
           );
         })}
@@ -1018,6 +1115,69 @@ export default function WorkoutScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* 챌린지 */}
+        {(() => {
+          const logMissions = missions.filter(
+            (m) => m.workoutLogId != null && Number(m.workoutLogId) === Number(log.workoutId),
+          );
+          if (logMissions.length === 0) return null;
+          const doneCount = logMissions.filter((m) => m.status === "DONE").length;
+          return (
+            <View
+              style={{
+                marginTop: 12,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#f97316" }}>
+                  챌린지
+                </Text>
+                <Text style={{ fontSize: 11, color: "#f9731699", marginLeft: "auto" }}>
+                  {doneCount}/{logMissions.length} 완료
+                </Text>
+              </View>
+              {logMissions.map((m) => {
+                const isDone = m.status === "DONE";
+                const isFailed = m.status === "FAILED";
+                return (
+                  <View
+                    key={m.id}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#f97316",
+                      }}
+                    />
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 13,
+                        color: isDone ? Colors.textMuted : isFailed ? "#ef444499" : Colors.text,
+                        textDecorationLine: isDone ? "line-through" : "none",
+                      }}
+                    >
+                      {m.content}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
       </View>
     );
   };
@@ -1072,6 +1232,7 @@ export default function WorkoutScreen() {
           >
             <TouchableOpacity
               onPress={() => setWeekOffset((w) => w - 1)}
+              delayPressIn={60}
               style={{ padding: 6 }}
             >
               <Text style={{ fontSize: 20, color: Colors.green }}>‹</Text>
@@ -1090,6 +1251,7 @@ export default function WorkoutScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => setWeekOffset((w) => Math.min(w + 1, 0))}
+              delayPressIn={60}
               style={{ padding: 6, opacity: weekOffset === 0 ? 0.3 : 1 }}
             >
               <Text style={{ fontSize: 20, color: Colors.green }}>›</Text>
@@ -1109,6 +1271,7 @@ export default function WorkoutScreen() {
                 <TouchableOpacity
                   key={key}
                   onPress={() => setSelectedDate(key)}
+                  delayPressIn={60}
                   style={{ alignItems: "center", gap: 4 }}
                 >
                   <Text

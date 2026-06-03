@@ -22,6 +22,17 @@ public class AuthController {
         return authService.kakaoLogin(request.getAccessToken());
     }
 
+    @PostMapping("/apple")
+    public ResponseEntity<KakaoLoginResponse> appleLogin(@RequestBody java.util.Map<String, String> body) {
+        try {
+            String identityToken = body.get("identityToken");
+            String name = body.get("name");
+            return ResponseEntity.ok(authService.appleLogin(identityToken, name));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).build();
+        }
+    }
+
     /**
      * 앱 시작 시 저장된 JWT가 유효한지 검증하는 엔드포인트
      * 유효하면 유저 정보 반환, 만료/invalid면 401

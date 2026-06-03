@@ -1,4 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
+import * as Linking from "expo-linking";
 import { Stack } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Text, View } from "react-native";
@@ -83,9 +85,26 @@ export default function RootLayout() {
       });
     });
 
+    // 카카오 공유 딥링크: kakaoe889...://kakaolink?code=ABC123
+    const handleDeepLink = ({ url }: { url: string }) => {
+      try {
+        if (!url.includes("kakaolink")) return;
+        const query = url.split("?")[1] ?? "";
+        const params = new URLSearchParams(query);
+        const code = params.get("code");
+        if (code) {
+          AsyncStorage.setItem("pendingInviteCode", code.toUpperCase());
+        }
+      } catch {}
+    };
+
+    const linkingSub = Linking.addEventListener("url", handleDeepLink);
+    Linking.getInitialURL().then((url) => { if (url) handleDeepLink({ url }); });
+
     return () => {
       unsubscribeBackground();
       unsubscribeForeground();
+      linkingSub.remove();
     };
   }, []);
 

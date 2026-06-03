@@ -9,6 +9,7 @@ import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,17 +29,20 @@ public class BodyLogController {
     private final MemberRepository memberRepository;
     private final ManualMemberRepository manualMemberRepository;
     private final JwtService jwtService;
+    private final NotificationService notificationService;
 
     public BodyLogController(BodyLogRepository bodyLogRepository,
                              ManualBodyLogRepository manualBodyLogRepository,
                              MemberRepository memberRepository,
                              ManualMemberRepository manualMemberRepository,
-                             JwtService jwtService) {
+                             JwtService jwtService,
+                             NotificationService notificationService) {
         this.bodyLogRepository = bodyLogRepository;
         this.manualBodyLogRepository = manualBodyLogRepository;
         this.memberRepository = memberRepository;
         this.manualMemberRepository = manualMemberRepository;
         this.jwtService = jwtService;
+        this.notificationService = notificationService;
     }
 
     private Map<String, Object> toMap(BodyLog log) {
@@ -78,6 +82,50 @@ public class BodyLogController {
                 .stream()
                 .map(this::toMap)
                 .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    // POST /api/bodylog/member/{memberId} - 트레이너가 연동 회원 바디로그 저장
+    @PostMapping("/member/{memberId}")
+    public ResponseEntity<Map<String, Object>> saveBodyLogForMember(
+            @PathVariable Long memberId,
+            @RequestBody Map<String, Object> body) {
+        Member member = memberRepository.findByIdWithUser(memberId)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+
+        BodyLog log = new BodyLog();
+        log.setMember(member);
+        log.setLogDate(java.time.LocalDate.now());
+        log.setCreatedAt(java.time.LocalDateTime.now());
+        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
+        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.get("memo") != null)        log.setMemo(body.get("memo").toString());
+        bodyLogRepository.save(log);
+
+        // 회원에게 바디로그 작성 알림
+        try {
+            if (member.getNotifBodyLog()) {
+                String trainerName = member.getTrainer() != null
+                    ? member.getTrainer().getUser().getName() : "트레이너";
+                notificationService.sendNotification(
+                    member.getUser(), "BODY_LOG",
+                    trainerName + "님이 바디로그를 작성했어요.",
+                    "BODY_LOG", log.getId()
+                );
+            }
+        } catch (Exception ignored) {}
+
+        List<Map<String, Object>> allLogs = bodyLogRepository
+                .findByMemberOrderByLogDateAsc(member)
+                .stream()
+                .map(this::toMap)
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("saved", toMap(log));
+        result.put("logs", allLogs);
         return ResponseEntity.ok(result);
     }
 

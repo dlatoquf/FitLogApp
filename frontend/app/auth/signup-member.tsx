@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -43,6 +43,15 @@ export default function SignupMemberScreen() {
   const [muscleMass, setMuscleMass] = useState("");
 
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("pendingInviteCode").then((code) => {
+      if (code) {
+        setTrainerCode(code);
+        AsyncStorage.removeItem("pendingInviteCode");
+      }
+    });
+  }, []);
 
   const handleVerifyCode = async () => {
     if (trainerCode.trim().length < 4) {

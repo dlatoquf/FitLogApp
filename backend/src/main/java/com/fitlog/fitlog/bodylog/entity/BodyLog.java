@@ -20,9 +20,6 @@ public class BodyLog {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @Column(name = "log_date", nullable = false)
-    private LocalDate logDate;
-
     private Double weight;
 
     @Column(name = "body_fat")
@@ -35,6 +32,9 @@ public class BodyLog {
     private Double muscleMass;
 
     private String memo;
+
+    @Column(name = "log_date", nullable = false)
+    private LocalDate logDate;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

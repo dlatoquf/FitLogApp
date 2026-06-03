@@ -12,12 +12,12 @@ import java.util.List;
 public class Trainer {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @MapsId
     @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
     @JsonIgnore
@@ -59,6 +59,12 @@ public class Trainer {
     @Column(name = "notif_personal_workout")
     private Boolean notifPersonalWorkout = true;
 
+    @Column(name = "notif_diet")
+    private Boolean notifDiet = true;
+
+    @Column(name = "notif_new_member")
+    private Boolean notifNewMember = true;
+
     // 슬롯 시작 분 오프셋: null=미설정, 0=정각(:00), 30=30분(:30)
     @Column(name = "slot_offset")
     private Integer slotOffset;
@@ -90,6 +96,8 @@ public class Trainer {
     public Boolean getNotifBirthday() { return notifBirthday == null || notifBirthday; }
     public Boolean getNotifMissionDone() { return notifMissionDone == null || notifMissionDone; }
     public Boolean getNotifPersonalWorkout() { return notifPersonalWorkout == null || notifPersonalWorkout; }
+    public Boolean getNotifDiet() { return notifDiet == null || notifDiet; }
+    public Boolean getNotifNewMember() { return notifNewMember == null || notifNewMember; }
     public void setUser(User user) { this.user = user; }
     public void setGymName(String gymName) { this.gymName = gymName; }
     public void setWorkDays(String workDays) { this.workDays = workDays; }
@@ -103,6 +111,8 @@ public class Trainer {
     public void setNotifBirthday(Boolean notifBirthday) { this.notifBirthday = notifBirthday; }
     public void setNotifMissionDone(Boolean notifMissionDone) { this.notifMissionDone = notifMissionDone; }
     public void setNotifPersonalWorkout(Boolean notifPersonalWorkout) { this.notifPersonalWorkout = notifPersonalWorkout; }
+    public void setNotifDiet(Boolean notifDiet) { this.notifDiet = notifDiet; }
+    public void setNotifNewMember(Boolean notifNewMember) { this.notifNewMember = notifNewMember; }
     public Integer getSlotOffset() { return slotOffset; }
     public void setSlotOffset(Integer slotOffset) { this.slotOffset = slotOffset; }
     public java.time.LocalDate getTrialEndDate() { return trialEndDate; }

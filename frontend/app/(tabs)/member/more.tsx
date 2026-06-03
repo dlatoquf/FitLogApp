@@ -61,6 +61,7 @@ export default function MemberMoreScreen() {
   const [notifPtPayment, setNotifPtPayment] = useState(true);
   const [notifFeedback, setNotifFeedback] = useState(true);
   const [notifWorkout, setNotifWorkout] = useState(true);
+  const [notifBodyLog, setNotifBodyLog] = useState(true);
   const [ptContracts, setPtContracts] = useState<
     {
       contractId: number;
@@ -73,19 +74,41 @@ export default function MemberMoreScreen() {
   const [termsVisible, setTermsVisible] = useState(false);
   const [termsContent, setTermsContent] = useState({ title: "", text: "" });
 
+  const syncNotifToServer = async (settings: Partial<{
+    notifFeedback: boolean; notifSchedule: boolean;
+    notifPtPayment: boolean; notifWorkout: boolean;
+  }>) => {
+    try {
+      await apiPut("/api/member/notification-settings", settings);
+    } catch {}
+  };
+
   const fetchProfile = async () => {
-    const pairs = await AsyncStorage.multiGet([
-      "notif_push_member",
-      "notif_schedule_member",
-      "notif_pt_payment",
-      "notif_feedback",
-      "notif_workout_member",
-    ]);
-    if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
-    if (pairs[1][1] !== null) setNotifSchedule(pairs[1][1] === "true");
-    if (pairs[2][1] !== null) setNotifPtPayment(pairs[2][1] === "true");
-    if (pairs[3][1] !== null) setNotifFeedback(pairs[3][1] === "true");
-    if (pairs[4][1] !== null) setNotifWorkout(pairs[4][1] === "true");
+    // 서버에서 알림 설정 우선 로드
+    try {
+      const serverSettings = await apiGet<{
+        notifFeedback: boolean; notifSchedule: boolean;
+        notifPtPayment: boolean; notifWorkout: boolean;
+      }>("/api/member/notification-settings");
+      const allOn = serverSettings.notifFeedback && serverSettings.notifSchedule
+        && serverSettings.notifPtPayment && serverSettings.notifWorkout;
+      setNotifPush(allOn);
+      setNotifFeedback(serverSettings.notifFeedback);
+      setNotifSchedule(serverSettings.notifSchedule);
+      setNotifPtPayment(serverSettings.notifPtPayment);
+      setNotifWorkout(serverSettings.notifWorkout);
+    } catch {
+      // 서버 실패 시 AsyncStorage 폴백
+      const pairs = await AsyncStorage.multiGet([
+        "notif_push_member", "notif_schedule_member",
+        "notif_pt_payment", "notif_feedback", "notif_workout_member",
+      ]);
+      if (pairs[0][1] !== null) setNotifPush(pairs[0][1] === "true");
+      if (pairs[1][1] !== null) setNotifSchedule(pairs[1][1] === "true");
+      if (pairs[2][1] !== null) setNotifPtPayment(pairs[2][1] === "true");
+      if (pairs[3][1] !== null) setNotifFeedback(pairs[3][1] === "true");
+      if (pairs[4][1] !== null) setNotifWorkout(pairs[4][1] === "true");
+    }
 
     try {
       const data = await apiGet<MemberProfile>(ENDPOINTS.member.me);
@@ -353,49 +376,75 @@ export default function MemberMoreScreen() {
     setNotifPush(value);
     await AsyncStorage.setItem("notif_push_member", String(value));
     if (!value) {
-      // 전체 끄면 세부 항목도 모두 끔
       setNotifSchedule(false);
       setNotifPtPayment(false);
       setNotifFeedback(false);
       setNotifWorkout(false);
+      setNotifBodyLog(false);
       await AsyncStorage.multiSet([
         ["notif_schedule_member", "false"],
         ["notif_pt_payment", "false"],
         ["notif_feedback", "false"],
         ["notif_workout_member", "false"],
+        ["notif_bodylog_member", "false"],
       ]);
+      await syncNotifToServer({ notifFeedback: false, notifSchedule: false, notifPtPayment: false, notifWorkout: false });
     } else {
-      // 전체 켜면 세부 항목도 모두 켬
       setNotifSchedule(true);
       setNotifPtPayment(true);
       setNotifFeedback(true);
       setNotifWorkout(true);
+      setNotifBodyLog(true);
       await AsyncStorage.multiSet([
         ["notif_schedule_member", "true"],
         ["notif_pt_payment", "true"],
         ["notif_feedback", "true"],
         ["notif_workout_member", "true"],
+        ["notif_bodylog_member", "true"],
       ]);
+      await syncNotifToServer({ notifFeedback: true, notifSchedule: true, notifPtPayment: true, notifWorkout: true });
     }
   };
+  const checkAndSyncMasterToggle = (overrides: Partial<{
+    notifWorkout: boolean; notifSchedule: boolean;
+    notifPtPayment: boolean; notifFeedback: boolean;
+  }>) => {
+    const w = overrides.notifWorkout  ?? notifWorkout;
+    const s = overrides.notifSchedule ?? notifSchedule;
+    const p = overrides.notifPtPayment ?? notifPtPayment;
+    const f = overrides.notifFeedback ?? notifFeedback;
+    const anyOn = w || s || p || f;
+    setNotifPush(anyOn);
+    AsyncStorage.setItem("notif_push_member", String(anyOn));
+  };
+
   const handleWorkoutToggle = async (value: boolean) => {
     setNotifWorkout(value);
     await AsyncStorage.setItem("notif_workout_member", String(value));
-    if (value && !notifPush) handlePushToggle(true);
+    await syncNotifToServer({ notifWorkout: value });
+    checkAndSyncMasterToggle({ notifWorkout: value });
   };
   const handleScheduleToggle = async (value: boolean) => {
     setNotifSchedule(value);
     await AsyncStorage.setItem("notif_schedule_member", String(value));
-    if (value && !notifPush) handlePushToggle(true);
+    await syncNotifToServer({ notifSchedule: value });
+    checkAndSyncMasterToggle({ notifSchedule: value });
   };
   const handlePtPaymentToggle = async (value: boolean) => {
     setNotifPtPayment(value);
     await AsyncStorage.setItem("notif_pt_payment", String(value));
-    if (value && !notifPush) handlePushToggle(true);
+    await syncNotifToServer({ notifPtPayment: value });
+    checkAndSyncMasterToggle({ notifPtPayment: value });
   };
   const handleFeedbackToggle = async (value: boolean) => {
     setNotifFeedback(value);
     await AsyncStorage.setItem("notif_feedback", String(value));
+    await syncNotifToServer({ notifFeedback: value });
+    checkAndSyncMasterToggle({ notifFeedback: value });
+  };
+  const handleBodyLogToggle = async (value: boolean) => {
+    setNotifBodyLog(value);
+    await AsyncStorage.setItem("notif_bodylog_member", String(value));
     if (value && !notifPush) handlePushToggle(true);
   };
 
@@ -892,11 +941,20 @@ export default function MemberMoreScreen() {
             disabled={!notifPush}
           />
           <View style={{ height: 1, backgroundColor: Colors.border }} />
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
           <SwitchRow
             label="운동 기록 (PT)"
             description="트레이너가 PT 기록 등록 시 알림"
             value={notifWorkout}
             onValueChange={handleWorkoutToggle}
+            disabled={!notifPush}
+          />
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
+          <SwitchRow
+            label="바디로그 알림"
+            description="트레이너가 바디로그 작성 시 알림"
+            value={notifBodyLog}
+            onValueChange={handleBodyLogToggle}
             disabled={!notifPush}
           />
         </View>

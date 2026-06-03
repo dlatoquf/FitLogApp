@@ -91,13 +91,18 @@ import { API_URL } from "../../../constants/api";
         await markOneRead(n.notificationId);
 
         // 트레이너가 회원에게 보낸 운동기록 알림
-        if (n.targetType === "WORKOUT_LOG") {
+        if (n.targetType === "WORKOUT_LOG" || n.type === "WORKOUT_LOG") {
             router.push("/(tabs)/member/workout");
             return;
         }
         // 트레이너가 회원에게 보낸 식단 피드백 알림
-        if (n.type === "FEEDBACK" || n.targetType === "FEEDBACK") {
+        if (n.type === "DIET_FEEDBACK" || n.type === "FEEDBACK" || n.targetType === "FEEDBACK" || n.targetType === "DIET_FEEDBACK") {
             router.push("/(tabs)/member/diet");
+            return;
+        }
+        // 트레이너가 바디로그 작성 알림
+        if (n.type === "BODY_LOG" || n.targetType === "BODY_LOG") {
+            router.push("/(tabs)/member/growth" as any);
             return;
         }
         // 예약 확정/취소 등 스케줄 관련 알림

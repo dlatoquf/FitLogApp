@@ -129,7 +129,7 @@ public class MemberHomeController {
         }
 
         if (body.get("phone") != null) {
-            member.setPhone(body.get("phone").toString());
+            member.setPhone(formatPhone(body.get("phone").toString()));
         }
 
         if (body.get("height") != null) {
@@ -312,13 +312,15 @@ public class MemberHomeController {
 
         // 트레이너에게 신규 회원 연결 알림
         try {
-            notificationService.sendNotification(
-                trainer.getUser(),
-                "NEW_MEMBER",
-                member.getUser().getName() + "님이 회원으로 등록됐어요.",
-                "MEMBER",
-                member.getId()
-            );
+            if (trainer.getNotifNewMember()) {
+                notificationService.sendNotification(
+                    trainer.getUser(),
+                    "NEW_MEMBER",
+                    member.getUser().getName() + "님이 회원으로 등록됐어요.",
+                    "MEMBER",
+                    member.getId()
+                );
+            }
         } catch (Exception ignored) {}
 
         return ResponseEntity.ok(Map.of(
@@ -400,5 +402,40 @@ public class MemberHomeController {
         }).collect(java.util.stream.Collectors.toList());
 
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/notification-settings")
+    public ResponseEntity<Map<String, Object>> getNotificationSettings(
+            @RequestHeader("Authorization") String authorization) {
+        Member member = memberHomeService.getMemberByToken(authorization);
+        return ResponseEntity.ok(Map.of(
+            "notifFeedback", member.getNotifFeedback(),
+            "notifSchedule", member.getNotifSchedule(),
+            "notifPtPayment", member.getNotifPtPayment(),
+            "notifWorkout", member.getNotifWorkout()
+        ));
+    }
+
+    @PutMapping("/notification-settings")
+    public ResponseEntity<Map<String, Object>> updateNotificationSettings(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, Boolean> body) {
+        Member member = memberHomeService.getMemberByToken(authorization);
+        if (body.containsKey("notifFeedback")) member.setNotifFeedback(body.get("notifFeedback"));
+        if (body.containsKey("notifSchedule")) member.setNotifSchedule(body.get("notifSchedule"));
+        if (body.containsKey("notifPtPayment")) member.setNotifPtPayment(body.get("notifPtPayment"));
+        if (body.containsKey("notifWorkout")) member.setNotifWorkout(body.get("notifWorkout"));
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("message", "알림 설정이 저장됐어요."));
+    }
+
+    private String formatPhone(String phone) {
+        if (phone == null) return null;
+        String d = phone.replaceAll("[^0-9]", "");
+        if (d.length() == 11)
+            return d.substring(0, 3) + "-" + d.substring(3, 7) + "-" + d.substring(7);
+        if (d.length() == 10)
+            return (d.startsWith("02") ? d.substring(0, 2) + "-" + d.substring(2, 6) : d.substring(0, 3) + "-" + d.substring(3, 6)) + "-" + d.substring(d.startsWith("02") ? 6 : 6);
+        return phone;
     }
 }

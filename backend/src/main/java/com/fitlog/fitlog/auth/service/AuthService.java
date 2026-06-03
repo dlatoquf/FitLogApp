@@ -10,15 +10,18 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final KakaoService kakaoService;
+    private final AppleService appleService;
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
     public AuthService(
             KakaoService kakaoService,
+            AppleService appleService,
             JwtService jwtService,
             UserRepository userRepository
     ) {
         this.kakaoService = kakaoService;
+        this.appleService = appleService;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
     }
@@ -45,6 +48,32 @@ public class AuthService {
         }
 
         System.out.println("유저 role: " + user.getRole());
+
+        boolean isNewUser = user.getRole() == null;
+        String role = user.getRole() != null ? user.getRole().name() : null;
+        String jwt = jwtService.generateToken(user.getId(), user.getEmail());
+
+        return new KakaoLoginResponse(jwt, isNewUser, role);
+    }
+
+    public KakaoLoginResponse appleLogin(String identityToken, String name) {
+        AppleService.AppleUserInfo appleUser = appleService.verifyIdentityToken(identityToken, name);
+
+        User user = userRepository.findByAppleId(appleUser.appleId())
+                .orElseGet(() -> {
+                    User newUser = new User();
+                    newUser.setAppleId(appleUser.appleId());
+                    newUser.setEmail(appleUser.email());
+                    // 이름은 최초 로그인 시에만 Apple이 제공 — 있으면 저장, 없으면 signup에서 입력
+                    if (appleUser.name() != null && !appleUser.name().isBlank()) {
+                        newUser.setName(appleUser.name());
+                    }
+                    return userRepository.save(newUser);
+                });
+
+        if (user.getDeletedAt() != null) {
+            throw new RuntimeException("삭제된 계정입니다. 7일 이내에 트레이너에게 복구를 요청하세요.");
+        }
 
         boolean isNewUser = user.getRole() == null;
         String role = user.getRole() != null ? user.getRole().name() : null;

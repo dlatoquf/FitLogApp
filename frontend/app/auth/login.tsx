@@ -1,15 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   Text,
   View,
 } from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { API_URL } from "../../constants/api";
@@ -204,6 +207,64 @@ export default function LoginScreen() {
   };
 
   // ─────────────────────────────────────────────
+  // 애플 로그인 버튼 핸들러
+  // ─────────────────────────────────────────────
+  const handleAppleLogin = async () => {
+    setLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const { identityToken, fullName } = credential;
+      if (!identityToken) throw new Error("Apple identityToken을 가져오지 못했어요.");
+
+      const name = fullName?.givenName && fullName?.familyName
+        ? `${fullName.familyName}${fullName.givenName}`
+        : null;
+
+      const res = await fetch(`${API_URL}/api/auth/apple`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identityToken, name }),
+      });
+
+      const text = await res.text();
+      let data: { jwt: string; isNewUser: boolean; role: string | null };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`서버 응답 오류: ${text}`);
+      }
+
+      if (!res.ok) throw new Error((data as any)?.message || `오류: ${res.status}`);
+
+      const { jwt, isNewUser, role } = data;
+      await AsyncStorage.setItem("jwt", jwt);
+      if (role) await AsyncStorage.setItem("role", role);
+
+      try {
+        const fcmToken = await messaging().getToken();
+        if (fcmToken) await saveFcmToken(fcmToken);
+      } catch {}
+
+      if (isNewUser || !role) {
+        router.replace("/auth/signup");
+      } else {
+        navigateByRole(role);
+      }
+    } catch (e: any) {
+      if (e?.code === "ERR_REQUEST_CANCELED") return; // 사용자가 직접 취소
+      Alert.alert("로그인 실패", "Apple 로그인에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────
   // JWT 자동검증 중 → 로딩 스피너만 표시
   // ─────────────────────────────────────────────
   if (checkingToken) {
@@ -301,7 +362,7 @@ export default function LoginScreen() {
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "row",
-              marginBottom: 24,
+              marginBottom: 12,
               opacity: loading ? 0.7 : 1,
             })}
           >
@@ -309,19 +370,55 @@ export default function LoginScreen() {
               <ActivityIndicator color={Colors.kakaoText} />
             ) : (
               <>
-                <Text style={{ fontSize: 22, marginRight: 10 }}>💬</Text>
-                <Text
-                  style={{
-                    color: Colors.kakaoText,
-                    fontWeight: "900",
-                    fontSize: 18,
-                  }}
-                >
+                {/* 카카오 말풍선 로고 */}
+                <Svg width={22} height={22} viewBox="0 0 24 24" style={{ marginRight: 10 }}>
+                  <Path
+                    d="M12 3C6.477 3 2 6.582 2 11c0 2.836 1.775 5.328 4.456 6.808L5.5 21l3.917-2.094A11.3 11.3 0 0 0 12 19c5.523 0 10-3.582 10-8s-4.477-8-10-8z"
+                    fill="#3C1E1E"
+                  />
+                </Svg>
+                <Text style={{ color: Colors.kakaoText, fontWeight: "900", fontSize: 18 }}>
                   카카오로 로그인
                 </Text>
               </>
             )}
           </Pressable>
+
+          {/* 애플 로그인 버튼 (iOS 전용) */}
+          {Platform.OS === "ios" && (
+            <Pressable
+              onPress={handleAppleLogin}
+              disabled={loading}
+              style={({ pressed }) => ({
+                width: "100%",
+                height: 64,
+                borderRadius: 22,
+                backgroundColor: pressed ? "#333" : "#000",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                marginBottom: 24,
+                opacity: loading ? 0.7 : 1,
+              })}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  {/* 애플 로고 */}
+                  <Svg width={20} height={24} viewBox="0 0 814 1000" style={{ marginRight: 10 }}>
+                    <Path
+                      d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.7 0 663 0 541.8c0-207.8 133.4-318.1 264.4-318.1 70.1 0 128.4 46.4 172.5 46.4 42.8 0 109.6-49.1 190.5-49.1zm-11.5-212.5c34.1-40.2 58.4-96.2 58.4-152.2 0-7.8-.6-15.6-1.9-22.7-55.4 2.1-121.8 36.8-161.3 84.4-31.3 36.1-61 92.1-61 148.8 0 8.4 1.3 16.9 1.9 19.5 3.3.6 8.4 1.3 13.6 1.3 49.9 0 112.3-33.5 150.3-79.1z"
+                      fill="#fff"
+                    />
+                  </Svg>
+                  <Text style={{ color: "#fff", fontWeight: "900", fontSize: 18 }}>
+                    Apple로 로그인
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          )}
 
           {/* 약관 */}
           <Text

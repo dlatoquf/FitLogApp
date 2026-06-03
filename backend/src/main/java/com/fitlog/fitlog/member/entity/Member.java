@@ -47,6 +47,21 @@ public class Member {
     // PT 잔여 0회가 된 날짜 — 7일 후 자동 INACTIVE 전환 기준
     private java.time.LocalDate ptEndedAt;
 
+    @Column(name = "notif_feedback")
+    private Boolean notifFeedback = true;
+
+    @Column(name = "notif_schedule")
+    private Boolean notifSchedule = true;
+
+    @Column(name = "notif_pt_payment")
+    private Boolean notifPtPayment = true;
+
+    @Column(name = "notif_workout")
+    private Boolean notifWorkout = true;
+
+    @Column(name = "notif_bodylog")
+    private Boolean notifBodyLog = true;
+
     public enum Status { ACTIVE, INACTIVE }
 
     public Long getId() { return id; }
@@ -87,4 +102,15 @@ public class Member {
     public void setPreviousTrainerId(Long previousTrainerId) { this.previousTrainerId = previousTrainerId; }
     public java.time.LocalDate getPtEndedAt() { return ptEndedAt; }
     public void setPtEndedAt(java.time.LocalDate ptEndedAt) { this.ptEndedAt = ptEndedAt; }
+
+    public Boolean getNotifFeedback() { return notifFeedback == null || notifFeedback; }
+    public Boolean getNotifSchedule() { return notifSchedule == null || notifSchedule; }
+    public Boolean getNotifPtPayment() { return notifPtPayment == null || notifPtPayment; }
+    public Boolean getNotifWorkout() { return notifWorkout == null || notifWorkout; }
+    public Boolean getNotifBodyLog() { return notifBodyLog == null || notifBodyLog; }
+    public void setNotifFeedback(Boolean v) { this.notifFeedback = v; }
+    public void setNotifSchedule(Boolean v) { this.notifSchedule = v; }
+    public void setNotifPtPayment(Boolean v) { this.notifPtPayment = v; }
+    public void setNotifWorkout(Boolean v) { this.notifWorkout = v; }
+    public void setNotifBodyLog(Boolean v) { this.notifBodyLog = v; }
 }

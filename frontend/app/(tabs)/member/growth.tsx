@@ -483,7 +483,7 @@ export default function MemberGrowthScreen() {
                       val: log.weight,
                       unit: "kg",
                       color: Colors.text,
-                      diff: null,
+                      diff: diffText("weight"),
                     },
                     {
                       label: "체지방량",

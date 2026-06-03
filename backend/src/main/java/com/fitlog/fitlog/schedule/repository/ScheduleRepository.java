@@ -222,4 +222,10 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     // OT 회원의 누적 OT 수업 횟수 (확정/완료 포함 전체)
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.manualMember = :manualMember AND s.sessionType = 'OT'")
     int countOtSessionsByManualMember(@Param("manualMember") ManualMember manualMember);
+
+    // 특정 OT 세션보다 앞선 OT 횟수 (날짜+시간 기준) → +1 하면 현재 세션의 회차
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.manualMember = :manualMember AND s.sessionType = 'OT' AND (s.date < :date OR (s.date = :date AND s.startTime < :startTime))")
+    int countOtSessionsBefore(@Param("manualMember") ManualMember manualMember,
+                              @Param("date") java.time.LocalDate date,
+                              @Param("startTime") java.time.LocalTime startTime);
 }

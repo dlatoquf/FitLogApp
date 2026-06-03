@@ -137,6 +137,9 @@ public class ManualMemberController {
                 ot.setPtTotal(ptTotal);
                 ot.setPtRemaining(body.get("ptRemaining") != null
                         ? ((Number) body.get("ptRemaining")).intValue() : ptTotal);
+                // OT → PT 전환: memo에서 "OT" 제거
+                String newMemo = body.get("memo") != null ? (String) body.get("memo") : null;
+                ot.setMemo("OT".equals(newMemo) ? null : newMemo);
                 if (body.get("amount") != null) ot.setAmount(((Number) body.get("amount")).longValue());
                 java.time.LocalDate pd = java.time.LocalDate.now();
                 if (body.get("paymentDate") != null) {
@@ -162,7 +165,7 @@ public class ManualMemberController {
         ManualMember m = new ManualMember();
         m.setTrainer(trainer);
         m.setName((String) body.get("name"));
-        if (body.get("phone") != null) m.setPhone((String) body.get("phone"));
+        if (body.get("phone") != null) m.setPhone(formatPhone((String) body.get("phone")));
         if (body.get("memo") != null) m.setMemo((String) body.get("memo"));
 
         boolean isOtMember = "OT".equals(body.get("memo"));
@@ -295,5 +298,18 @@ public class ManualMemberController {
             @PathVariable Long id) {
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private String formatPhone(String phone) {
+        if (phone == null) return null;
+        String d = phone.replaceAll("[^0-9]", "");
+        if (d.length() == 11)
+            return d.substring(0, 3) + "-" + d.substring(3, 7) + "-" + d.substring(7);
+        if (d.length() == 10) {
+            if (d.startsWith("02"))
+                return d.substring(0, 2) + "-" + d.substring(2, 6) + "-" + d.substring(6);
+            return d.substring(0, 3) + "-" + d.substring(3, 6) + "-" + d.substring(6);
+        }
+        return phone;
     }
 }

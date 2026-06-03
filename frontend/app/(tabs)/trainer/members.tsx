@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -188,6 +189,7 @@ export default function TrainerMembersScreen() {
   // ── 메모 추가 ──────────────────────────────────────────────────────────────
   const submitMemo = async () => {
     if (!memoInput.trim() || !memoTarget) return;
+    Keyboard.dismiss();
     setAddingMemo(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
@@ -515,7 +517,7 @@ export default function TrainerMembersScreen() {
                   fontWeight: "600",
                 }}
               >
-                회원 추가
+                기존 회원 추가
               </Text>
             </TouchableOpacity>
             {/* 비활성 회원 보기 버튼 */}
@@ -1014,88 +1016,88 @@ export default function TrainerMembersScreen() {
                       </Text>
                     </View>
                     {ptEndedMembers.map((m) => (
-                        <TouchableOpacity
-                          key={m.key}
-                          onPress={() => {
-                            setInactiveModal(false);
-                            const url = m.isLinked
-                              ? `/(tabs)/trainer/member-detail?id=${m.id}`
-                              : `/(tabs)/trainer/member-detail?id=${m.id}&type=manual`;
-                            router.push(url as any);
-                          }}
+                      <TouchableOpacity
+                        key={m.key}
+                        onPress={() => {
+                          setInactiveModal(false);
+                          const url = m.isLinked
+                            ? `/(tabs)/trainer/member-detail?id=${m.id}`
+                            : `/(tabs)/trainer/member-detail?id=${m.id}&type=manual`;
+                          router.push(url as any);
+                        }}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F9FAFB",
+                          borderRadius: 10,
+                          padding: 12,
+                          marginBottom: 6,
+                          borderWidth: 1,
+                          borderColor: "#E5E7EB",
+                        }}
+                      >
+                        <View
                           style={{
-                            flexDirection: "row",
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: "#D1D5DB",
+                            justifyContent: "center",
                             alignItems: "center",
-                            backgroundColor: "#F9FAFB",
-                            borderRadius: 10,
-                            padding: 12,
-                            marginBottom: 6,
-                            borderWidth: 1,
-                            borderColor: "#E5E7EB",
+                            marginRight: 10,
                           }}
                         >
-                          <View
+                          <Text
                             style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: 8,
-                              backgroundColor: "#D1D5DB",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              marginRight: 10,
+                              fontSize: 13,
+                              fontWeight: "800",
+                              color: "#fff",
                             }}
                           >
-                            <Text
-                              style={{
-                                fontSize: 13,
-                                fontWeight: "800",
-                                color: "#fff",
-                              }}
-                            >
-                              {m.name[0]}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: "700",
-                                color: Colors.textMuted,
-                              }}
-                            >
-                              {m.name}
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                color: Colors.textMuted,
-                                marginTop: 2,
-                              }}
-                            >
-                              PT 0 / {m.ptTotal}회
-                            </Text>
-                          </View>
-                          <View
+                            {m.name[0]}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
                             style={{
-                              backgroundColor: "#F3F4F6",
-                              borderRadius: 6,
-                              paddingHorizontal: 7,
-                              paddingVertical: 3,
-                              borderWidth: 1,
-                              borderColor: "#D1D5DB",
+                              fontSize: 14,
+                              fontWeight: "700",
+                              color: Colors.textMuted,
                             }}
                           >
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                fontWeight: "700",
-                                color: "#6B7280",
-                              }}
-                            >
-                              피티 종료
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
+                            {m.name}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: Colors.textMuted,
+                              marginTop: 2,
+                            }}
+                          >
+                            PT 0 / {m.ptTotal}회
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            backgroundColor: "#F3F4F6",
+                            borderRadius: 6,
+                            paddingHorizontal: 7,
+                            paddingVertical: 3,
+                            borderWidth: 1,
+                            borderColor: "#D1D5DB",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "700",
+                              color: "#6B7280",
+                            }}
+                          >
+                            피티 종료
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 )}

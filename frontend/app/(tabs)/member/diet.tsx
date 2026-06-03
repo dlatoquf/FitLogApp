@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -56,6 +56,7 @@ const getWeekDates = (offset: number): Date[] => {
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function MemberDietScreen() {
+  const scrollRef = useRef<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
   const [photos, setPhotos] = useState<DietPhoto[]>([]);
@@ -97,7 +98,10 @@ export default function MemberDietScreen() {
     }
   }, [dateKey]);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  useFocusEffect(useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    fetchData();
+  }, [fetchData]));
 
   // ── 사진 비율 자동 계산 ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -223,6 +227,7 @@ export default function MemberDietScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} tintColor={Colors.green} />}
       >

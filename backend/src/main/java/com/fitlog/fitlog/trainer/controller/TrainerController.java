@@ -251,11 +251,19 @@ public class TrainerController {
         if (body.containsKey("notifPersonalWorkout")) {
             trainer.setNotifPersonalWorkout(Boolean.TRUE.equals(body.get("notifPersonalWorkout")));
         }
+        if (body.containsKey("notifDiet")) {
+            trainer.setNotifDiet(Boolean.TRUE.equals(body.get("notifDiet")));
+        }
+        if (body.containsKey("notifNewMember")) {
+            trainer.setNotifNewMember(Boolean.TRUE.equals(body.get("notifNewMember")));
+        }
         trainerRepository.save(trainer);
         return ResponseEntity.ok(Map.of(
                 "notifBirthday", trainer.getNotifBirthday(),
                 "notifMissionDone", trainer.getNotifMissionDone(),
-                "notifPersonalWorkout", trainer.getNotifPersonalWorkout()
+                "notifPersonalWorkout", trainer.getNotifPersonalWorkout(),
+                "notifDiet", trainer.getNotifDiet(),
+                "notifNewMember", trainer.getNotifNewMember()
         ));
     }
 
@@ -267,7 +275,9 @@ public class TrainerController {
         return ResponseEntity.ok(Map.of(
                 "notifBirthday", trainer.getNotifBirthday(),
                 "notifMissionDone", trainer.getNotifMissionDone(),
-                "notifPersonalWorkout", trainer.getNotifPersonalWorkout()
+                "notifPersonalWorkout", trainer.getNotifPersonalWorkout(),
+                "notifDiet", trainer.getNotifDiet(),
+                "notifNewMember", trainer.getNotifNewMember()
         ));
     }
 
