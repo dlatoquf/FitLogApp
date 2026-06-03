@@ -152,27 +152,63 @@ public class NotificationScheduler {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 5. 매일 오전 9시(KST) – 무료 체험 D-1 알림
-    //    trialEndDate = 내일인 FREE 플랜 트레이너에게 알림
+    // 5. 매일 오전 9시(KST) – 무료 체험 D-3 / D-1 알림
     // ─────────────────────────────────────────────────────────
     @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
     public void sendTrialExpiryWarning() {
-        LocalDate tomorrow = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1);
-        List<com.fitlog.fitlog.trainer.entity.Trainer> trainers =
-            trainerRepository.findTrialExpiringTomorrow(tomorrow);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        for (com.fitlog.fitlog.trainer.entity.Trainer trainer : trainers) {
+        // D-3 알림
+        List<com.fitlog.fitlog.trainer.entity.Trainer> d3Trainers =
+            trainerRepository.findTrialExpiringOn(today.plusDays(3));
+        for (com.fitlog.fitlog.trainer.entity.Trainer trainer : d3Trainers) {
             try {
                 if (trainer.getUser() == null) continue;
                 notificationService.sendNotification(
                     trainer.getUser(),
                     "TRIAL_EXPIRY_WARNING",
-                    "무료 체험이 내일 종료돼요. PRO로 구독하면 회원 무제한으로 계속 사용할 수 있어요.",
+                    "무료 체험이 3일 후 종료돼요. 구독하지 않으면 회원이 5명으로 제한돼요.",
                     "GENERAL",
                     null
                 );
             } catch (Exception e) {
-                System.err.println("[체험만료경고] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
+                System.err.println("[체험만료D-3] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
+            }
+        }
+
+        // D-1 알림
+        List<com.fitlog.fitlog.trainer.entity.Trainer> d1Trainers =
+            trainerRepository.findTrialExpiringTomorrow(today.plusDays(1));
+        for (com.fitlog.fitlog.trainer.entity.Trainer trainer : d1Trainers) {
+            try {
+                if (trainer.getUser() == null) continue;
+                notificationService.sendNotification(
+                    trainer.getUser(),
+                    "TRIAL_EXPIRY_WARNING",
+                    "무료 체험이 내일 종료돼요. 구독하지 않으면 회원이 5명으로 제한돼요.",
+                    "GENERAL",
+                    null
+                );
+            } catch (Exception e) {
+                System.err.println("[체험만료D-1] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
+            }
+        }
+
+        // D-0 알림 (당일)
+        List<com.fitlog.fitlog.trainer.entity.Trainer> d0Trainers =
+            trainerRepository.findTrialExpiringOn(today);
+        for (com.fitlog.fitlog.trainer.entity.Trainer trainer : d0Trainers) {
+            try {
+                if (trainer.getUser() == null) continue;
+                notificationService.sendNotification(
+                    trainer.getUser(),
+                    "TRIAL_EXPIRY_WARNING",
+                    "오늘 무료 체험이 종료돼요. 지금 구독하지 않으면 회원이 5명으로 제한돼요.",
+                    "GENERAL",
+                    null
+                );
+            } catch (Exception e) {
+                System.err.println("[체험만료D-0] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
             }
         }
     }

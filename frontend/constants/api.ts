@@ -12,8 +12,11 @@ export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
 export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 /*자취방 */
-export const API_URL = "http://192.168.0.182:8080";
-export const ANALYTICS_URL = "http://192.168.0.106:8001";
+/*export const API_URL = "http://192.168.0.251:8080";*/
+/*export const ANALYTICS_URL = "http://192.168.0.251:8001";*/
+/*테스트 서버 (TestFlight)*/
+export const API_URL = "https://fitlog-api.duckdns.org";
+export const ANALYTICS_URL = "http://52.78.154.44:8001";
 /*카페 */
 /*export const API_URL = "http://192.168.45.99:8080";*/
 /*오ㅃㅏ집 */

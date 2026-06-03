@@ -690,14 +690,23 @@ export default function TrainerMembersScreen() {
             </Text>
           </View>
         ) : (
-          displayed.map((m) => {
+          displayed.map((m, index) => {
             const color = ptColor(m.ptRemaining, m.ptTotal);
             const graceDaysLeft = ptGraceDaysLeft(m);
+            const isLocked = plan === "FREE" && index >= 5;
 
             return (
               <TouchableOpacity
                 key={m.key}
                 onPress={() => {
+                  if (isLocked) {
+                    Alert.alert(
+                      "PRO 플랜 필요",
+                      "무료 플랜은 회원 5명까지 관리할 수 있어요.\nPRO로 업그레이드하면 무제한으로 관리할 수 있어요.",
+                      [{ text: "확인" }]
+                    );
+                    return;
+                  }
                   if (m.isLinked) {
                     router.push(
                       `/(tabs)/trainer/member-detail?id=${m.id}` as any,
@@ -711,13 +720,14 @@ export default function TrainerMembersScreen() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: Colors.bgSub,
+                  backgroundColor: isLocked ? "#F9FAFB" : Colors.bgSub,
                   borderRadius: 10,
                   paddingVertical: 9,
                   paddingHorizontal: 12,
                   marginBottom: 6,
                   borderWidth: 1,
-                  borderColor: Colors.border,
+                  borderColor: isLocked ? "#E5E7EB" : Colors.border,
+                  opacity: isLocked ? 0.5 : 1,
                 }}
               >
                 {/* 아바타 */}
@@ -732,11 +742,13 @@ export default function TrainerMembersScreen() {
                     marginRight: 10,
                   }}
                 >
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}
-                  >
-                    {m.name[0]}
-                  </Text>
+                  {isLocked ? (
+                    <Text style={{ fontSize: 14 }}>🔒</Text>
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
+                      {m.name[0]}
+                    </Text>
+                  )}
                 </View>
 
                 {/* 이름 + 뱃지 + 메모 버튼 */}

@@ -1722,18 +1722,22 @@ export default function TrainerHomeScreen() {
                 <TouchableOpacity
                   key={`${item.isManual ? "manual" : "linked"}-${item.memberId}-${item.time}`}
                   onPress={() => {
+                    console.log("[홈 일정 클릭]", {
+                      name: item.memberName,
+                      memberId: item.memberId,
+                      isManual: item.isManual,
+                      isOt,
+                      sessionType: item.sessionType,
+                    });
                     if (isOt) {
-                      // OT 회원: 미연동 회원 운동일지 탭으로 이동
                       router.push(
                         `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
                       );
                     } else if (item.isManual) {
-                      // 일반 미연동 회원: 미연동 회원 상세로 이동
                       router.push(
                         `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
                       );
                     } else {
-                      // 연동 회원: 회원 상세로 이동
                       router.push(
                         `/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=1`,
                       );

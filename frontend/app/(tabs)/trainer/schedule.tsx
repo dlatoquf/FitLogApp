@@ -946,7 +946,6 @@ export default function TrainerScheduleScreen() {
                   paddingTop: 3,
                 }}
               >
-                ;
                 <Text
                   style={{
                     fontSize: 9,

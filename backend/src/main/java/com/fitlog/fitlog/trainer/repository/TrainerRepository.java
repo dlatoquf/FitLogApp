@@ -47,4 +47,8 @@ public interface TrainerRepository extends JpaRepository<Trainer, Long> {
     // 무료 체험 D-1 알림 대상 (trialEndDate = 내일)
     @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.trialEndDate = :tomorrow AND t.plan = 'FREE'")
     List<Trainer> findTrialExpiringTomorrow(@Param("tomorrow") LocalDate tomorrow);
+
+    // 무료 체험 D-3 알림 대상 (trialEndDate = 3일 후)
+    @Query("SELECT t FROM Trainer t JOIN FETCH t.user WHERE t.trialEndDate = :targetDate AND t.plan = 'FREE'")
+    List<Trainer> findTrialExpiringOn(@Param("targetDate") LocalDate targetDate);
 }

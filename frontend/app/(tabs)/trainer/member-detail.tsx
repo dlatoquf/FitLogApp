@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
@@ -1231,6 +1231,8 @@ export default function MemberDetailScreen() {
   // OT 회원: memo="OT" 이면서 ptTotal이 없거나 0인 경우 (addPt로 PT 등록된 경우는 PT 회원으로 취급)
   const isOt = isManual && member?.memo === "OT" && (!member?.ptTotal || member?.ptTotal === 0);
   const [loading, setLoading] = useState(true);
+  // 현재 렌더링 중인 memberId 추적 — 이전 회원 데이터가 노출되는 것 방지
+  const [renderedMemberId, setRenderedMemberId] = useState<number>(memberId);
   // 미연동 회원은 운동로그 탭(1)에서 시작
   const [tab, setTab] = useState(
     initialTab ? Number(initialTab) : type === "manual" ? 1 : 0,
@@ -1916,8 +1918,12 @@ export default function MemberDetailScreen() {
   const dayFitLogs = fitLogs.filter(
     (l: any) => String(l.date ?? l.logDate).slice(0, 10) === selectedDateKey,
   );
-  const dayPtLogs = dayFitLogs.filter((l: any) => l.workoutType === "PT");
-  const dayOtLogs = dayFitLogs.filter((l: any) => l.workoutType === "OT");
+  // PT 등록된 미연동 회원은 과거 OT 로그도 PT 섹션에 합쳐서 표시
+  const dayPtLogs = dayFitLogs.filter((l: any) =>
+    l.workoutType === "PT" || (!isOt && l.workoutType === "OT")
+  );
+  const dayOtLogs = isOt ? dayFitLogs.filter((l: any) => l.workoutType === "OT") : [];
+
   const dayPersonalLogs = dayFitLogs.filter(
     (l: any) => l.workoutType === "PERSONAL",
   );
@@ -2073,10 +2079,16 @@ export default function MemberDetailScreen() {
     })();
   }, []);
 
+  // memberId 바뀌는 즉시 이전 회원 데이터 숨김 (렌더 전에 동기 실행)
+  useLayoutEffect(() => {
+    setRenderedMemberId(-1);
+    setMember(null);
+    setLoading(true);
+  }, [memberId]);
+
   // 회원 기본 정보 + 최신 목표
   useEffect(() => {
     const init = async () => {
-      setLoading(true);
       // 다른 회원 상세로 이동할 때 이전 회원에서 선택했던 날짜/주차가 남지 않도록 초기화
       // 알림에서 진입 시 해당 날짜로 이동
       if (notifDate) {
@@ -2088,14 +2100,21 @@ export default function MemberDetailScreen() {
         setWeekOffset(0);
       }
       resetFitLogForm();
-      // 회원 변경 시 운동 기록 상태 초기화
+      // 회원 변경 시 상태 완전 초기화 (비동기 ref 포함)
+      setRenderedMemberId(-1); // 즉시 이전 회원 데이터 숨김
+      setMember(null);
       setFitLogs([]);
       setAllFitLogs([]);
       setFitLogCache({});
       setFitLogHistoryLoaded(false);
       setExpandedExerciseMediaKeys({});
       didLoadWorkoutRef.current = false;
+      fetchingFitLogHistoryRef.current = false;
+      fetchingFitLogKeyRef.current = null;
+      // 탭도 파라미터 기준으로 리셋
+      setTab(initialTab ? Number(initialTab) : type === "manual" ? 1 : 0);
       await fetchMember();
+      setRenderedMemberId(memberId); // 새 회원 데이터 준비 완료
       setLoading(false);
       // 탭과 무관하게 항상 운동 기록 로드 (캘린더 점 표시용)
       didLoadWorkoutRef.current = true;
@@ -2651,7 +2670,7 @@ export default function MemberDetailScreen() {
     }
   };
 
-  if (loading || !member) {
+  if (loading || !member || renderedMemberId !== memberId) {
     return (
       <View
         style={{
@@ -3729,22 +3748,26 @@ export default function MemberDetailScreen() {
             >
               {member.user.name}
             </Text>
-            {/* 미연동 뱃지 */}
+            {/* 미연동 / OT 뱃지 */}
             {isManual && (
               <View
                 style={{
-                  backgroundColor: "#FFF7ED",
+                  backgroundColor: isOt ? "#FFF7ED" : "#F3F4F6",
                   borderWidth: 1,
-                  borderColor: "#FDBA7455",
+                  borderColor: isOt ? "#FDBA7455" : "#D1D5DB",
                   borderRadius: 8,
                   paddingHorizontal: 10,
                   paddingVertical: 3,
                 }}
               >
                 <Text
-                  style={{ fontSize: 11, fontWeight: "800", color: "#F97316" }}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "800",
+                    color: isOt ? "#F97316" : "#6B7280",
+                  }}
                 >
-                  미연동
+                  {isOt ? "OT" : "미연동"}
                 </Text>
               </View>
             )}

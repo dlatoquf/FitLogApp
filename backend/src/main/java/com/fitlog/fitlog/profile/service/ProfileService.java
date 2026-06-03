@@ -70,9 +70,9 @@ public class ProfileService {
         // 제휴 코드 처리
         applyAffiliateCode(trainer, req.getAffiliateCode());
 
-        // 최초 등록 시 30일(1개월) 무료 체험 부여
+        // 최초 등록 시 1개월 무료 체험 부여
         if (isNew && trainer.getTrialEndDate() == null) {
-            trainer.setTrialEndDate(java.time.LocalDate.now().plusDays(30));
+            trainer.setTrialEndDate(java.time.LocalDate.now().plusMonths(1));
         }
 
         Trainer saved = trainerRepository.save(trainer);

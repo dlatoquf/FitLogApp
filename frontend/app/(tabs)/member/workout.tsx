@@ -684,6 +684,7 @@ export default function WorkoutScreen() {
       String(l.date ?? (l as any).logDate).slice(0, 10) === selectedDate &&
       l.workoutType === "PT",
   );
+
   const dayFitLogs = workoutLogs.filter(
     (l) =>
       String(l.date ?? (l as any).logDate).slice(0, 10) === selectedDate &&
@@ -2583,7 +2584,7 @@ export default function WorkoutScreen() {
                     renderWorkoutCard(
                       log,
                       log.workoutType === "PT" ? Colors.green : Colors.blue,
-                      log.workoutType === "PT" ? "PT 수업" : "개인 운동",
+                      log.workoutType === "PT" ? "PT 수업 완료" : "개인 운동",
                     ),
                   )}
 

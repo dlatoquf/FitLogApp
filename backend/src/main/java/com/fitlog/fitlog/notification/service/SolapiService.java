@@ -75,7 +75,7 @@ public class SolapiService {
      */
     public void sendWorkoutLogNotice(String memberName, String phone,
                                      List<Map<String, Object>> exercises, String trainerName) {
-        sendWorkoutLogNotice(memberName, phone, exercises, trainerName, null, null, Collections.emptyList());
+        sendWorkoutLogNotice(memberName, phone, exercises, trainerName, null, null, Collections.emptyList(), null, null);
     }
 
     /**
@@ -91,7 +91,8 @@ public class SolapiService {
      */
     public void sendWorkoutLogNotice(String memberName, String phone,
                                      List<Map<String, Object>> exercises, String trainerName,
-                                     Integer conditionScore, String feedback, List<String> missions) {
+                                     Integer conditionScore, String feedback, List<String> missions,
+                                     String trainerCode, Integer sessionNumber) {
         // 설정값 없으면 발송 스킵
         if (apiKey.isBlank() || apiSecret.isBlank() || senderNumber.isBlank()) {
             System.out.println("[Solapi] API 키 미설정 — 알림톡 발송 스킵. application.properties 확인 필요.");
@@ -106,7 +107,7 @@ public class SolapiService {
         String normalizedPhone = phone.replaceAll("[^0-9]", "");
 
         // 전체 운동 포맷 메시지 생성
-        String messageText = buildFullWorkoutText(memberName, trainerName, exercises, conditionScore, feedback, missions);
+        String messageText = buildFullWorkoutText(memberName, trainerName, exercises, conditionScore, feedback, missions, trainerCode, sessionNumber);
 
         try {
             // Solapi HMAC-SHA256 인증 헤더 생성
@@ -484,9 +485,15 @@ public class SolapiService {
     private String buildFullWorkoutText(String memberName, String trainerName,
                                         List<Map<String, Object>> exercises,
                                         Integer conditionScore, String feedback,
-                                        List<String> missions) {
+                                        List<String> missions, String trainerCode,
+                                        Integer sessionNumber) {
         StringBuilder sb = new StringBuilder();
-        sb.append("[핏로그] ").append(memberName).append("님 오늘 PT 기록\n");
+        if (sessionNumber != null && sessionNumber > 0) {
+            sb.append("[핏로그] ").append(memberName).append("님 ")
+              .append(sessionNumber).append("회차 수업 완료\n");
+        } else {
+            sb.append("[핏로그] ").append(memberName).append("님 오늘 PT 기록\n");
+        }
         sb.append("──────────────\n");
 
         // 컨디션
@@ -557,6 +564,19 @@ public class SolapiService {
         }
 
         sb.append("\n트레이너: ").append(trainerName);
+
+        // 앱 설치 안내
+        sb.append("\n\n──────────────\n");
+        sb.append("자세한 세트 무게 횟수와 피드백은\n핏로그 앱에서 확인할 수 있어요 📱\n\n");
+        if (trainerCode != null && !trainerCode.isBlank()) {
+            sb.append("트레이너 코드: ").append(trainerCode).append("\n");
+        }
+        // 트레이너 코드가 있으면 링크에 박아주기
+        String installLink = (trainerCode != null && !trainerCode.isBlank())
+                ? appDownloadLink + "?code=" + trainerCode
+                : appDownloadLink;
+        sb.append("앱 설치: ").append(installLink);
+
         return sb.toString();
     }
 
@@ -564,7 +584,7 @@ public class SolapiService {
     @SuppressWarnings("unchecked")
     private String buildFullWorkoutText(String memberName, String trainerName,
                                         List<Map<String, Object>> exercises) {
-        return buildFullWorkoutText(memberName, trainerName, exercises, null, null, Collections.emptyList());
+        return buildFullWorkoutText(memberName, trainerName, exercises, null, null, Collections.emptyList(), null, null);
     }
 
     private int toInt(Object o) {

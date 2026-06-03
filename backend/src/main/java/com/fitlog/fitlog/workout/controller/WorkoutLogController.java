@@ -195,9 +195,19 @@ public class WorkoutLogController {
         log.setManualMember(mm);
         log.setMember(null);
         log.setTrainer(trainer);
-        log.setLogDate(java.time.LocalDate.parse((String) body.get("date")));
-        boolean isOtMember = "OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "");
-        log.setWorkoutType(isOtMember ? "OT" : "PT");
+        java.time.LocalDate logDate = java.time.LocalDate.parse((String) body.get("date"));
+        log.setLogDate(logDate);
+
+        // 해당 날짜 CONFIRMED 스케줄의 session_type으로 workout_type 결정
+        // 스케줄이 없으면 회원 메모로 판단
+        String workoutType = scheduleRepository
+                .findByTrainerAndDateAndStatus(trainer, logDate, "CONFIRMED")
+                .stream()
+                .filter(s -> s.getManualMember() != null && s.getManualMember().getId().equals(mm.getId()))
+                .findFirst()
+                .map(s -> s.getSessionType() != null ? s.getSessionType() : "PT")
+                .orElse("OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "") ? "OT" : "PT");
+        log.setWorkoutType(workoutType);
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());
         if (body.containsKey("painPoints"))
@@ -310,6 +320,18 @@ public class WorkoutLogController {
                     .collect(java.util.stream.Collectors.toList());
         }
 
+        // 트레이너 코드 조회
+        String trainerCode = trainerRepository.findByUser(trainerUser)
+                .map(t -> t.getTrainerCode())
+                .orElse(null);
+
+        // PT 회차 계산 (총 횟수 - 잔여 횟수)
+        Integer sessionNumber = null;
+        if (mm.getPtTotal() != null && mm.getPtRemaining() != null) {
+            int used = mm.getPtTotal() - mm.getPtRemaining();
+            if (used > 0) sessionNumber = used;
+        }
+
         boolean isOt = "OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "");
         if (isOt) {
             solapiService.sendOtWorkoutComplete(
@@ -326,7 +348,9 @@ public class WorkoutLogController {
                     trainerUser.getName(),
                     conditionScore,
                     feedback,
-                    missions
+                    missions,
+                    trainerCode,
+                    sessionNumber
             );
         }
 
