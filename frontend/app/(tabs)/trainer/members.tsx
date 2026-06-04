@@ -833,6 +833,32 @@ export default function TrainerMembersScreen() {
                       </Text>
                     </>
                   ) : m.isLinked ? (
+                    plan === "FREE" ? (
+                      <View
+                        style={{
+                          backgroundColor: Colors.goldBg,
+                          borderWidth: 1,
+                          borderColor: Colors.gold + "44",
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        <Text style={{ fontSize: 9, color: Colors.gold }}>🔒</Text>
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: Colors.gold,
+                            fontWeight: "700",
+                          }}
+                        >
+                          PT 미등록
+                        </Text>
+                      </View>
+                    ) : (
                     <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
@@ -859,6 +885,7 @@ export default function TrainerMembersScreen() {
                         PT 미등록
                       </Text>
                     </TouchableOpacity>
+                    )
                   ) : (
                     <View
                       style={{

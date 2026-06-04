@@ -175,8 +175,8 @@ public class MemberHomeService {
         map.put("goal",        member.getGoal());
         map.put("ptRemaining", member.getPtRemaining());
         map.put("ptTotal",     member.getPtTotal());
-        map.put("ptStartDate", member.getPtStartDate());
-        map.put("ptExpDate",   member.getPtExpDate());
+        map.put("ptStartDate",    member.getPtStartDate());
+        map.put("ptExpDate",      member.getPtExpDate());
         // ACTIVE 상태일 때만 트레이너 정보 노출 (INACTIVE = 연결해제 상태)
         boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
         if (member.getTrainer() != null && isActive) {

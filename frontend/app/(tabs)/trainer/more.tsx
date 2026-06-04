@@ -61,6 +61,11 @@ export default function TrainerMoreScreen() {
   const [termsVisible, setTermsVisible] = useState(false);
   const [termsContent, setTermsContent] = useState({ title: "", text: "" });
 
+  // 사용가이드 열기
+  const openGuide = () => {
+    router.push("/(tabs)/trainer/guide" as any);
+  };
+
 
   // 문의하기
   const [inquiryVisible, setInquiryVisible] = useState(false);
@@ -958,6 +963,19 @@ export default function TrainerMoreScreen() {
           }}
         >
           <InfoRow label="버전" value="1.0.0" />
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
+          <TouchableOpacity
+            onPress={openGuide}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: 16,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: Colors.text }}>사용가이드</Text>
+            <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
+          </TouchableOpacity>
           <View style={{ height: 1, backgroundColor: Colors.border }} />
           <TouchableOpacity
             onPress={() => {

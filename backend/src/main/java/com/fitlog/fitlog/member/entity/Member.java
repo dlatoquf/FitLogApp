@@ -35,6 +35,7 @@ public class Member {
     private String goal;
     private String memo;
 
+
     @Enumerated(EnumType.STRING)
     private Status status = Status.ACTIVE;
 
@@ -61,6 +62,9 @@ public class Member {
 
     @Column(name = "notif_bodylog")
     private Boolean notifBodyLog = true;
+
+    @Column(name = "notif_notice")
+    private Boolean notifNotice = true;
 
     public enum Status { ACTIVE, INACTIVE }
 
@@ -108,9 +112,11 @@ public class Member {
     public Boolean getNotifPtPayment() { return notifPtPayment == null || notifPtPayment; }
     public Boolean getNotifWorkout() { return notifWorkout == null || notifWorkout; }
     public Boolean getNotifBodyLog() { return notifBodyLog == null || notifBodyLog; }
+    public Boolean getNotifNotice() { return notifNotice == null || notifNotice; }
     public void setNotifFeedback(Boolean v) { this.notifFeedback = v; }
     public void setNotifSchedule(Boolean v) { this.notifSchedule = v; }
     public void setNotifPtPayment(Boolean v) { this.notifPtPayment = v; }
     public void setNotifWorkout(Boolean v) { this.notifWorkout = v; }
     public void setNotifBodyLog(Boolean v) { this.notifBodyLog = v; }
+    public void setNotifNotice(Boolean v) { this.notifNotice = v; }
 }

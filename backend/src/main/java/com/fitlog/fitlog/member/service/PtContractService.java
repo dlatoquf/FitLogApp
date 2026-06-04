@@ -100,7 +100,14 @@ public class PtContractService {
         int prevRemaining = member.getPtRemaining() != null ? member.getPtRemaining() : 0;
 
         member.setPtTotal(prevTotal + request.getSessions());
-        member.setPtRemaining(prevRemaining + request.getSessions());
+        // 첫 등록 시 initialRemaining이 있으면 해당 값으로, 없으면 sessions만큼 증가
+        if (prevTotal == 0 && request.getInitialRemaining() != null) {
+            member.setPtRemaining(prevRemaining + request.getInitialRemaining());
+            contract.setRemainSessions(request.getInitialRemaining());
+            ptContractRepository.save(contract);
+        } else {
+            member.setPtRemaining(prevRemaining + request.getSessions());
+        }
 
         // PT 추가 시 만료 카운트다운 초기화 (7일 비활성화 방지)
         member.setPtEndedAt(null);

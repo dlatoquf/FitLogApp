@@ -408,12 +408,13 @@ public class MemberHomeController {
     public ResponseEntity<Map<String, Object>> getNotificationSettings(
             @RequestHeader("Authorization") String authorization) {
         Member member = memberHomeService.getMemberByToken(authorization);
-        return ResponseEntity.ok(Map.of(
-            "notifFeedback", member.getNotifFeedback(),
-            "notifSchedule", member.getNotifSchedule(),
-            "notifPtPayment", member.getNotifPtPayment(),
-            "notifWorkout", member.getNotifWorkout()
-        ));
+        Map<String, Object> settings = new java.util.LinkedHashMap<>();
+        settings.put("notifFeedback", member.getNotifFeedback());
+        settings.put("notifSchedule", member.getNotifSchedule());
+        settings.put("notifPtPayment", member.getNotifPtPayment());
+        settings.put("notifWorkout", member.getNotifWorkout());
+        settings.put("notifNotice", member.getNotifNotice());
+        return ResponseEntity.ok(settings);
     }
 
     @PutMapping("/notification-settings")
@@ -425,6 +426,7 @@ public class MemberHomeController {
         if (body.containsKey("notifSchedule")) member.setNotifSchedule(body.get("notifSchedule"));
         if (body.containsKey("notifPtPayment")) member.setNotifPtPayment(body.get("notifPtPayment"));
         if (body.containsKey("notifWorkout")) member.setNotifWorkout(body.get("notifWorkout"));
+        if (body.containsKey("notifNotice")) member.setNotifNotice(body.get("notifNotice"));
         memberRepository.save(member);
         return ResponseEntity.ok(Map.of("message", "알림 설정이 저장됐어요."));
     }

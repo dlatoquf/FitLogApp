@@ -1,5 +1,5 @@
-import { Tabs } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 import { Colors } from "../../../constants/Colors";
 
 export default function TrainerTabLayout() {
@@ -12,13 +12,13 @@ export default function TrainerTabLayout() {
         tabBarInactiveTintColor: Colors.textMuted,
 
         tabBarStyle: {
-        backgroundColor: "#fff",
-        borderTopWidth: 1,
-        borderTopColor: Colors.border,
-        height: 62,
-        paddingTop: 4,
-        paddingBottom: 4,
-      },
+          backgroundColor: "#fff",
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+          height: 62,
+          paddingTop: 4,
+          paddingBottom: 4,
+        },
 
         tabBarLabelStyle: {
           fontSize: 11,
@@ -94,6 +94,8 @@ export default function TrainerTabLayout() {
       <Tabs.Screen name="member-detail" options={{ href: null }} />
       <Tabs.Screen name="fitlog-write" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="guide" options={{ href: null }} />
+      <Tabs.Screen name="member-notices" options={{ href: null }} />
     </Tabs>
   );
 }

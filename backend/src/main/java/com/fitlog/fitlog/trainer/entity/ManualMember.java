@@ -32,6 +32,7 @@ public class ManualMember {
     @Column(name = "memo")
     private String memo;
 
+
     // 결제 금액 및 날짜 (신규 회원 등록 시)
     @Column(name = "amount")
     private Long amount;

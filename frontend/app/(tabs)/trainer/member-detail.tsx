@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import KakaoShare from "@react-native-kakao/share";
+import { useFocusEffect } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as Clipboard from "expo-clipboard";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -7,8 +8,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -150,7 +156,8 @@ function buildDateGroups(logs: FitLog[]): DateGroup[] {
   for (const log of sorted) {
     const la = log as any;
     const date = String(la.date ?? la.logDate ?? "").slice(0, 10);
-    const type: "PT" | "OT" | "개인" = la.workoutType === "PT" ? "PT" : la.workoutType === "OT" ? "OT" : "개인";
+    const type: "PT" | "OT" | "개인" =
+      la.workoutType === "PT" ? "PT" : la.workoutType === "OT" ? "OT" : "개인";
     if (!dateMap.has(date)) {
       dateMap.set(date, new Map());
       dateTypeOrder.set(date, []);
@@ -444,8 +451,20 @@ function HistoryTable({
                       height={ROW_H * tg.totalRows}
                       bold
                       center
-                      color={tg.type === "PT" ? Colors.green : tg.type === "OT" ? "#F97316" : Colors.textMuted}
-                      bg={tg.type === "PT" ? "#f0fff4" : tg.type === "OT" ? "#FFF7ED" : "#fafafa"}
+                      color={
+                        tg.type === "PT"
+                          ? Colors.green
+                          : tg.type === "OT"
+                            ? "#F97316"
+                            : Colors.textMuted
+                      }
+                      bg={
+                        tg.type === "PT"
+                          ? "#f0fff4"
+                          : tg.type === "OT"
+                            ? "#FFF7ED"
+                            : "#fafafa"
+                      }
                     />
                     <MergedCell
                       value={tg.painPoints ?? ""}
@@ -1229,7 +1248,10 @@ export default function MemberDetailScreen() {
 
   const [member, setMember] = useState<Member | null>(null);
   // OT 회원: memo="OT" 이면서 ptTotal이 없거나 0인 경우 (addPt로 PT 등록된 경우는 PT 회원으로 취급)
-  const isOt = isManual && member?.memo === "OT" && (!member?.ptTotal || member?.ptTotal === 0);
+  const isOt =
+    isManual &&
+    member?.memo === "OT" &&
+    (!member?.ptTotal || member?.ptTotal === 0);
   const [loading, setLoading] = useState(true);
   // 현재 렌더링 중인 memberId 추적 — 이전 회원 데이터가 노출되는 것 방지
   const [renderedMemberId, setRenderedMemberId] = useState<number>(memberId);
@@ -1416,6 +1438,9 @@ export default function MemberDetailScreen() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [ptForm, setPtForm] = useState({
     sessions: "0",
+    remaining: "",
+    amount: "",
+    contractDate: todayStr,
     startDate: todayStr,
     endDate: "",
     memo: "",
@@ -1531,6 +1556,9 @@ export default function MemberDetailScreen() {
         } as any);
         setPtForm({
           sessions: "0",
+          remaining: "",
+          amount: "",
+          contractDate: todayStr,
           startDate: todayStr,
           endDate: "",
           memo: "",
@@ -1540,6 +1568,9 @@ export default function MemberDetailScreen() {
         setMember(data);
         setPtForm({
           sessions: "0",
+          remaining: "",
+          amount: "",
+          contractDate: todayStr,
           startDate: todayStr,
           endDate: data.ptExpDate || "",
           memo: "",
@@ -1919,10 +1950,12 @@ export default function MemberDetailScreen() {
     (l: any) => String(l.date ?? l.logDate).slice(0, 10) === selectedDateKey,
   );
   // PT 등록된 미연동 회원은 과거 OT 로그도 PT 섹션에 합쳐서 표시
-  const dayPtLogs = dayFitLogs.filter((l: any) =>
-    l.workoutType === "PT" || (!isOt && l.workoutType === "OT")
+  const dayPtLogs = dayFitLogs.filter(
+    (l: any) => l.workoutType === "PT" || (!isOt && l.workoutType === "OT"),
   );
-  const dayOtLogs = isOt ? dayFitLogs.filter((l: any) => l.workoutType === "OT") : [];
+  const dayOtLogs = isOt
+    ? dayFitLogs.filter((l: any) => l.workoutType === "OT")
+    : [];
 
   const dayPersonalLogs = dayFitLogs.filter(
     (l: any) => l.workoutType === "PERSONAL",
@@ -2183,12 +2216,14 @@ export default function MemberDetailScreen() {
         name: ex.name ?? "",
         memo: ex.memo ?? "",
         mediaFiles: [],
-        existingMediaList: (ex.mediaList ?? (ex.media ? [ex.media] : [])).map((m: any) => ({
-          id: m.id,
-          url: m.url ?? m.mediaUrl ?? m.secureUrl,
-          publicId: m.publicId ?? "",
-          mediaType: m.mediaType ?? "IMAGE",
-        })),
+        existingMediaList: (ex.mediaList ?? (ex.media ? [ex.media] : [])).map(
+          (m: any) => ({
+            id: m.id,
+            url: m.url ?? m.mediaUrl ?? m.secureUrl,
+            publicId: m.publicId ?? "",
+            mediaType: m.mediaType ?? "IMAGE",
+          }),
+        ),
         sets: (ex.sets ?? []).map((s: any) => ({
           setId: s.setId ?? s.id ?? undefined,
           weight: s.weight != null ? String(s.weight) : "",
@@ -2260,7 +2295,10 @@ export default function MemberDetailScreen() {
     const ex = exercises[exerciseIndex];
     const totalCount = ex.mediaFiles.length + ex.existingMediaList.length;
     if (totalCount >= 3) {
-      Alert.alert("최대 3개", "운동당 사진/영상은 최대 3개까지 추가할 수 있어요.");
+      Alert.alert(
+        "최대 3개",
+        "운동당 사진/영상은 최대 3개까지 추가할 수 있어요.",
+      );
       return;
     }
 
@@ -2293,7 +2331,8 @@ export default function MemberDetailScreen() {
             quality: 0.8,
             videoMaxDuration: 120,
           });
-          if (!result.canceled && result.assets.length > 0) addAsset(result.assets[0]);
+          if (!result.canceled && result.assets.length > 0)
+            addAsset(result.assets[0]);
         },
       },
       {
@@ -2316,12 +2355,20 @@ export default function MemberDetailScreen() {
     ]);
   };
 
-  const removeMedia = (exerciseIndex: number, type: "new" | "existing", fileIndex: number) => {
+  const removeMedia = (
+    exerciseIndex: number,
+    type: "new" | "existing",
+    fileIndex: number,
+  ) => {
     const u = [...exercises];
     if (type === "new") {
-      u[exerciseIndex].mediaFiles = u[exerciseIndex].mediaFiles.filter((_, i) => i !== fileIndex);
+      u[exerciseIndex].mediaFiles = u[exerciseIndex].mediaFiles.filter(
+        (_, i) => i !== fileIndex,
+      );
     } else {
-      u[exerciseIndex].existingMediaList = u[exerciseIndex].existingMediaList.filter((_, i) => i !== fileIndex);
+      u[exerciseIndex].existingMediaList = u[
+        exerciseIndex
+      ].existingMediaList.filter((_, i) => i !== fileIndex);
     }
     setExercises(u);
   };
@@ -2384,7 +2431,7 @@ export default function MemberDetailScreen() {
       const exercisesWithMedia = await Promise.all(
         valid.map(async (ex) => {
           const uploadedUrls = await Promise.all(
-            (ex.mediaFiles ?? []).map((f) => uploadToCloudinary(f.uri, f.type))
+            (ex.mediaFiles ?? []).map((f) => uploadToCloudinary(f.uri, f.type)),
           );
           return {
             name: ex.name,
@@ -2547,7 +2594,9 @@ export default function MemberDetailScreen() {
     const memberName = member?.user?.name ?? "회원";
 
     const exerciseNames = Array.from(
-      new Set((smsPromptData.exercises ?? []).map((ex) => ex.name).filter(Boolean)),
+      new Set(
+        (smsPromptData.exercises ?? []).map((ex) => ex.name).filter(Boolean),
+      ),
     );
     const exerciseText = exerciseNames.length
       ? exerciseNames.map((name) => `- ${name}`).join("\n")
@@ -2564,9 +2613,9 @@ export default function MemberDetailScreen() {
     const code = trainerInviteCode.trim();
     const inviteUrl = isOt
       ? "https://fitlog.app"
-      : (code
-          ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
-          : "https://fitlog.app/download");
+      : code
+        ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
+        : "https://fitlog.app/download";
     setSmsPromptData((p) => ({ ...p, visible: false }));
     try {
       await KakaoShare.shareTextTemplate({
@@ -2639,12 +2688,40 @@ export default function MemberDetailScreen() {
     }
   };
   const savePT = async () => {
+    const isFirst = !member?.ptTotal || member.ptTotal === 0;
     if (!ptForm.sessions || Number(ptForm.sessions) <= 0) {
-      Alert.alert("오류", "추가할 횟수를 입력해주세요.");
+      Alert.alert(
+        "오류",
+        isFirst
+          ? "첫 PT 결제 수를 입력해주세요."
+          : "추가할 횟수를 입력해주세요.",
+      );
+      return;
+    }
+    if (
+      isFirst &&
+      ptForm.remaining !== "" &&
+      Number(ptForm.remaining) > Number(ptForm.sessions)
+    ) {
+      Alert.alert("오류", "현재 잔여 PT 수는 첫 PT 결제 수보다 클 수 없어요.");
       return;
     }
     try {
       const jwt = await AsyncStorage.getItem("jwt");
+      const amountNum = ptForm.amount
+        ? Number(ptForm.amount.replace(/,/g, ""))
+        : undefined;
+      const body: any = {
+        sessions: Number(ptForm.sessions),
+        startDate: ptForm.startDate || undefined,
+        endDate: ptForm.endDate || undefined,
+        memo: ptForm.memo || undefined,
+        amount: amountNum || undefined,
+        contractDate: ptForm.contractDate || undefined,
+      };
+      if (isFirst && ptForm.remaining !== "") {
+        body.initialRemaining = Number(ptForm.remaining);
+      }
       const res = await fetch(
         `${API_URL}/api/trainer/members/${memberId}/pt/add`,
         {
@@ -2653,18 +2730,18 @@ export default function MemberDetailScreen() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${jwt}`,
           },
-          body: JSON.stringify({
-            sessions: Number(ptForm.sessions),
-            startDate: ptForm.startDate || undefined,
-            endDate: ptForm.endDate || undefined,
-            memo: ptForm.memo || undefined,
-          }),
+          body: JSON.stringify(body),
         },
       );
-      if (!res.ok) throw new Error("PT 추가 실패");
+      if (!res.ok) throw new Error("PT 등록 실패");
       setShowPTEdit(false);
       fetchMember();
-      Alert.alert("완료", `PT ${ptForm.sessions}회가 추가됐어요!`);
+      Alert.alert(
+        "완료",
+        isFirst
+          ? `PT ${ptForm.sessions}회가 등록됐어요!`
+          : `PT ${ptForm.sessions}회가 추가됐어요!`,
+      );
     } catch (e: any) {
       Alert.alert("오류", e.message);
     }
@@ -3123,7 +3200,8 @@ export default function MemberDetailScreen() {
   const getExerciseMediaList = (exercise: any) => {
     // mediaList(배열) 우선, 없으면 media(단일) 폴백
     const list = exercise?.mediaList ?? exercise?.medias ?? [];
-    const items = list.length > 0 ? list : (exercise?.media ? [exercise.media] : []);
+    const items =
+      list.length > 0 ? list : exercise?.media ? [exercise.media] : [];
     return items
       .filter(Boolean)
       .map((media: any) => ({
@@ -3658,7 +3736,18 @@ export default function MemberDetailScreen() {
                             : "#f97316",
                       }}
                     >
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDone ? "#22c55e" : isFailed ? "#ef4444" : "#f97316" }} />
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: isDone
+                            ? "#22c55e"
+                            : isFailed
+                              ? "#ef4444"
+                              : "#f97316",
+                        }}
+                      />
                     </Text>
                     <Text
                       style={{
@@ -3772,24 +3861,51 @@ export default function MemberDetailScreen() {
               </View>
             )}
           </View>
-          {/* 오른쪽: ⋮ 메뉴 (이동된 회원은 숨김) */}
-          {!isReadOnly && (
+          {/* 오른쪽: 공지사항 + ⋮ 메뉴 */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <TouchableOpacity
-              onPress={handleMemberMenu}
-              disabled={memberActionLoading}
-              style={{ padding: 8 }}
+              onPress={() =>
+                router.push(
+                  `/(tabs)/trainer/member-notices?memberId=${memberId}&memberName=${encodeURIComponent(member.user.name)}&isManual=${isManual}` as any,
+                )
+              }
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.bgSub,
+              }}
             >
               <Text
                 style={{
-                  fontSize: 22,
-                  color: Colors.textMuted,
-                  fontWeight: "700",
+                  fontSize: 12,
+                  color: Colors.textSub,
+                  fontWeight: "600",
                 }}
               >
-                ⋮
+                공지사항
               </Text>
             </TouchableOpacity>
-          )}
+            {!isReadOnly && (
+              <TouchableOpacity
+                onPress={handleMemberMenu}
+                disabled={memberActionLoading}
+                style={{ padding: 8 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 22,
+                    color: Colors.textMuted,
+                    fontWeight: "700",
+                  }}
+                >
+                  ⋮
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
         {!isManual && member.goal && (
           <View
@@ -3932,6 +4048,7 @@ export default function MemberDetailScreen() {
         </View>
 
         {/* 탭 — 미연동 회원은 운동로그 + 바디로그만, 연동 회원은 3탭 전체 */}
+
         {isManual ? (
           <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
             {[
@@ -4367,11 +4484,8 @@ export default function MemberDetailScreen() {
                       </Text>
                     </View>
                     {dayOtLogs.map((log: any) =>
-                      renderFitLogCard(
-                        log,
-                        "#F97316",
-                        "OT 수업 완료",
-                        () => startEditFitLog(log),
+                      renderFitLogCard(log, "#F97316", "OT 수업 완료", () =>
+                        startEditFitLog(log),
                       ),
                     )}
                   </View>
@@ -5480,67 +5594,164 @@ export default function MemberDetailScreen() {
 
                   {/* 운동별 미디어 (최대 3개) */}
                   <View style={{ marginTop: 8 }}>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    <View
+                      style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+                    >
                       {/* 기존 미디어 */}
                       {(ex.existingMediaList ?? []).map((m, mIdx) => (
-                        <View key={`existing-${mIdx}`} style={{ position: "relative" }}>
-                          <TouchableOpacity onPress={() => setSelectedMedia(m as any)}>
+                        <View
+                          key={`existing-${mIdx}`}
+                          style={{ position: "relative" }}
+                        >
+                          <TouchableOpacity
+                            onPress={() => setSelectedMedia(m as any)}
+                          >
                             <Image
                               source={{
-                                uri: m.mediaType === "VIDEO"
-                                  ? m.url.replace(/\.(mp4|mov|avi|webm)(\?.*)?$/i, ".jpg")
-                                  : m.url,
+                                uri:
+                                  m.mediaType === "VIDEO"
+                                    ? m.url.replace(
+                                        /\.(mp4|mov|avi|webm)(\?.*)?$/i,
+                                        ".jpg",
+                                      )
+                                    : m.url,
                               }}
-                              style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: Colors.bgSub }}
+                              style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: 8,
+                                backgroundColor: Colors.bgSub,
+                              }}
                               resizeMode="cover"
                             />
                             {m.mediaType === "VIDEO" && (
-                              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 8 }}>
-                                <Text style={{ color: "#fff", fontSize: 16 }}>▶</Text>
+                              <View
+                                style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  backgroundColor: "rgba(0,0,0,0.3)",
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <Text style={{ color: "#fff", fontSize: 16 }}>
+                                  ▶
+                                </Text>
                               </View>
                             )}
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => removeMedia(ei, "existing", mIdx)}
-                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: Colors.red, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center" }}
+                            style={{
+                              position: "absolute",
+                              top: -6,
+                              right: -6,
+                              backgroundColor: Colors.red,
+                              borderRadius: 10,
+                              width: 18,
+                              height: 18,
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
                           >
-                            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>×</Text>
+                            <Text
+                              style={{
+                                color: "#fff",
+                                fontSize: 10,
+                                fontWeight: "800",
+                              }}
+                            >
+                              ×
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       ))}
                       {/* 새로 추가한 미디어 */}
                       {(ex.mediaFiles ?? []).map((f, fIdx) => (
-                        <View key={`new-${fIdx}`} style={{ position: "relative" }}>
+                        <View
+                          key={`new-${fIdx}`}
+                          style={{ position: "relative" }}
+                        >
                           {f.type === "image" ? (
-                            <Image source={{ uri: f.uri }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
+                            <Image
+                              source={{ uri: f.uri }}
+                              style={{ width: 64, height: 64, borderRadius: 8 }}
+                              resizeMode="cover"
+                            />
                           ) : (
-                            <View style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: "#1a1a2e", justifyContent: "center", alignItems: "center" }}>
+                            <View
+                              style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: 8,
+                                backgroundColor: "#1a1a2e",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              }}
+                            >
                               <Text style={{ fontSize: 20 }}>🎬</Text>
                             </View>
                           )}
                           <TouchableOpacity
                             onPress={() => removeMedia(ei, "new", fIdx)}
-                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: Colors.red, borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center" }}
+                            style={{
+                              position: "absolute",
+                              top: -6,
+                              right: -6,
+                              backgroundColor: Colors.red,
+                              borderRadius: 10,
+                              width: 18,
+                              height: 18,
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
                           >
-                            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>×</Text>
+                            <Text
+                              style={{
+                                color: "#fff",
+                                fontSize: 10,
+                                fontWeight: "800",
+                              }}
+                            >
+                              ×
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       ))}
                       {/* 추가 버튼 (3개 미만일 때만) */}
-                      {(ex.mediaFiles ?? []).length + (ex.existingMediaList ?? []).length < 3 && (
+                      {(ex.mediaFiles ?? []).length +
+                        (ex.existingMediaList ?? []).length <
+                        3 && (
                         <TouchableOpacity
                           onPress={() => handlePickMedia(ei)}
                           style={{
-                            width: 64, height: 64,
-                            borderWidth: 1, borderStyle: "dashed",
+                            width: 64,
+                            height: 64,
+                            borderWidth: 1,
+                            borderStyle: "dashed",
                             borderColor: Colors.green + "66",
                             borderRadius: 8,
                             backgroundColor: Colors.greenLight,
-                            justifyContent: "center", alignItems: "center",
+                            justifyContent: "center",
+                            alignItems: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 20, color: Colors.green }}>+</Text>
-                          <Text style={{ fontSize: 9, color: Colors.green, marginTop: 2 }}>사진/영상</Text>
+                          <Text style={{ fontSize: 20, color: Colors.green }}>
+                            +
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              color: Colors.green,
+                              marginTop: 2,
+                            }}
+                          >
+                            사진/영상
+                          </Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -6066,6 +6277,9 @@ export default function MemberDetailScreen() {
         onRequestClose={() => {
           setPtForm({
             sessions: "0",
+            remaining: "",
+            amount: "",
+            contractDate: todayStr,
             startDate: todayStr,
             endDate: "",
             memo: "",
@@ -6083,6 +6297,9 @@ export default function MemberDetailScreen() {
             onPress={() => {
               setPtForm({
                 sessions: "0",
+                remaining: "",
+                amount: "",
+                contractDate: todayStr,
                 startDate: todayStr,
                 endDate: "",
                 memo: "",
@@ -6117,17 +6334,25 @@ export default function MemberDetailScreen() {
                 marginBottom: 4,
               }}
             >
-              PT 추가 등록
+              {!member?.ptTotal || member.ptTotal === 0
+                ? "PT 등록"
+                : "PT 추가 등록"}
             </Text>
-            <Text
-              style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 8 }}
-            >
-              현재 잔여: {member?.ptRemaining ?? 0}회 · 총:{" "}
-              {member?.ptTotal ?? 0}회
-            </Text>
+            {!member?.ptTotal || member.ptTotal === 0 ? null : (
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: Colors.textMuted,
+                  marginBottom: 8,
+                }}
+              >
+                현재 잔여: {member?.ptRemaining ?? 0}회 · 총:{" "}
+                {member?.ptTotal ?? 0}회
+              </Text>
+            )}
 
-            {/* 첫 등록일 표시 */}
-            {member?.ptStartDate ? (
+            {/* 첫 등록일 표시 (이미 PT가 있는 경우) */}
+            {member?.ptStartDate && (member?.ptTotal ?? 0) > 0 && (
               <View
                 style={{
                   backgroundColor: Colors.bgSub,
@@ -6154,209 +6379,401 @@ export default function MemberDetailScreen() {
                   {member.ptStartDate}
                 </Text>
               </View>
-            ) : (
-              <View
-                style={{
-                  backgroundColor: "#FFF9E6",
-                  borderRadius: 10,
-                  padding: 10,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "#FFE58F",
-                }}
-              >
-                <Text style={{ fontSize: 12, color: "#B8860B" }}>
-                  🌟 첫 PT 등록이에요! 시작일을 확인해주세요.
-                </Text>
-              </View>
             )}
 
-            {/* 추가 횟수 */}
-            <Text
-              style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}
-            >
-              추가할 횟수
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: Colors.bgSub,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: 10,
-                overflow: "hidden",
-                marginBottom: 12,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() =>
-                  setPtForm((f) => ({
-                    ...f,
-                    sessions: String(Math.max(0, Number(f.sessions) - 1)),
-                  }))
-                }
-                style={{
-                  padding: 12,
-                  borderRightWidth: 1,
-                  borderRightColor: Colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 18, color: Colors.textMuted }}>−</Text>
-              </TouchableOpacity>
-              <TextInput
-                value={ptForm.sessions}
-                onChangeText={(v) =>
-                  setPtForm((f) => ({
-                    ...f,
-                    sessions: v.replace(/[^0-9]/g, ""),
-                  }))
-                }
-                keyboardType="number-pad"
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  fontSize: 24,
-                  fontWeight: "800",
-                  color: Colors.green,
-                  paddingVertical: 10,
-                }}
-              />
-              <TouchableOpacity
-                onPress={() =>
-                  setPtForm((f) => ({
-                    ...f,
-                    sessions: String(Number(f.sessions) + 1),
-                  }))
-                }
-                style={{
-                  padding: 12,
-                  borderLeftWidth: 1,
-                  borderLeftColor: Colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 18, color: Colors.green }}>+</Text>
-              </TouchableOpacity>
-            </View>
+            {/* 첫 PT 등록 시 — 기존회원 추가 스타일 폼 */}
+            {(!member?.ptTotal || member.ptTotal === 0) && (
+              <>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  첫 PT 결제 수 (회) *
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: Colors.textMuted,
+                    marginBottom: 8,
+                  }}
+                >
+                  처음 등록할 때 구매한 총 수업 수
+                </Text>
+                <TextInput
+                  value={ptForm.sessions === "0" ? "" : ptForm.sessions}
+                  onChangeText={(v) =>
+                    setPtForm((f) => ({
+                      ...f,
+                      sessions: v.replace(/[^0-9]/g, "") || "0",
+                    }))
+                  }
+                  placeholder="예: 20"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 12,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  현재 잔여 PT 수 (회) *
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: Colors.textMuted,
+                    marginBottom: 8,
+                  }}
+                >
+                  지금까지 수업을 진행하고 남은 횟수
+                </Text>
+                <TextInput
+                  value={ptForm.remaining}
+                  onChangeText={(v) =>
+                    setPtForm((f) => ({
+                      ...f,
+                      remaining: v.replace(/[^0-9]/g, ""),
+                    }))
+                  }
+                  placeholder="예: 15"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 12,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  결제 금액 (원)
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: Colors.textMuted,
+                    marginBottom: 8,
+                  }}
+                >
+                  첫 PT 결제 금액 — 매출 집계에 사용돼요
+                </Text>
+                <TextInput
+                  value={ptForm.amount}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/[^0-9]/g, "");
+                    setPtForm((f) => ({
+                      ...f,
+                      amount: digits ? Number(digits).toLocaleString() : "",
+                    }));
+                  }}
+                  placeholder="예: 500,000"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 12,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 4,
+                  }}
+                >
+                  결제일 *
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: Colors.textMuted,
+                    marginBottom: 8,
+                  }}
+                >
+                  처음 PT를 결제한 날짜
+                </Text>
+                <TextInput
+                  value={ptForm.contractDate}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/[^0-9]/g, "").slice(0, 8);
+                    const fmt =
+                      digits.length > 6
+                        ? `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`
+                        : digits.length > 4
+                          ? `${digits.slice(0, 4)}-${digits.slice(4)}`
+                          : digits;
+                    setPtForm((f) => ({
+                      ...f,
+                      contractDate: fmt,
+                      startDate: fmt,
+                    }));
+                    if (digits.length === 8) Keyboard.dismiss();
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 16,
+                  }}
+                />
+              </>
+            )}
 
-            {/* 추가 후 잔여 미리보기 */}
-            <View
-              style={{
-                backgroundColor: Colors.greenLight,
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 12,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  marginBottom: 2,
-                }}
-              >
-                추가 후 잔여
-              </Text>
-              <Text
-                style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}
-              >
-                {(member?.ptRemaining ?? 0) + Number(ptForm.sessions || 0)}회
-              </Text>
-            </View>
+            {/* 추가 횟수 +/- UI — 기존 PT 있을 때만 */}
+            {(member?.ptTotal ?? 0) > 0 && (
+              <>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  추가할 횟수
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    marginBottom: 12,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() =>
+                      setPtForm((f) => ({
+                        ...f,
+                        sessions: String(Math.max(0, Number(f.sessions) - 1)),
+                      }))
+                    }
+                    style={{
+                      padding: 12,
+                      borderRightWidth: 1,
+                      borderRightColor: Colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 18, color: Colors.textMuted }}>
+                      −
+                    </Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    value={ptForm.sessions}
+                    onChangeText={(v) =>
+                      setPtForm((f) => ({
+                        ...f,
+                        sessions: v.replace(/[^0-9]/g, ""),
+                      }))
+                    }
+                    keyboardType="number-pad"
+                    style={{
+                      flex: 1,
+                      textAlign: "center",
+                      fontSize: 24,
+                      fontWeight: "800",
+                      color: Colors.green,
+                      paddingVertical: 10,
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() =>
+                      setPtForm((f) => ({
+                        ...f,
+                        sessions: String(Number(f.sessions) + 1),
+                      }))
+                    }
+                    style={{
+                      padding: 12,
+                      borderLeftWidth: 1,
+                      borderLeftColor: Colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 18, color: Colors.green }}>+</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <Text
-              style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}
-            >
-              계약 시작일
-            </Text>
-            <TextInput
-              value={ptForm.startDate}
-              onChangeText={(v) => {
-                const n = v.replace(/[^0-9]/g, "").slice(0, 8);
-                const fmt =
-                  n.length > 6
-                    ? `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6)}`
-                    : n.length > 4
-                      ? `${n.slice(0, 4)}-${n.slice(4)}`
-                      : n;
-                setPtForm((f) => ({ ...f, startDate: fmt }));
-                if (n.length === 8) Keyboard.dismiss();
-              }}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textPlaceholder}
-              keyboardType="number-pad"
-              maxLength={10}
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 14,
-                color: Colors.text,
-                marginBottom: 10,
-              }}
-            />
-            <Text
-              style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}
-            >
-              만료일 (선택)
-            </Text>
-            <TextInput
-              value={ptForm.endDate}
-              onChangeText={(v) => {
-                const n = v.replace(/[^0-9]/g, "").slice(0, 8);
-                const fmt =
-                  n.length > 6
-                    ? `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6)}`
-                    : n.length > 4
-                      ? `${n.slice(0, 4)}-${n.slice(4)}`
-                      : n;
-                setPtForm((f) => ({ ...f, endDate: fmt }));
-                if (n.length === 8) Keyboard.dismiss();
-              }}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textPlaceholder}
-              keyboardType="number-pad"
-              maxLength={10}
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 14,
-                color: Colors.text,
-                marginBottom: 10,
-              }}
-            />
-            <Text
-              style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 6 }}
-            >
-              메모
-            </Text>
-            <TextInput
-              value={ptForm.memo}
-              onChangeText={(v) => setPtForm((f) => ({ ...f, memo: v }))}
-              placeholder="예: 추가 결제 10회"
-              placeholderTextColor={Colors.textPlaceholder}
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 14,
-                color: Colors.text,
-                marginBottom: 16,
-              }}
-            />
+                {/* 추가 후 잔여 미리보기 */}
+                <View
+                  style={{
+                    backgroundColor: Colors.greenLight,
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: Colors.textMuted,
+                      marginBottom: 2,
+                    }}
+                  >
+                    추가 후 잔여
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      fontWeight: "900",
+                      color: Colors.green,
+                    }}
+                  >
+                    {(member?.ptRemaining ?? 0) + Number(ptForm.sessions || 0)}
+                    회
+                  </Text>
+                </View>
+
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  계약 시작일
+                </Text>
+                <TextInput
+                  value={ptForm.startDate}
+                  onChangeText={(v) => {
+                    const n = v.replace(/[^0-9]/g, "").slice(0, 8);
+                    const fmt =
+                      n.length > 6
+                        ? `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6)}`
+                        : n.length > 4
+                          ? `${n.slice(0, 4)}-${n.slice(4)}`
+                          : n;
+                    setPtForm((f) => ({ ...f, startDate: fmt }));
+                    if (n.length === 8) Keyboard.dismiss();
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 10,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  만료일 (선택)
+                </Text>
+                <TextInput
+                  value={ptForm.endDate}
+                  onChangeText={(v) => {
+                    const n = v.replace(/[^0-9]/g, "").slice(0, 8);
+                    const fmt =
+                      n.length > 6
+                        ? `${n.slice(0, 4)}-${n.slice(4, 6)}-${n.slice(6)}`
+                        : n.length > 4
+                          ? `${n.slice(0, 4)}-${n.slice(4)}`
+                          : n;
+                    setPtForm((f) => ({ ...f, endDate: fmt }));
+                    if (n.length === 8) Keyboard.dismiss();
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 10,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: Colors.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  메모
+                </Text>
+                <TextInput
+                  value={ptForm.memo}
+                  onChangeText={(v) => setPtForm((f) => ({ ...f, memo: v }))}
+                  placeholder="예: 추가 결제 10회"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 12,
+                    fontSize: 14,
+                    color: Colors.text,
+                    marginBottom: 16,
+                  }}
+                />
+              </>
+            )}
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
                 onPress={() => {
                   setPtForm({
                     sessions: "0",
+                    remaining: "",
+                    amount: "",
+                    contractDate: todayStr,
                     startDate: todayStr,
                     endDate: "",
                     memo: "",

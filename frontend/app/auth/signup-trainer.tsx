@@ -96,7 +96,7 @@ export default function SignupTrainerScreen() {
       }
 
       await AsyncStorage.removeItem("pendingName");
-      router.replace("/(tabs)/trainer/home");
+      router.replace("/onboarding/trainer");
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "알 수 없는 오류가 발생했어요.");
     } finally {

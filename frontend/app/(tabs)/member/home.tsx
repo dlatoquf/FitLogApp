@@ -89,6 +89,11 @@ export default function MemberHomeScreen() {
     content: string;
     date: string;
   } | null>(null);
+  const [latestNotice, setLatestNotice] = useState<{
+    id: number;
+    content: string;
+    createdAt: string;
+  } | null>(null);
   const [latestWorkoutFeedback, setLatestWorkoutFeedback] = useState<{
     content: string;
     date: string;
@@ -111,7 +116,9 @@ export default function MemberHomeScreen() {
       ]);
       if (!homeRes.ok) {
         const errText = await homeRes.text().catch(() => "");
-        throw new Error(`서버 오류 (${homeRes.status})${errText ? ": " + errText.slice(0, 120) : ""}`);
+        throw new Error(
+          `서버 오류 (${homeRes.status})${errText ? ": " + errText.slice(0, 120) : ""}`,
+        );
       }
       const homeData = await homeRes.json();
       setData(homeData);
@@ -122,7 +129,7 @@ export default function MemberHomeScreen() {
       const fromKey = toDateKey(thisMonday);
       const toKey = toDateKey(thisSunday);
       try {
-        const [fitlogRes, bodylogRes, feedbackRes, missionsRes] =
+        const [fitlogRes, bodylogRes, feedbackRes, missionsRes, noticeRes] =
           await Promise.all([
             fetch(`${API_URL}/api/fitlog/me?from=${fromKey}&to=${toKey}`, {
               headers,
@@ -130,6 +137,7 @@ export default function MemberHomeScreen() {
             fetch(`${API_URL}/api/bodylog/me`, { headers }),
             fetch(`${API_URL}/api/diet/feedback/latest`, { headers }),
             fetch(`${API_URL}/api/missions/my`, { headers }),
+            fetch(`${API_URL}/api/member/notices/latest`, { headers }),
           ]);
         if (fitlogRes.ok) {
           try {
@@ -142,15 +150,21 @@ export default function MemberHomeScreen() {
             setWeekWorkoutDates(dates);
             // 오늘 운동 피드백만 표시
             const todayStr = toDateKey(new Date());
-            const todayFeedback = logs.find((l: any) =>
-              l.feedback && String(l.feedback).trim() &&
-              String(l.date ?? l.logDate ?? "").slice(0, 10) === todayStr
+            const todayFeedback = logs.find(
+              (l: any) =>
+                l.feedback &&
+                String(l.feedback).trim() &&
+                String(l.date ?? l.logDate ?? "").slice(0, 10) === todayStr,
             );
-            setLatestWorkoutFeedback(todayFeedback ? {
-              content: todayFeedback.feedback,
-              date: todayStr,
-              trainerName: todayFeedback.trainerName ?? "",
-            } : null);
+            setLatestWorkoutFeedback(
+              todayFeedback
+                ? {
+                    content: todayFeedback.feedback,
+                    date: todayStr,
+                    trainerName: todayFeedback.trainerName ?? "",
+                  }
+                : null,
+            );
           } catch {}
         }
         if (bodylogRes.ok) {
@@ -172,7 +186,11 @@ export default function MemberHomeScreen() {
             const todayStr = toDateKey(new Date());
             setLatestFeedback(
               fb && fb.date === todayStr
-                ? { trainerName: fb.trainerName, content: fb.content, date: fb.date }
+                ? {
+                    trainerName: fb.trainerName,
+                    content: fb.content,
+                    date: fb.date,
+                  }
                 : null,
             );
           } catch {}
@@ -189,6 +207,13 @@ export default function MemberHomeScreen() {
               })),
             );
           } catch {}
+        }
+        if (noticeRes.ok && noticeRes.status !== 204) {
+          try {
+            setLatestNotice(await noticeRes.json());
+          } catch {}
+        } else {
+          setLatestNotice(null);
         }
       } catch {}
       if (weekRes.ok) setThisWeek(await weekRes.json());
@@ -574,7 +599,7 @@ export default function MemberHomeScreen() {
         >
           <Text
             style={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: "700",
               color: Colors.textSub,
               marginBottom: 12,
@@ -647,7 +672,139 @@ export default function MemberHomeScreen() {
           </Text>
         </View>
 
-        {/* 트레이너 챌린지 — 운동현황 바로 아래 */}
+        {/* 이번 주 내 수업 */}
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "700",
+              color: Colors.text,
+              marginBottom: 10,
+            }}
+          >
+            이번 주 내 수업
+          </Text>
+          {activeThisWeek.length === 0 ? (
+            <Text
+              style={{
+                fontSize: 13,
+                color: Colors.textMuted,
+                textAlign: "center",
+                paddingVertical: 8,
+              }}
+            >
+              이번 주 확정된 수업이 없어요
+            </Text>
+          ) : (
+            activeThisWeek.map((s) => (
+              <View
+                key={`${s.scheduleId}-${s.date}-${s.startTime}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: Colors.blueBg,
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 6,
+                  borderWidth: 1,
+                  borderColor: Colors.blue + "44",
+                }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: Colors.blue,
+                    marginRight: 10,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.text,
+                    flex: 1,
+                  }}
+                >
+                  {s.date}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.blue,
+                  }}
+                >
+                  {s.startTime}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* 트레이너 공지사항 */}
+        <TouchableOpacity
+          onPress={() => router.push("/(tabs)/member/notices" as any)}
+          style={{
+            backgroundColor: "#FFFBEB",
+            borderRadius: 14,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
+            borderWidth: 1,
+            borderColor: "#FDE68A",
+            marginBottom: 12,
+          }}
+          activeOpacity={0.8}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 6,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}>
+              📢 트레이너 공지
+            </Text>
+            <Text style={{ fontSize: 11, color: "#B45309" }}>더보기 →</Text>
+          </View>
+          {latestNotice ? (
+            <>
+              <Text
+                style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
+                numberOfLines={2}
+              >
+                {latestNotice.content}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: Colors.textPlaceholder,
+                  marginTop: 4,
+                }}
+              >
+                {latestNotice.createdAt}
+              </Text>
+            </>
+          ) : (
+            <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+              아직 등록된 공지가 없어요
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* 트레이너 챌린지 */}
         <View
           style={{
             backgroundColor: "#fff7ed",
@@ -776,7 +933,7 @@ export default function MemberHomeScreen() {
           )}
         </View>
 
-        {/* 운동 피드백 — 챌린지 바로 아래 */}
+        {/* 운동 피드백 */}
         {latestWorkoutFeedback && (
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/member/workout" as any)}
@@ -790,11 +947,33 @@ export default function MemberHomeScreen() {
               marginBottom: 10,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 운동 피드백</Text>
-              <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestWorkoutFeedback.date}</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              <Text
+                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
+              >
+                트레이너 운동 피드백
+              </Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: Colors.textMuted,
+                  marginLeft: "auto",
+                }}
+              >
+                {latestWorkoutFeedback.date}
+              </Text>
             </View>
-            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }} numberOfLines={2}>
+            <Text
+              style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }}
+              numberOfLines={2}
+            >
               {latestWorkoutFeedback.content}
             </Text>
           </TouchableOpacity>
@@ -814,309 +993,38 @@ export default function MemberHomeScreen() {
               marginBottom: 10,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 식단 피드백</Text>
-              <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestFeedback.date}</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              <Text
+                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
+              >
+                트레이너 식단 피드백
+              </Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: Colors.textMuted,
+                  marginLeft: "auto",
+                }}
+              >
+                {latestFeedback.date}
+              </Text>
             </View>
-            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }} numberOfLines={2}>
+            <Text
+              style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }}
+              numberOfLines={2}
+            >
               {latestFeedback.content}
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* 바디 로그 */}
-        <TouchableOpacity
-          onPress={() => router.push("/(tabs)/member/growth" as any)}
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 14,
-            padding: 14,
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: Colors.border,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 10,
-            }}
-          >
-            <Text
-              style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub }}
-            >
-              바디 로그
-            </Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-            >
-              {lastBodyLog && (
-                <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                  {lastBodyLog.date}
-                </Text>
-              )}
-              <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
-            </View>
-          </View>
-          {lastBodyLog ? (
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {/* 체중 */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: "#fff",
-                  borderRadius: 10,
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: Colors.textMuted,
-                    marginBottom: 4,
-                  }}
-                >
-                  체중
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "900",
-                    color: Colors.text,
-                  }}
-                >
-                  {lastBodyLog.weight ?? "-"}
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "400",
-                      color: Colors.textMuted,
-                    }}
-                  >
-                    kg
-                  </Text>
-                </Text>
-                {weightDiff != null && (
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "700",
-                      color:
-                        weightDiff < 0
-                          ? Colors.blue
-                          : weightDiff > 0
-                            ? Colors.red
-                            : Colors.textMuted,
-                      marginTop: 2,
-                    }}
-                  >
-                    {weightDiff > 0 ? `+${weightDiff}` : weightDiff}
-                  </Text>
-                )}
-              </View>
-              {/* 체지방 */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: "#fff",
-                  borderRadius: 10,
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: Colors.textMuted,
-                    marginBottom: 4,
-                  }}
-                >
-                  체지방률
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "900",
-                    color: Colors.gold,
-                  }}
-                >
-                  {lastBodyLog.bodyFat ?? "-"}
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "400",
-                      color: Colors.textMuted,
-                    }}
-                  >
-                    %
-                  </Text>
-                </Text>
-                {bodyFatDiff !== null && bodyFatDiff !== 0 && (
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "800",
-                      color: bodyFatDiff > 0 ? Colors.red : Colors.green,
-                      marginTop: 2,
-                    }}
-                  >
-                    {bodyFatDiff > 0 ? `+${bodyFatDiff}` : bodyFatDiff}
-                  </Text>
-                )}
-              </View>
-              {/* 근육량 */}
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: "#fff",
-                  borderRadius: 10,
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: Colors.textMuted,
-                    marginBottom: 4,
-                  }}
-                >
-                  근육량
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "900",
-                    color: Colors.green,
-                  }}
-                >
-                  {lastBodyLog.muscleMass ?? "-"}
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "400",
-                      color: Colors.textMuted,
-                    }}
-                  >
-                    kg
-                  </Text>
-                </Text>
-                {muscleMassDiff !== null && muscleMassDiff !== 0 && (
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "800",
-                      color: muscleMassDiff > 0 ? Colors.green : Colors.red,
-                      marginTop: 2,
-                    }}
-                  >
-                    {muscleMassDiff > 0 ? `+${muscleMassDiff}` : muscleMassDiff}
-                  </Text>
-                )}
-              </View>
-            </View>
-          ) : (
-            <View style={{ alignItems: "center", paddingVertical: 12 }}>
-              <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-                아직 기록이 없어요
-              </Text>
-              <Text
-                style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
-              >
-                탭하여 첫 번째 바디 로그를 남겨보세요
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* 이번 주 내 수업 */}
-        <View
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: Colors.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "700",
-              color: Colors.text,
-              marginBottom: 10,
-            }}
-          >
-            이번 주 내 수업
-          </Text>
-          {activeThisWeek.length === 0 ? (
-            <Text
-              style={{
-                fontSize: 13,
-                color: Colors.textMuted,
-                textAlign: "center",
-                paddingVertical: 8,
-              }}
-            >
-              이번 주 확정된 수업이 없어요
-            </Text>
-          ) : (
-            activeThisWeek.map((s) => (
-              <View
-                key={`${s.scheduleId}-${s.date}-${s.startTime}`}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: Colors.blueBg,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginBottom: 6,
-                  borderWidth: 1,
-                  borderColor: Colors.blue + "44",
-                }}
-              >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: Colors.blue,
-                    marginRight: 10,
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.text,
-                    flex: 1,
-                  }}
-                >
-                  {s.date}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.blue,
-                  }}
-                >
-                  {s.startTime}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
 
       </ScrollView>
 

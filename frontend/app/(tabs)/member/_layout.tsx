@@ -100,6 +100,7 @@ export default function MemberTabLayout() {
 
       <Tabs.Screen name="schedule" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="notices" options={{ href: null }} />
     </Tabs>
   );
 }

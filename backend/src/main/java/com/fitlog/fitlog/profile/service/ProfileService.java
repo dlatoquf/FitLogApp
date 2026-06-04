@@ -160,7 +160,7 @@ public class ProfileService {
             return m;
         });
         if (member.getUser() == null) member.setUser(savedUser);
-        member.setPhone(req.getPhone());
+        member.setPhone(req.getPhone().replaceAll("[^0-9]", ""));
         if (req.getBirthDate() != null && !req.getBirthDate().isBlank()) {
             member.setBirthDate(req.getBirthDate());
         }
