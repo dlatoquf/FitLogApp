@@ -5,6 +5,7 @@ import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.notice.entity.TrainerNotice;
 import com.fitlog.fitlog.notice.repository.TrainerNoticeRepository;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
@@ -26,6 +27,7 @@ public class TrainerNoticeController {
     private final MemberRepository memberRepository;
     private final ManualMemberRepository manualMemberRepository;
     private final JwtService jwtService;
+    private final NotificationService notificationService;
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -33,12 +35,14 @@ public class TrainerNoticeController {
                                    TrainerRepository trainerRepository,
                                    MemberRepository memberRepository,
                                    ManualMemberRepository manualMemberRepository,
-                                   JwtService jwtService) {
+                                   JwtService jwtService,
+                                   NotificationService notificationService) {
         this.noticeRepository = noticeRepository;
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
         this.manualMemberRepository = manualMemberRepository;
         this.jwtService = jwtService;
+        this.notificationService = notificationService;
     }
 
     // ── 연동 회원 공지 목록 조회
@@ -67,6 +71,10 @@ public class TrainerNoticeController {
         notice.setMember(member);
         notice.setContent(content.trim());
         noticeRepository.save(notice);
+        try {
+            notificationService.sendNotification(member.getUser(), "GENERAL",
+                    trainer.getUser().getName() + " 트레이너의 공지: " + content.trim());
+        } catch (Exception ignored) {}
         return ResponseEntity.ok(toMap(notice));
     }
 
