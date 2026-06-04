@@ -32,6 +32,10 @@ public class NotificationService {
      * notificationService.sendNotification(user, "SCHEDULE_CONFIRM", "수업이 확정됐어요!", "SCHEDULE", scheduleId);
      */
     public void sendNotification(User user, String type, String content, String targetType, Long targetId) {
+        sendNotification(user, type, content, targetType, targetId, null);
+    }
+
+    public void sendNotification(User user, String type, String content, String targetType, Long targetId, String date) {
         // 1. DB에 알림 저장
         Notification notification = new Notification();
         notification.setUser(user);
@@ -43,19 +47,19 @@ public class NotificationService {
 
         // 2. FCM 푸시 전송 (토큰 있을 때만)
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-            sendPush(user.getFcmToken(), content, type);
+            sendPush(user.getFcmToken(), content, type, date);
         }
     }
 
     // targetType, targetId 없는 단순 알림용
     public void sendNotification(User user, String type, String content) {
-        sendNotification(user, type, content, null, null);
+        sendNotification(user, type, content, null, null, null);
     }
 
     // FCM 푸시 실제 전송
-    private void sendPush(String fcmToken, String body, String type) {
+    private void sendPush(String fcmToken, String body, String type, String date) {
         try {
-            Message message = Message.builder()
+            Message.Builder builder = Message.builder()
                     .setToken(fcmToken)
                     .setApnsConfig(ApnsConfig.builder()
                             .setAps(Aps.builder().setSound("default").setBadge(1).build())
@@ -67,8 +71,11 @@ public class NotificationService {
                             .setTitle("FitLog")
                             .setBody(body)
                             .build())
-                    .putData("type", type)
-                    .build();
+                    .putData("type", type);
+            if (date != null && !date.isBlank()) {
+                builder.putData("date", date);
+            }
+            Message message = builder.build();
 
             FirebaseMessaging.getInstance().send(message);
         } catch (com.google.firebase.messaging.FirebaseMessagingException e) {

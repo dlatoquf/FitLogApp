@@ -91,9 +91,9 @@ export default function MemberMoreScreen() {
         notifFeedback: boolean; notifSchedule: boolean;
         notifPtPayment: boolean; notifWorkout: boolean; notifNotice: boolean;
       }>("/api/member/notification-settings");
-      const allOn = serverSettings.notifFeedback && serverSettings.notifSchedule
-        && serverSettings.notifPtPayment && serverSettings.notifWorkout && serverSettings.notifNotice;
-      setNotifPush(allOn);
+      // master toggle은 AsyncStorage 기준으로 읽음 (서브토글 AND 계산 X)
+      const storedMaster = await AsyncStorage.getItem("notif_push_member");
+      setNotifPush(storedMaster !== "false");
       setNotifFeedback(serverSettings.notifFeedback);
       setNotifSchedule(serverSettings.notifSchedule);
       setNotifPtPayment(serverSettings.notifPtPayment);
@@ -387,6 +387,7 @@ export default function MemberMoreScreen() {
       ]);
       await syncNotifToServer({ notifFeedback: false, notifSchedule: false, notifPtPayment: false, notifWorkout: false, notifNotice: false });
     } else {
+      // 전체 켤 때 모두 true로 세팅 후 서버 동기화
       setNotifSchedule(true); setNotifPtPayment(true); setNotifFeedback(true);
       setNotifWorkout(true); setNotifBodyLog(true); setNotifNotice(true);
       await AsyncStorage.multiSet([
@@ -933,18 +934,18 @@ export default function MemberMoreScreen() {
           />
           <View style={{ height: 1, backgroundColor: Colors.border }} />
           <SwitchRow
-            label="피드백 알림"
-            description="트레이너 운동·식단 피드백 알림"
-            value={notifFeedback}
-            onValueChange={handleFeedbackToggle}
-            disabled={!notifPush}
-          />
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <SwitchRow
             label="공지사항 알림"
             description="트레이너가 공지사항을 등록하면 알림"
             value={notifNotice}
             onValueChange={handleNoticeToggle}
+            disabled={!notifPush}
+          />
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
+          <SwitchRow
+            label="피드백 알림"
+            description="트레이너 운동·식단 피드백 알림"
+            value={notifFeedback}
+            onValueChange={handleFeedbackToggle}
             disabled={!notifPush}
           />
           <View style={{ height: 1, backgroundColor: Colors.border }} />

@@ -46,6 +46,7 @@
         "CFBundleDevelopmentRegion": "ko",
         "CFBundleLocalizations": ["ko", "en"],
         "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification", "fetch"],
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait"
         ],

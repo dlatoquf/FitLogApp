@@ -2081,6 +2081,8 @@ export default function MemberDetailScreen() {
       setWeekOffset(0);
       // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
       fetchMember();
+      fetchFitLogs(true);
+      fetchFitLogHistory(true);
     }, [initialTab, isManual]),
   );
 
@@ -2158,6 +2160,15 @@ export default function MemberDetailScreen() {
 
     init();
   }, [memberId]);
+
+  // 알림에서 날짜가 변경될 때 캘린더만 해당 날짜로 이동 (회원이 같아도 적용)
+  useEffect(() => {
+    if (notifDate) {
+      const d = parseDateStr(notifDate);
+      setSelectedDate(d);
+      setWeekOffset(calcWeekOffset(d));
+    }
+  }, [notifDate]);
 
   // 탭 전환 시 운동/바디만 처리
   useEffect(() => {

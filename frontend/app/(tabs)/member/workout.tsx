@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams } from "expo-router";
 import { ResizeMode, Video } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
@@ -67,11 +68,29 @@ interface WorkoutLog {
 }
 
 export default function WorkoutScreen() {
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [weekOffset, setWeekOffset] = useState(0);
   const today = toDateKey(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  useEffect(() => {
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setSelectedDate(dateParam);
+      const getMonday = (date: Date) => {
+        const m = new Date(date);
+        m.setHours(0, 0, 0, 0);
+        m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+        return m;
+      };
+      const d = new Date(dateParam);
+      const offset = Math.round(
+        (getMonday(d).getTime() - getMonday(new Date()).getTime()) / (7 * 24 * 60 * 60 * 1000)
+      );
+      setWeekOffset(offset);
+    }
+  }, [dateParam]);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -658,9 +677,13 @@ export default function WorkoutScreen() {
     if (prevWeekOffset.current === weekOffset) return;
     prevWeekOffset.current = weekOffset;
     const dates = getWeekDates(weekOffset);
-    const todayKey = toDateKey(new Date());
-    const inThisWeek = dates.some((d) => toDateKey(d) === todayKey);
-    setSelectedDate(inThisWeek ? todayKey : toDateKey(dates[0]));
+    const weekKeys = dates.map((d) => toDateKey(d));
+    // selectedDate가 이미 해당 주 안에 있으면 리셋하지 않음 (알림 날짜 이동 보호)
+    if (!weekKeys.includes(selectedDate)) {
+      const todayKey = toDateKey(new Date());
+      const inThisWeek = weekKeys.includes(todayKey);
+      setSelectedDate(inThisWeek ? todayKey : weekKeys[0]);
+    }
     fetchLogs(null, weekOffset);
   }, [weekOffset]);
 

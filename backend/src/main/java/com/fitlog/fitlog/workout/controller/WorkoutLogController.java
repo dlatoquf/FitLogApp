@@ -169,7 +169,8 @@ public class WorkoutLogController {
                     "WORKOUT_LOG",
                     notiContent,
                     "WORKOUT_LOG",
-                    log.getWorkoutId()
+                    log.getWorkoutId(),
+                    log.getLogDate() != null ? log.getLogDate().toString() : null
             );
         }
 
@@ -430,7 +431,8 @@ public class WorkoutLogController {
                 "FEEDBACK",
                 trainer.getUser().getName() + " 트레이너가 운동 피드백을 남겼어요.",
                 "WORKOUT_LOG",
-                log.getWorkoutId()
+                log.getWorkoutId(),
+                log.getLogDate() != null ? log.getLogDate().toString() : null
             );
         }
 

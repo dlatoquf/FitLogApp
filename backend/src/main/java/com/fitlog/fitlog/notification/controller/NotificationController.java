@@ -3,7 +3,9 @@ package com.fitlog.fitlog.notification.controller;
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
+import com.fitlog.fitlog.diet.repository.DietDayFeedbackRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
+import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +20,21 @@ import java.util.stream.Collectors;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final DietDayFeedbackRepository dietDayFeedbackRepository;
+    private final WorkoutLogRepository workoutLogRepository;
     private final UserRepository userRepository;
     private final JwtService jwtService;
 
     public NotificationController(NotificationRepository notificationRepository,
                                   UserRepository userRepository,
-                                  JwtService jwtService) {
+                                  JwtService jwtService,
+                                  DietDayFeedbackRepository dietDayFeedbackRepository,
+                                  WorkoutLogRepository workoutLogRepository) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
+        this.dietDayFeedbackRepository = dietDayFeedbackRepository;
+        this.workoutLogRepository = workoutLogRepository;
     }
 
     // 내 알림 조회
@@ -49,6 +57,24 @@ public class NotificationController {
                     map.put("createdAt", n.getCreatedAt());
                     map.put("targetType", n.getTargetType());
                     map.put("targetId", n.getTargetId());
+                    // 날짜·회원 연계 화면 이동을 위한 추가 필드
+                    if (n.getTargetId() != null) {
+                        if ("DIET_FEEDBACK".equals(n.getTargetType())) {
+                            dietDayFeedbackRepository.findById(n.getTargetId())
+                                .ifPresent(f -> map.put("targetDate", f.getDate().toString()));
+                        } else if ("WORKOUT_LOG".equals(n.getTargetType())) {
+                            workoutLogRepository.findById(n.getTargetId()).ifPresent(l -> {
+                                if (l.getLogDate() != null) map.put("targetDate", l.getLogDate().toString());
+                                if (l.getMember() != null) map.put("memberId", l.getMember().getId());
+                            });
+                        }
+                    }
+                    // DIET_PHOTO: content에서 날짜 파싱 ("OO님이 2026-05-31 식단 사진을 등록했어요.")
+                    if ("DIET_PHOTO".equals(n.getType()) && n.getContent() != null) {
+                        java.util.regex.Matcher m = java.util.regex.Pattern
+                            .compile("(\\d{4}-\\d{2}-\\d{2})").matcher(n.getContent());
+                        if (m.find()) map.put("targetDate", m.group(1));
+                    }
                     return map;
                 })
                 .collect(Collectors.toList());

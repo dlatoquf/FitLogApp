@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -56,9 +57,30 @@ const getWeekDates = (offset: number): Date[] => {
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function MemberDietScreen() {
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const scrollRef = useRef<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
+
+  useEffect(() => {
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const d = new Date(dateParam);
+      if (!isNaN(d.getTime())) {
+        setSelectedDate(d);
+        // 해당 날짜가 속한 주의 월요일 vs 오늘이 속한 주의 월요일 차이로 offset 계산
+        const getMonday = (date: Date) => {
+          const m = new Date(date);
+          m.setHours(0, 0, 0, 0);
+          m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+          return m;
+        };
+        const offset = Math.round(
+          (getMonday(d).getTime() - getMonday(new Date()).getTime()) / (7 * 24 * 60 * 60 * 1000)
+        );
+        setWeekOffset(offset);
+      }
+    }
+  }, [dateParam]);
   const [photos, setPhotos] = useState<DietPhoto[]>([]);
   const [dayFeedback, setDayFeedback] = useState<DayFeedback | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +124,11 @@ export default function MemberDietScreen() {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
     fetchData();
   }, [fetchData]));
+
+  // 알림 등 외부에서 날짜가 바뀌면 즉시 재조회
+  useEffect(() => {
+    fetchData();
+  }, [dateKey]);
 
   // ── 사진 비율 자동 계산 ─────────────────────────────────────────────────────
   useEffect(() => {

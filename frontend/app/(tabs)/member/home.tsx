@@ -148,13 +148,14 @@ export default function MemberHomeScreen() {
               ),
             );
             setWeekWorkoutDates(dates);
-            // 오늘 운동 피드백만 표시
+            // 오늘 개인운동 피드백만 표시
             const todayStr = toDateKey(new Date());
             const todayFeedback = logs.find(
               (l: any) =>
                 l.feedback &&
                 String(l.feedback).trim() &&
-                String(l.date ?? l.logDate ?? "").slice(0, 10) === todayStr,
+                String(l.date ?? l.logDate ?? "").slice(0, 10) === todayStr &&
+                (l.workoutType === "PERSONAL" || !l.workoutType),
             );
             setLatestWorkoutFeedback(
               todayFeedback

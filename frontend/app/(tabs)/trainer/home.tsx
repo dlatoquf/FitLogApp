@@ -486,7 +486,7 @@ export default function TrainerHomeScreen() {
           const revenueCatKey =
             Platform.OS === "ios"
               ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
-              : "goog_ANDROID_KEY_HERE"; // TODO: RevenueCat 대시보드에서 Android 키 발급 후 교체
+              : "goog_basbVZDtouCQZzqQwYIsKIlwCdx";
           await Purchases.configure({
             apiKey: revenueCatKey,
           });

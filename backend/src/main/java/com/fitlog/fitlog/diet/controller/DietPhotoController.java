@@ -188,7 +188,8 @@ public class DietPhotoController {
                 "DIET_FEEDBACK",
                 trainer.getUser().getName() + " 트레이너가 식단 피드백을 남겼어요.",
                 "DIET_FEEDBACK",
-                saved.getId()
+                saved.getId(),
+                date.toString()
             );
         }
 
