@@ -21,8 +21,8 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 prepare_react_native_project!
 
 target 'FitLog' do
+  use_modular_headers!
   use_expo_modules!
-  pod 'GoogleUtilities', :modular_headers => true
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -60,20 +60,5 @@ target 'FitLog' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
-      end
-    end
-    # Xcode 26+ Apple clang consteval 버그 우회: fmt 헤더 직접 패치
-    fmt_base = File.join(installer.sandbox.root, 'fmt/include/fmt/base.h')
-    if File.exist?(fmt_base)
-      content = File.read(fmt_base)
-      patched = content.gsub(
-        '#elif defined(__apple_build_version__) && __apple_build_version__ < 14000029L',
-        '#elif defined(__apple_build_version__)'
-      )
-      File.write(fmt_base, patched)
-    end
   end
 end
