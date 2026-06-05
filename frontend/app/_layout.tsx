@@ -7,6 +7,7 @@ import { Animated, Text, TouchableOpacity } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
+import { API_URL } from "../constants/api";
 
 async function initFCM() {
   try {
@@ -106,9 +107,21 @@ export default function RootLayout() {
   useEffect(() => {
     initFCM();
 
+    const markAllNotificationsRead = async () => {
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+        if (!jwt) return;
+        await fetch(`${API_URL}/api/notifications/read-all`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+      } catch {}
+    };
+
     const unsubscribeBackground = messaging().onNotificationOpenedApp((remoteMessage) => {
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
+      markAllNotificationsRead();
       if (type) navigateByType(type, date);
     });
 
@@ -116,6 +129,7 @@ export default function RootLayout() {
       if (!remoteMessage) return;
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
+      markAllNotificationsRead();
       if (type) navigateByType(type, date);
     });
 
