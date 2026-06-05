@@ -45,7 +45,7 @@ public class NotificationService {
         notificationRepository.save(notification);
 
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-            sendPush(user.getFcmToken(), content, type, date);
+            sendPushWithTarget(user.getFcmToken(), content, type, date, targetId);
         }
     }
 
@@ -54,6 +54,10 @@ public class NotificationService {
     }
 
     private void sendPush(String fcmToken, String body, String type, String date) {
+        sendPushWithTarget(fcmToken, body, type, date, null);
+    }
+
+    private void sendPushWithTarget(String fcmToken, String body, String type, String date, Long targetId) {
         if (firebaseCredentials == null) {
             System.out.println("Firebase 미설정 - 푸시 전송 생략");
             return;
@@ -65,6 +69,9 @@ public class NotificationService {
             String dataField = "\"type\": \"" + type + "\"";
             if (date != null && !date.isBlank()) {
                 dataField += ", \"date\": \"" + date + "\"";
+            }
+            if (targetId != null) {
+                dataField += ", \"targetId\": \"" + targetId + "\"";
             }
 
             String json = "{"

@@ -2,19 +2,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
 import { router, Stack } from "expo-router";
-import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Platform, Text, TouchableOpacity } from "react-native";
+import { Animated, Text, TouchableOpacity } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
 import { API_URL } from "../constants/api";
 
-function isTablet() {
-  const { width, height } = Dimensions.get("window");
-  const shortSide = Math.min(width, height);
-  return shortSide >= 600;
-}
 
 async function initFCM() {
   try {
@@ -34,7 +28,7 @@ async function initFCM() {
   }
 }
 
-function navigateByType(type: string, date?: string) {
+function navigateByType(type: string, date?: string, targetId?: string) {
   try {
     AsyncStorage.getItem("role").then((role) => {
       const isTrainer = role === "TRAINER";
@@ -55,7 +49,11 @@ function navigateByType(type: string, date?: string) {
       } else if (type === "SCHEDULE_OPEN" || type === "SCHEDULE_REQUEST") {
         router.push(isTrainer ? "/(tabs)/trainer/schedule" : "/(tabs)/member/home");
       } else if (type === "NEW_MEMBER") {
-        router.push("/(tabs)/trainer/members" as any);
+        if (targetId) {
+          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { memberId: targetId } } as any);
+        } else {
+          router.push("/(tabs)/trainer/members" as any);
+        }
       }
     });
   } catch {}
@@ -114,15 +112,6 @@ export default function RootLayout() {
   const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; key: number } | null>(null);
 
   useEffect(() => {
-    // Android 폰은 세로 고정, 태블릿은 자유 회전
-    if (Platform.OS === "android") {
-      if (isTablet()) {
-        ScreenOrientation.unlockAsync();
-      } else {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      }
-    }
-
     initFCM();
 
     const markAllNotificationsRead = async () => {
@@ -139,16 +128,18 @@ export default function RootLayout() {
     const unsubscribeBackground = messaging().onNotificationOpenedApp((remoteMessage) => {
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
+      const targetId = remoteMessage.data?.targetId as string | undefined;
       markAllNotificationsRead();
-      if (type) navigateByType(type, date);
+      if (type) navigateByType(type, date, targetId);
     });
 
     messaging().getInitialNotification().then((remoteMessage) => {
       if (!remoteMessage) return;
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
+      const targetId = remoteMessage.data?.targetId as string | undefined;
       markAllNotificationsRead();
-      if (type) navigateByType(type, date);
+      if (type) navigateByType(type, date, targetId);
     });
 
     const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {

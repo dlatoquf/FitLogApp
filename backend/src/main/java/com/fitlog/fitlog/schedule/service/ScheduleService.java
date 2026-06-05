@@ -265,7 +265,7 @@ public class ScheduleService {
                 notificationService.sendNotification(
                         member.getUser(),
                         "SCHEDULE_CONFIRM",
-                        formatDate(date) + " " + startTime + " 수업이 확정됐어요.",
+                        formatDate(date.toString()) + " " + startTime + " 수업이 확정됐어요.",
                         "SCHEDULE",
                         schedule.getId()
                 );

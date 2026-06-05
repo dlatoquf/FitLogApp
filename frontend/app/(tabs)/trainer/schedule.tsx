@@ -133,7 +133,10 @@ export default function TrainerScheduleScreen() {
   // 수동 슬롯 추가 모달 (시간 직접 선택)
   const [manualModal, setManualModal] = useState(false);
   const [manualTime, setManualTime] = useState("09:00");
+  const [manualTimeFixed, setManualTimeFixed] = useState(false); // 주간 셀 탭 시 시간 고정
   const [addingManual, setAddingManual] = useState(false);
+  const [trainerStartTime, setTrainerStartTime] = useState("09:00"); // 출근 시간
+  const weekScrollRef = useRef<ScrollView>(null);
 
   // PT / OT / 개인운동 / 개인일정
   const [sessionType, setSessionType] = useState<
@@ -229,7 +232,7 @@ export default function TrainerScheduleScreen() {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
 
-        const [calRes, memoRes, slotSettingsRes] = await Promise.all([
+        const [calRes, memoRes, slotSettingsRes, profileRes] = await Promise.all([
           fetch(
             `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
             { headers },
@@ -238,7 +241,12 @@ export default function TrainerScheduleScreen() {
             headers,
           }),
           fetch(`${API_URL}/api/trainer/slot-settings`, { headers }),
+          fetch(`${API_URL}/api/profile/trainer`, { headers }),
         ]);
+        if (profileRes?.ok) {
+          const profileData = await profileRes.json();
+          if (profileData.startTime) setTrainerStartTime(profileData.startTime.slice(0, 5));
+        }
 
         if (calRes.ok) setSlots(await calRes.json());
         if (memoRes?.ok) {
@@ -833,6 +841,7 @@ export default function TrainerScheduleScreen() {
       if (members.length === 0) await fetchMembers();
       setSelectedDate(d);
       setManualTime(time);
+      setManualTimeFixed(true);
       if (
         existingSlot &&
         existingSlot.status !== "CONFIRMED" &&
@@ -924,9 +933,17 @@ export default function TrainerScheduleScreen() {
 
         {/* 세로 스크롤 그리드 */}
         <ScrollView
+          ref={weekScrollRef}
           nestedScrollEnabled
           showsVerticalScrollIndicator={false}
           style={{ maxHeight: GRID_MAX_H }}
+          onLayout={() => {
+            // 출근 시간 인덱스로 자동 스크롤
+            const startIdx = times.indexOf(trainerStartTime);
+            if (startIdx > 0) {
+              weekScrollRef.current?.scrollTo({ y: startIdx * (SLOT_H + 1), animated: false });
+            }
+          }}
         >
           {times.map((time) => (
             <View
@@ -1093,6 +1110,7 @@ export default function TrainerScheduleScreen() {
               onPress={async () => {
                 if (members.length === 0) await fetchMembers();
                 setManualTime("09:00");
+                setManualTimeFixed(false);
                 setManualModal(true);
               }}
               style={{
@@ -1310,6 +1328,7 @@ export default function TrainerScheduleScreen() {
             onPress={async () => {
               if (members.length === 0) await fetchMembers();
               setManualTime("09:00");
+              setManualTimeFixed(false);
               setManualModal(true);
             }}
             style={{
@@ -2466,51 +2485,46 @@ export default function TrainerScheduleScreen() {
               ))}
             </View>
 
-            {/* 시간 선택 */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: Colors.textSub,
-                marginBottom: 8,
-              }}
-            >
-              시작 시간
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 20 }}
-            >
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {makeTimeOptions(slotOffset === 30 ? 30 : 0).map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    onPress={() => setManualTime(t)}
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                      backgroundColor:
-                        manualTime === t ? Colors.green : Colors.bgSub,
-                      borderWidth: 1,
-                      borderColor:
-                        manualTime === t ? Colors.green : Colors.border,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: manualTime === t ? "#fff" : Colors.text,
-                      }}
-                    >
-                      {t}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            {/* 시간 선택 - 주간 셀 탭 시 고정, + 버튼 시 선택 가능 */}
+            {manualTimeFixed ? (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                  시작 시간
+                </Text>
+                <View style={{
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                  backgroundColor: Colors.green, alignSelf: "flex-start",
+                }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>{manualTime}</Text>
+                </View>
               </View>
-            </ScrollView>
+            ) : (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                  시작 시간
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {makeTimeOptions(slotOffset === 30 ? 30 : 0).map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => setManualTime(t)}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+                          backgroundColor: manualTime === t ? Colors.green : Colors.bgSub,
+                          borderWidth: 1,
+                          borderColor: manualTime === t ? Colors.green : Colors.border,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: manualTime === t ? "#fff" : Colors.text }}>
+                          {t}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
 
             {/* OT: 이름 + 전화번호 입력 / PT: 회원 선택 */}
             {sessionType === "OT" ? (

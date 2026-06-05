@@ -447,7 +447,6 @@ public class WorkoutLogController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
 
-        System.out.println("🔥 getMemberWorkoutLogs 호출 id=" + id + ", from=" + from + ", to=" + to);
 
         getUserFromToken(authorization);
         Member member = memberRepository.findById(id)
@@ -455,7 +454,6 @@ public class WorkoutLogController {
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().minusWeeks(4);
         LocalDate toDate   = to   != null ? LocalDate.parse(to)   : LocalDate.now();
 
-        System.out.println("🔥 workoutLogRepository 조회 직전");
 
         return ResponseEntity.ok(toResponse(workoutLogRepository.findByMemberAndDateBetween(member, fromDate, toDate)));
     }

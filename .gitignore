@@ -52,3 +52,11 @@ backend/src/main/resources/application.properties
 
 backend/src/main/resources/firebase-service-account.json
 backend/build/resources/main/firebase-service-account.json
+
+# EAS credentials
+frontend/credentials.json
+frontend/credentials/
+
+# Google service account keys
+*.json.key
+*-service-account.json
