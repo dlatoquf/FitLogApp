@@ -54,6 +54,8 @@ function navigateByType(type: string, date?: string) {
         router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/notices" as any);
       } else if (type === "SCHEDULE_OPEN" || type === "SCHEDULE_REQUEST") {
         router.push(isTrainer ? "/(tabs)/trainer/schedule" : "/(tabs)/member/home");
+      } else if (type === "NEW_MEMBER") {
+        router.push("/(tabs)/trainer/members" as any);
       }
     });
   } catch {}
