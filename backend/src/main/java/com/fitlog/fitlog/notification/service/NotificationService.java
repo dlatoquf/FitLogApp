@@ -1,42 +1,41 @@
 package com.fitlog.fitlog.notification.service;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.notification.entity.Notification;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
-import com.google.firebase.messaging.AndroidConfig;
-import com.google.firebase.messaging.AndroidNotification;
-import com.google.firebase.messaging.ApnsConfig;
-import com.google.firebase.messaging.Aps;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 @Service
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final GoogleCredentials firebaseCredentials;
+
+    private static final String FCM_URL =
+            "https://fcm.googleapis.com/v1/projects/fitlogapp-e972c/messages:send";
 
     public NotificationService(NotificationRepository notificationRepository,
-                               UserRepository userRepository) {
+                               UserRepository userRepository,
+                               GoogleCredentials firebaseCredentials) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.firebaseCredentials = firebaseCredentials;
     }
 
-    /**
-     * DB에 알림 저장 + FCM 푸시 전송
-     * 다른 서비스에서 알림 보낼 때 이 메서드 호출하면 됨
-     *
-     * 사용 예시:
-     * notificationService.sendNotification(user, "SCHEDULE_CONFIRM", "수업이 확정됐어요!", "SCHEDULE", scheduleId);
-     */
     public void sendNotification(User user, String type, String content, String targetType, Long targetId) {
         sendNotification(user, type, content, targetType, targetId, null);
     }
 
     public void sendNotification(User user, String type, String content, String targetType, Long targetId, String date) {
-        // 1. DB에 알림 저장
         Notification notification = new Notification();
         notification.setUser(user);
         notification.setType(type);
@@ -45,53 +44,67 @@ public class NotificationService {
         notification.setTargetId(targetId);
         notificationRepository.save(notification);
 
-        // 2. FCM 푸시 전송 (토큰 있을 때만)
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
             sendPush(user.getFcmToken(), content, type, date);
         }
     }
 
-    // targetType, targetId 없는 단순 알림용
     public void sendNotification(User user, String type, String content) {
         sendNotification(user, type, content, null, null, null);
     }
 
-    // FCM 푸시 실제 전송
     private void sendPush(String fcmToken, String body, String type, String date) {
+        if (firebaseCredentials == null) {
+            System.out.println("Firebase 미설정 - 푸시 전송 생략");
+            return;
+        }
         try {
-            Message.Builder builder = Message.builder()
-                    .setToken(fcmToken)
-                    .setApnsConfig(ApnsConfig.builder()
-                            .setAps(Aps.builder().setSound("default").setBadge(1).build())
-                            .build())
-                    .setAndroidConfig(AndroidConfig.builder()
-                            .setNotification(AndroidNotification.builder().setSound("default").build())
-                            .build())
-                    .setNotification(com.google.firebase.messaging.Notification.builder()
-                            .setTitle("FitLog")
-                            .setBody(body)
-                            .build())
-                    .putData("type", type);
-            if (date != null && !date.isBlank()) {
-                builder.putData("date", date);
-            }
-            Message message = builder.build();
+            firebaseCredentials.refreshIfExpired();
+            String accessToken = firebaseCredentials.getAccessToken().getTokenValue();
 
-            FirebaseMessaging.getInstance().send(message);
-        } catch (com.google.firebase.messaging.FirebaseMessagingException e) {
-            String errorCode = e.getMessagingErrorCode() != null ? e.getMessagingErrorCode().name() : "";
-            // 토큰 무효 (앱 삭제·재설치) → DB에서 토큰 제거
-            if (errorCode.equals("UNREGISTERED") || errorCode.equals("INVALID_ARGUMENT")) {
+            String dataField = "\"type\": \"" + type + "\"";
+            if (date != null && !date.isBlank()) {
+                dataField += ", \"date\": \"" + date + "\"";
+            }
+
+            String json = "{"
+                    + "\"message\": {"
+                    + "  \"token\": \"" + fcmToken + "\","
+                    + "  \"notification\": {\"title\": \"FitLog\", \"body\": \"" + escapeJson(body) + "\"},"
+                    + "  \"data\": {" + dataField + "},"
+                    + "  \"apns\": {\"payload\": {\"aps\": {\"sound\": \"default\", \"badge\": 1}}},"
+                    + "  \"android\": {\"notification\": {\"sound\": \"default\"}}"
+                    + "}"
+                    + "}";
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(FCM_URL))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                System.out.println("FCM 푸시 전송 성공");
+            } else if (response.statusCode() == 404 || response.body().contains("UNREGISTERED")) {
                 userRepository.findByFcmToken(fcmToken).ifPresent(u -> {
                     u.setFcmToken(null);
                     userRepository.save(u);
                     System.out.println("만료된 FCM 토큰 삭제: userId=" + u.getId());
                 });
             } else {
-                System.out.println("FCM 푸시 전송 실패 [" + errorCode + "]: " + e.getMessage());
+                System.out.println("FCM 전송 실패 [" + response.statusCode() + "]: " + response.body());
             }
-        } catch (Exception e) {
-            System.out.println("FCM 푸시 전송 실패: " + e.getMessage());
+        } catch (IOException | InterruptedException e) {
+            System.out.println("FCM 전송 예외: " + e.getMessage());
         }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

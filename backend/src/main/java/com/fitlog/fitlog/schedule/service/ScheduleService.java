@@ -265,7 +265,7 @@ public class ScheduleService {
                 notificationService.sendNotification(
                         member.getUser(),
                         "SCHEDULE_CONFIRM",
-                        "수업이 확정됐어요. " + date + " " + startTime,
+                        formatDate(date) + " " + startTime + " 수업이 확정됐어요.",
                         "SCHEDULE",
                         schedule.getId()
                 );
@@ -302,7 +302,7 @@ public class ScheduleService {
                 notificationService.sendNotification(
                         member.getUser(),
                         "SCHEDULE_CANCEL",
-                        "수업이 취소됐어요. " + schedule.getDate() + " " + schedule.getStartTime(),
+                        formatDate(schedule.getDate().toString()) + " " + schedule.getStartTime() + " 수업이 취소됐어요.",
                         "SCHEDULE",
                         scheduleId
                 );
@@ -497,5 +497,16 @@ public class ScheduleService {
         Long userId = jwtService.getUserIdFromToken(token);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("유저 없음"));
+    }
+
+    private String formatDate(String date) {
+        try {
+            String[] parts = date.split("-");
+            int month = Integer.parseInt(parts[1]);
+            int day = Integer.parseInt(parts[2]);
+            return month + "월 " + day + "일";
+        } catch (Exception e) {
+            return date;
+        }
     }
 }

@@ -10,13 +10,17 @@ import java.util.List;
 
 public interface MissionRepository extends JpaRepository<Mission, Long> {
 
-    // 회원의 현재 미션 (PENDING + DONE만, FAILED 제외 — trainer+user JOIN FETCH)
+    // 회원의 현재 미션 (가장 최근 workoutLogId 기준 — 이전 수업 미션 노출 방지)
     @Query("""
         SELECT m FROM Mission m
         LEFT JOIN FETCH m.trainer t
         LEFT JOIN FETCH t.user
         WHERE m.member.id = :memberId
           AND m.status IN :statuses
+          AND m.workoutLogId = (
+              SELECT MAX(m2.workoutLogId) FROM Mission m2
+              WHERE m2.member.id = :memberId
+          )
         ORDER BY m.createdAt DESC
     """)
     List<Mission> findRecentByMemberId(@Param("memberId") Long memberId,
