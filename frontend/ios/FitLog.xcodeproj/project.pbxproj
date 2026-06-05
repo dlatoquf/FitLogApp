@@ -419,7 +419,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.anonymous.FitLogApp;
 				PRODUCT_NAME = FitLog;
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "*[expo] com.anonymous.FitLogApp AppStore 2026-05-16T00:55:11.089Z";
+				
 				SWIFT_OBJC_BRIDGING_HEADER = "FitLog/FitLog-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -456,7 +456,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.anonymous.FitLogApp;
 				PRODUCT_NAME = FitLog;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "*[expo] com.anonymous.FitLogApp AppStore 2026-06-05T03:32:35.103Z";
+				
 				SWIFT_OBJC_BRIDGING_HEADER = "FitLog/FitLog-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
