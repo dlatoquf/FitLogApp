@@ -2083,7 +2083,7 @@ export default function MemberDetailScreen() {
       fetchMember();
       fetchFitLogs(true);
       fetchFitLogHistory(true);
-    }, [initialTab, isManual]),
+    }, [initialTab, isManual, memberId]),
   );
 
   // PT 미등록 뱃지에서 진입 시 PT 추가 모달 자동 오픈

@@ -667,9 +667,12 @@ export default function WorkoutScreen() {
   // 탭 포커스될 때마다 자동 새로고침 (현재 weekOffset 기준)
   useFocusEffect(
     useCallback(() => {
+      setSelectedDate(toDateKey(new Date()));
+      setWeekOffset(0);
       fetchAll();
       if (!memberId) fetchMemberInfo();
-    }, [weekOffset]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
   );
 
   // weekOffset 변경 시 날짜 리셋 + 재조회

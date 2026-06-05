@@ -128,11 +128,7 @@ export default function TrainerNotificationsScreen() {
 
         // ── 회원 생일 당일 / 7일 전 → 해당 회원 상세 페이지
         if (n.type === "BIRTHDAY_TODAY" || n.type === "BIRTHDAY_WEEK") {
-            if (n.targetId) {
-                router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any);
-            } else {
-                router.push("/(tabs)/trainer/home");
-            }
+            router.push("/(tabs)/trainer/home");
             return;
         }
 

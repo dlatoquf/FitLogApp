@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -116,7 +116,7 @@ export default function TrainerScheduleScreen() {
   const [members, setMembers] = useState<any[]>([]);
 
   // 뷰 모드 (월간 / 주간)
-  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [viewMode, setViewMode] = useState<"month" | "week">("week");
   const [weekOffset, setWeekOffset] = useState(0);
 
   // 월별 메모
@@ -136,6 +136,7 @@ export default function TrainerScheduleScreen() {
   const [manualTimeFixed, setManualTimeFixed] = useState(false); // 주간 셀 탭 시 시간 고정
   const [addingManual, setAddingManual] = useState(false);
   const [trainerStartTime, setTrainerStartTime] = useState("09:00"); // 출근 시간
+  const trainerStartTimeRef = useRef("09:00");
   const weekScrollRef = useRef<ScrollView>(null);
 
   // PT / OT / 개인운동 / 개인일정
@@ -245,7 +246,11 @@ export default function TrainerScheduleScreen() {
         ]);
         if (profileRes?.ok) {
           const profileData = await profileRes.json();
-          if (profileData.startTime) setTrainerStartTime(profileData.startTime.slice(0, 5));
+          if (profileData.startTime) {
+            const st = profileData.startTime.slice(0, 5);
+            setTrainerStartTime(st);
+            trainerStartTimeRef.current = st;
+          }
         }
 
         if (calRes.ok) setSlots(await calRes.json());
@@ -282,7 +287,25 @@ export default function TrainerScheduleScreen() {
       setViewMonth(now.getMonth() + 1);
       fetchAll();
       fetchMembers();
-    }, [fetchAll]),
+      // 탭 복귀 시에도 이번 주 가장 빠른 슬롯 vs 출근 시간 기준 스크롤
+      if (viewMode === "week") {
+        setTimeout(() => {
+          const effectiveOffset = slotOffset === 30 ? 30 : 0;
+          const times = makeTimeOptions(effectiveOffset as 0 | 30);
+          const weekDateKeys = getWeekDatesForOffset(weekOffset).map((d) => toDateKey(d));
+          const weekSlotTimes = slots
+            .filter((s: any) => weekDateKeys.includes(s.date))
+            .map((s: any) => s.startTime.slice(0, 5));
+          const earliestSlot = weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
+          const scrollTarget = earliestSlot && earliestSlot < trainerStartTimeRef.current
+            ? earliestSlot
+            : trainerStartTimeRef.current;
+          const startIdx = times.indexOf(scrollTarget);
+          if (startIdx > 0) weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
+        }, 150);
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, slotOffset]),
   );
 
   const fetchMembers = async () => {
@@ -362,6 +385,28 @@ export default function TrainerScheduleScreen() {
     const em = total % 60;
     return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
   };
+
+  // 주간 뷰 진입 시 — 이번 주 가장 빠른 슬롯 vs 출근 시간 중 더 이른 시간으로 스크롤
+  useEffect(() => {
+    if (viewMode !== "week") return;
+    const effectiveOffset = slotOffset === 30 ? 30 : 0;
+    const times = makeTimeOptions(effectiveOffset as 0 | 30);
+    // 이번 주 슬롯 중 가장 빠른 시작 시간
+    const weekDateKeys = currentWeekDates.map((d) => toDateKey(d));
+    const weekSlotTimes = slots
+      .filter((s) => weekDateKeys.includes(s.date))
+      .map((s) => s.startTime.slice(0, 5));
+    const earliestSlot = weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
+    const scrollTarget = earliestSlot && earliestSlot < trainerStartTime
+      ? earliestSlot
+      : trainerStartTime;
+    const startIdx = times.indexOf(scrollTarget);
+    if (startIdx <= 0) return;
+    const timer = setTimeout(() => {
+      weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [viewMode, trainerStartTime, slotOffset, slots, currentWeekDates]);
 
   // ─── 주간 이동 ───────────────────────────────────────────────────────────
 
@@ -937,13 +982,6 @@ export default function TrainerScheduleScreen() {
           nestedScrollEnabled
           showsVerticalScrollIndicator={false}
           style={{ maxHeight: GRID_MAX_H }}
-          onLayout={() => {
-            // 출근 시간 인덱스로 자동 스크롤
-            const startIdx = times.indexOf(trainerStartTime);
-            if (startIdx > 0) {
-              weekScrollRef.current?.scrollTo({ y: startIdx * (SLOT_H + 1), animated: false });
-            }
-          }}
         >
           {times.map((time) => (
             <View
@@ -2429,7 +2467,7 @@ export default function TrainerScheduleScreen() {
                 marginBottom: 4,
               }}
             >
-              {selDate.getMonth() + 1}월 {selDate.getDate()}일 스케줄 추가
+              {manualTimeFixed ? `${manualTime} 스케줄 추가` : `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 스케줄 추가`}
             </Text>
             <Text
               style={{
@@ -2485,20 +2523,8 @@ export default function TrainerScheduleScreen() {
               ))}
             </View>
 
-            {/* 시간 선택 - 주간 셀 탭 시 고정, + 버튼 시 선택 가능 */}
-            {manualTimeFixed ? (
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
-                  시작 시간
-                </Text>
-                <View style={{
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-                  backgroundColor: Colors.green, alignSelf: "flex-start",
-                }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>{manualTime}</Text>
-                </View>
-              </View>
-            ) : (
+            {/* 시간 선택 - 주간 셀 탭 시 숨김, + 버튼 시 선택 가능 */}
+            {!manualTimeFixed && (
               <>
                 <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
                   시작 시간

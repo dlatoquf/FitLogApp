@@ -1,10 +1,7 @@
 package com.anonymous.FitLogApp
 
 import android.app.Application
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.res.Configuration
-import android.os.Build
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -49,27 +46,11 @@ class MainApplication : Application(), ReactApplication {
       ReleaseLevel.STABLE
     }
     loadReactNative(this)
-    createNotificationChannel()
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
-  }
-
-  private fun createNotificationChannel() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val channel = NotificationChannel(
-        "fitlog_default",
-        "FitLog 알림",
-        NotificationManager.IMPORTANCE_HIGH
-      ).apply {
-        description = "FitLog 푸시 알림"
-        enableVibration(true)
-      }
-      val manager = getSystemService(NotificationManager::class.java)
-      manager.createNotificationChannel(channel)
-    }
   }
 }

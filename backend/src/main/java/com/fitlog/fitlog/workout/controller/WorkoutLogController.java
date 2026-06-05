@@ -154,13 +154,9 @@ public class WorkoutLogController {
             }
         }
 
-        String ptRemainingStr = member.getPtRemaining() != null ? " · PT 잔여 " + member.getPtRemaining() + "회" : "";
-        String notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요." + ptRemainingStr;
+        String ptStr = member.getPtRemaining() != null ? " 잔여 PT " + member.getPtRemaining() + "회" : "";
+        String notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요." + ptStr;
 
-        // 미션이 있으면 알림 내용 추가
-        if (missions != null && !missions.isEmpty()) {
-            notiContent += " 챌린지도 등록됐어요.";
-        }
 
         // FCM 푸시 + 인앱 알림
         if (member.getNotifWorkout()) {

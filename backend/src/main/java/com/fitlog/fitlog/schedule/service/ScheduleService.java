@@ -265,7 +265,7 @@ public class ScheduleService {
                 notificationService.sendNotification(
                         member.getUser(),
                         "SCHEDULE_CONFIRM",
-                        formatDate(date.toString()) + " " + startTime + " 수업이 확정됐어요.",
+                        date + " " + startTime.toString().substring(0, 5) + " 수업이 확정됐어요.",
                         "SCHEDULE",
                         schedule.getId()
                 );
@@ -302,7 +302,7 @@ public class ScheduleService {
                 notificationService.sendNotification(
                         member.getUser(),
                         "SCHEDULE_CANCEL",
-                        formatDate(schedule.getDate().toString()) + " " + schedule.getStartTime() + " 수업이 취소됐어요.",
+                        schedule.getDate() + " " + schedule.getStartTime().toString().substring(0, 5) + " 수업이 취소됐어요.",
                         "SCHEDULE",
                         scheduleId
                 );

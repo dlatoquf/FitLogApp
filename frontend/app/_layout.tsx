@@ -32,7 +32,7 @@ function navigateByType(type: string, date?: string, targetId?: string) {
   try {
     AsyncStorage.getItem("role").then((role) => {
       const isTrainer = role === "TRAINER";
-      if (type === "SCHEDULE_CONFIRM" || type === "PT_ADD" || type === "PT_EXPIRY") {
+      if (type === "SCHEDULE_CONFIRM" || type === "SCHEDULE_CANCEL" || type === "PT_ADD" || type === "PT_EXPIRY") {
         router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/home");
       } else if (type === "DIET_FEEDBACK") {
         router.push(date
@@ -46,6 +46,10 @@ function navigateByType(type: string, date?: string, targetId?: string) {
         );
       } else if (type === "GENERAL") {
         router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/notices" as any);
+      } else if (type === "BIRTHDAY_TODAY" || type === "BIRTHDAY_WEEK") {
+        router.push("/(tabs)/trainer/home");
+      } else if (type === "SCHEDULE_REMINDER") {
+        router.push("/(tabs)/member/home");
       } else if (type === "SCHEDULE_OPEN" || type === "SCHEDULE_REQUEST") {
         router.push(isTrainer ? "/(tabs)/trainer/schedule" : "/(tabs)/member/home");
       } else if (type === "NEW_MEMBER") {
@@ -59,7 +63,7 @@ function navigateByType(type: string, date?: string, targetId?: string) {
   } catch {}
 }
 
-function InAppBanner({ title, body, type, date }: { title: string; body: string; type?: string; date?: string }) {
+function InAppBanner({ title, body, type, date, targetId }: { title: string; body: string; type?: string; date?: string; targetId?: string }) {
   const translateY = useRef(new Animated.Value(-120)).current;
   const { top } = useSafeAreaInsets();
 
@@ -95,7 +99,7 @@ function InAppBanner({ title, body, type, date }: { title: string; body: string;
     >
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => type && navigateByType(type, date)}
+        onPress={() => type && navigateByType(type, date, targetId)}
       >
         <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14, marginBottom: 2 }}>
           {title}
@@ -109,7 +113,7 @@ function InAppBanner({ title, body, type, date }: { title: string; body: string;
 }
 
 export default function RootLayout() {
-  const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; key: number } | null>(null);
+  const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; targetId?: string; key: number } | null>(null);
 
   useEffect(() => {
     initFCM();
@@ -148,6 +152,7 @@ export default function RootLayout() {
         body: remoteMessage.notification?.body ?? "",
         type: remoteMessage.data?.type as string | undefined,
         date: remoteMessage.data?.date as string | undefined,
+        targetId: remoteMessage.data?.targetId as string | undefined,
         key: Date.now(),
       });
     });
@@ -186,7 +191,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)/trainer" />
       </Stack>
       {banner && (
-        <InAppBanner key={banner.key} title={banner.title} body={banner.body} type={banner.type} date={banner.date} />
+        <InAppBanner key={banner.key} title={banner.title} body={banner.body} type={banner.type} date={banner.date} targetId={banner.targetId} />
       )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -107,21 +107,21 @@ export default function MemberNotificationsScreen() {
             return;
         }
 
-        // ── 수업 확정 → 일정 탭
+        // ── 수업 확정 → 홈
         if (n.type === "SCHEDULE_CONFIRM") {
-            router.push("/(tabs)/member/schedule");
+            router.push("/(tabs)/member/home");
             return;
         }
 
-        // ── 수업 취소 → 일정 탭
+        // ── 수업 취소 → 홈
         if (n.type === "SCHEDULE_CANCEL") {
-            router.push("/(tabs)/member/schedule");
+            router.push("/(tabs)/member/home");
             return;
         }
 
-        // ── 수업 30분 전 알림 → 일정 탭
+        // ── 수업 30분 전 알림 → 홈
         if (n.type === "SCHEDULE_REMINDER") {
-            router.push("/(tabs)/member/schedule");
+            router.push("/(tabs)/member/home");
             return;
         }
 
