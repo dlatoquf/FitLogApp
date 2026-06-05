@@ -1,8 +1,13 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 
 export default function MemberTabLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Platform.OS === "android" ? Math.max(insets.bottom, 4) : 4;
+
   return (
     <Tabs
       screenOptions={{
@@ -12,9 +17,9 @@ export default function MemberTabLayout() {
           backgroundColor: "#fff",
           borderTopWidth: 1,
           borderTopColor: Colors.border,
-          height: 62,
+          height: 62 + bottomPadding,
           paddingTop: 4,
-          paddingBottom: 4,
+          paddingBottom: bottomPadding,
         },
 
         tabBarActiveTintColor: Colors.green,
