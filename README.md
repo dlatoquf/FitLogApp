@@ -175,3 +175,4 @@ npx expo run:android
 - [x] AWS 인프라 구성 (EC2, RDS, S3)
 - [x] iOS · Android 테스트 배포
 - [ ] App Store 정식 출시
+- [ ] Android 정식 출시
