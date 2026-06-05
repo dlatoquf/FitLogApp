@@ -2,12 +2,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
 import { router, Stack } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Text, TouchableOpacity } from "react-native";
+import { Animated, Dimensions, Platform, Text, TouchableOpacity } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
 import { API_URL } from "../constants/api";
+
+function isTablet() {
+  const { width, height } = Dimensions.get("window");
+  const shortSide = Math.min(width, height);
+  return shortSide >= 600;
+}
 
 async function initFCM() {
   try {
@@ -105,6 +112,15 @@ export default function RootLayout() {
   const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; key: number } | null>(null);
 
   useEffect(() => {
+    // Android 폰은 세로 고정, 태블릿은 자유 회전
+    if (Platform.OS === "android") {
+      if (isTablet()) {
+        ScreenOrientation.unlockAsync();
+      } else {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      }
+    }
+
     initFCM();
 
     const markAllNotificationsRead = async () => {
