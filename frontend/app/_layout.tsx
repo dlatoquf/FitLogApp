@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
-import { router, Stack } from "expo-router";
+import { router, Stack, useRootNavigationState } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Text, TouchableOpacity } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,7 +39,26 @@ function navigateByType(type: string, date?: string, targetId?: string) {
           ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any)
           : "/(tabs)/member/diet"
         );
-      } else if (type === "WORKOUT_LOG" || type === "FEEDBACK") {
+      } else if (type === "DIET_PHOTO") {
+        if (targetId) {
+          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "0", ...(date ? { date } : {}) } } as any);
+        } else {
+          router.push("/(tabs)/trainer/members" as any);
+        }
+      } else if (type === "WORKOUT_LOG") {
+        if (isTrainer) {
+          if (targetId) {
+            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
+          } else {
+            router.push("/(tabs)/trainer/members" as any);
+          }
+        } else {
+          router.push(date
+            ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any)
+            : "/(tabs)/member/workout"
+          );
+        }
+      } else if (type === "FEEDBACK") {
         router.push(date
           ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any)
           : "/(tabs)/member/workout"
@@ -52,9 +71,9 @@ function navigateByType(type: string, date?: string, targetId?: string) {
         router.push("/(tabs)/member/home");
       } else if (type === "SCHEDULE_OPEN" || type === "SCHEDULE_REQUEST") {
         router.push(isTrainer ? "/(tabs)/trainer/schedule" : "/(tabs)/member/home");
-      } else if (type === "NEW_MEMBER") {
+      } else if (type === "NEW_MEMBER" || type === "MEMBER_DELETED" || type === "MEMBER_DISCONNECT" || type === "MISSION_DONE") {
         if (targetId) {
-          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { memberId: targetId } } as any);
+          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId } } as any);
         } else {
           router.push("/(tabs)/trainer/members" as any);
         }
@@ -114,6 +133,15 @@ function InAppBanner({ title, body, type, date, targetId }: { title: string; bod
 
 export default function RootLayout() {
   const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; targetId?: string; key: number } | null>(null);
+  const [initialNotif, setInitialNotif] = useState<{ type: string; date?: string; targetId?: string } | null>(null);
+  const navigationState = useRootNavigationState();
+
+  // 콜드 스타트: 라우터가 준비되면 저장해둔 알림으로 이동
+  useEffect(() => {
+    if (!navigationState?.key || !initialNotif) return;
+    navigateByType(initialNotif.type, initialNotif.date, initialNotif.targetId);
+    setInitialNotif(null);
+  }, [navigationState?.key, initialNotif]);
 
   useEffect(() => {
     initFCM();
@@ -143,7 +171,7 @@ export default function RootLayout() {
       const date = remoteMessage.data?.date as string | undefined;
       const targetId = remoteMessage.data?.targetId as string | undefined;
       markAllNotificationsRead();
-      if (type) navigateByType(type, date, targetId);
+      if (type) setInitialNotif({ type, date, targetId });
     });
 
     const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {

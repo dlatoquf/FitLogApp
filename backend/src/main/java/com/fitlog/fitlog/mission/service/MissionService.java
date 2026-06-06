@@ -78,7 +78,7 @@ public class MissionService {
                     "MISSION_DONE",
                     memberName + "님이 챌린지를 완료했어요.",
                     "MISSION",
-                    missionId
+                    memberId
             );
         }
 

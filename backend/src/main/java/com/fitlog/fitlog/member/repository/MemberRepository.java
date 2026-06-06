@@ -54,7 +54,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
         FROM Member m
         JOIN FETCH m.user
         WHERE (
-            (m.trainer.id = :trainerId AND m.user.deletedAt IS NULL)
+            m.trainer.id = :trainerId
             OR m.previousTrainerId = :trainerId
         )
         ORDER BY

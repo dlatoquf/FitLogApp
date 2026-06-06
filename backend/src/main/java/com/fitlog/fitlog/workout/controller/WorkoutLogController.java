@@ -393,7 +393,8 @@ public class WorkoutLogController {
                     "WORKOUT_LOG",
                     notiContent,
                     "WORKOUT_LOG",
-                    log.getWorkoutId()
+                    member.getId(),
+                    log.getLogDate() != null ? log.getLogDate().toString() : null
             );
         }
 
