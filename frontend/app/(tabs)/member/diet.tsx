@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import {
   API_URL,
@@ -61,6 +62,7 @@ const getWeekDates = (offset: number): Date[] => {
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function MemberDietScreen() {
+  const insets = useSafeAreaInsets();
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   const scrollRef = useRef<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -625,7 +627,7 @@ export default function MemberDietScreen() {
                   borderTopLeftRadius: 22,
                   borderTopRightRadius: 22,
                   padding: 22,
-                  paddingBottom: Platform.OS === "ios" ? 40 : 22,
+                  paddingBottom: Math.max(insets.bottom, 22),
                 }}
               >
                 <View

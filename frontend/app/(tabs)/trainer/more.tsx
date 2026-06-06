@@ -5,6 +5,7 @@ import {
   Alert,
   Clipboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
 import { API_URL, ENDPOINTS } from "../../../constants/api";
@@ -32,6 +34,7 @@ for (let h = 5; h <= 24; h++) {
 }
 
 export default function TrainerMoreScreen() {
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -720,10 +723,33 @@ export default function TrainerMoreScreen() {
               </Text>
             </View>
             <Text
-              style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}
+              style={{ fontSize: 13, fontWeight: "700", color: Colors.green, flex: 1 }}
             >
               PRO 플랜 구독 중 · 회원 무제한
             </Text>
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert(
+                  "구독 관리",
+                  "구독을 취소하면 현재 결제 기간 만료 후 무료 플랜(회원 5명)으로 전환돼요.",
+                  [
+                    { text: "닫기", style: "cancel" },
+                    {
+                      text: "구독 취소하기",
+                      style: "destructive",
+                      onPress: () => {
+                        const url = Platform.OS === "ios"
+                          ? "https://apps.apple.com/account/subscriptions"
+                          : "https://play.google.com/store/account/subscriptions";
+                        Linking.openURL(url);
+                      },
+                    },
+                  ]
+                )
+              }
+            >
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>구독 취소</Text>
+            </TouchableOpacity>
           </View>
         ) : plan === "PRO" && trialEndDate ? (
           // 무료 체험 중
@@ -1398,7 +1424,7 @@ export default function TrainerMoreScreen() {
                   borderTopLeftRadius: 24,
                   borderTopRightRadius: 24,
                   padding: 28,
-                  paddingBottom: Platform.OS === "ios" ? 44 : 28,
+                  paddingBottom: Math.max(insets.bottom, 28),
                 }}
               >
                 <View

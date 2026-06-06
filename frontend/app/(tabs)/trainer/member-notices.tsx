@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 
@@ -23,6 +24,7 @@ interface Notice {
 }
 
 export default function MemberNoticesScreen() {
+  const insets = useSafeAreaInsets();
   const { memberId, memberName, isManual } = useLocalSearchParams<{
     memberId: string;
     memberName: string;
@@ -282,7 +284,7 @@ export default function MemberNoticesScreen() {
           borderTopWidth: 1,
           borderTopColor: Colors.border,
           padding: 12,
-          paddingBottom: Platform.OS === "ios" ? 34 : 12,
+          paddingBottom: Math.max(insets.bottom, 12),
           backgroundColor: "#fff",
         }}
       >

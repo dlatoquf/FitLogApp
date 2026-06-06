@@ -34,6 +34,7 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
@@ -1206,6 +1207,7 @@ function HistoryTable({
 }
 
 export default function MemberDetailScreen() {
+  const insets = useSafeAreaInsets();
   const {
     id,
     initialTab,
@@ -6324,7 +6326,7 @@ export default function MemberDetailScreen() {
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               padding: 24,
-              paddingBottom: Platform.OS === "ios" ? 40 : 24,
+              paddingBottom: Math.max(insets.bottom, 24),
             }}
           >
             <View
@@ -6975,7 +6977,7 @@ export default function MemberDetailScreen() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 padding: 28,
-                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               <View

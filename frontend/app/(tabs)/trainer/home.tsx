@@ -21,6 +21,7 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases from "react-native-purchases";
 import { shareTextTemplate } from "@react-native-kakao/share";
 import { Colors } from "../../../constants/Colors";
@@ -104,6 +105,7 @@ const NOTI_ICON: Record<string, string> = {
 };
 
 export default function TrainerHomeScreen() {
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -2123,7 +2125,7 @@ export default function TrainerHomeScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingHorizontal: 28,
-                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               <Text
@@ -2344,7 +2346,7 @@ export default function TrainerHomeScreen() {
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               padding: 28,
-              paddingBottom: Platform.OS === "ios" ? 44 : 28,
+              paddingBottom: Math.max(insets.bottom, 28),
             }}
           >
             {/* 핸들 바 */}
@@ -3013,7 +3015,7 @@ export default function TrainerHomeScreen() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 padding: 28,
-                paddingBottom: Platform.OS === "ios" ? 40 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               {/* 드래그 핸들 */}
@@ -3121,7 +3123,7 @@ export default function TrainerHomeScreen() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 padding: 28,
-                paddingBottom: Platform.OS === "ios" ? 40 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               <GestureDetector gesture={inviteDragGesture}>
@@ -3268,7 +3270,7 @@ export default function TrainerHomeScreen() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 padding: 28,
-                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               {/* 핸들 바 */}

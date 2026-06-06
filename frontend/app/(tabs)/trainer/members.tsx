@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
@@ -58,6 +59,7 @@ function ptColor(ptRemaining: number, ptTotal: number): string {
 // ─── 컴포넌트 ────────────────────────────────────────────────────────────────
 
 export default function TrainerMembersScreen() {
+  const insets = useSafeAreaInsets();
   const [allMembers, setAllMembers] = useState<DisplayMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1618,7 +1620,7 @@ export default function TrainerMembersScreen() {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 padding: 28,
-                paddingBottom: Platform.OS === "ios" ? 44 : 28,
+                paddingBottom: Math.max(insets.bottom, 28),
               }}
             >
               <View
