@@ -971,7 +971,7 @@ export default function TrainerMoreScreen() {
             desc="회원이 챌린지를 완료하면 알림"
             value={notifMissionDone}
             onValueChange={(v) => handleNotifMissionDone(v)}
-            color="#f97316"
+            color={Colors.green}
             disabled={!notifPush}
           />
         </View>

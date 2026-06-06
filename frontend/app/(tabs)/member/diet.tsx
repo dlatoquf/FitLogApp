@@ -101,6 +101,7 @@ export default function MemberDietScreen() {
   const [labelInput, setLabelInput] = useState("");
   const [pickedImageUris, setPickedImageUris] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [weekDietDates, setWeekDietDates] = useState<Set<string>>(new Set());
 
   const dateKey = toDateKey(selectedDate);
   const todayKey = toDateKey(new Date());
@@ -148,6 +149,31 @@ export default function MemberDietScreen() {
   useEffect(() => {
     fetchData();
   }, [dateKey]);
+
+  // 주간 식단 입력 여부 조회 (점 표시용)
+  useEffect(() => {
+    const fetchWeekDiet = async () => {
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+        const results = await Promise.all(
+          weekDates.map(async (d) => {
+            const key = toDateKey(d);
+            const res = await fetch(`${API_URL}/api/diet/photos?date=${key}`, {
+              headers: { Authorization: `Bearer ${jwt}` },
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return (data.photos ?? []).length > 0 ? key : null;
+          }),
+        );
+        setWeekDietDates(new Set(results.filter(Boolean) as string[]));
+      } catch {
+        // 실패 시 무시
+      }
+    };
+    fetchWeekDiet();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset]);
 
   // ── 사진 비율 자동 계산 ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -375,6 +401,7 @@ export default function MemberDietScreen() {
               const isSelected = key === dateKey;
               const isToday = key === todayKey;
               const isFuture = key > todayKey;
+              const hasDiet = weekDietDates.has(key);
               return (
                 <TouchableOpacity
                   key={key}
@@ -427,6 +454,18 @@ export default function MemberDietScreen() {
                     >
                       {d.getDate()}
                     </Text>
+                  </View>
+                  <View style={{ height: 6, justifyContent: "center", alignItems: "center" }}>
+                    {hasDiet && (
+                      <View
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: 3,
+                          backgroundColor: "#F59E0B",
+                        }}
+                      />
+                    )}
                   </View>
                 </TouchableOpacity>
               );

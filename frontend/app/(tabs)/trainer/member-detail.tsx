@@ -3,8 +3,10 @@ import KakaoShare from "@react-native-kakao/share";
 import { useFocusEffect } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -1386,6 +1388,7 @@ export default function MemberDetailScreen() {
     { url: string; mediaType: string }[]
   >([]);
   const [mediaGalleryIndex, setMediaGalleryIndex] = useState(0);
+  const [mediaDownloading, setMediaDownloading] = useState(false);
   const [expandedExerciseMediaKeys, setExpandedExerciseMediaKeys] = useState<{
     [key: string]: boolean;
   }>({});
@@ -1522,6 +1525,34 @@ export default function MemberDetailScreen() {
   const handleMemberMenu = () => {
     menuModalY.setValue(0);
     setMenuVisible(true);
+  };
+
+  const handleDownloadMedia = async (media: any) => {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("권한 필요", "갤러리 접근 권한이 필요해요.");
+      return;
+    }
+    try {
+      setMediaDownloading(true);
+      const isVideo = media.mediaType === "VIDEO";
+      const cleanUrl = media.url.split("?")[0];
+      const urlExt = cleanUrl.split(".").pop()?.toLowerCase();
+      const ext = isVideo
+        ? (["mp4", "mov", "m4v"].includes(urlExt ?? "") ? urlExt : "mp4")
+        : (["jpg", "jpeg", "png", "webp", "heic"].includes(urlExt ?? "") ? urlExt : "jpg");
+      const cacheDir = FileSystem.cacheDirectory ?? "file:///tmp/";
+      const fileUri = `${cacheDir}fitlog_${Date.now()}.${ext}`;
+      const downloadResumable = FileSystem.createDownloadResumable(media.url, fileUri);
+      const result = await downloadResumable.downloadAsync();
+      if (!result || result.status !== 200) throw new Error(`HTTP ${result?.status}`);
+      await MediaLibrary.saveToLibraryAsync(result.uri);
+      Alert.alert("저장 완료", isVideo ? "영상이 갤러리에 저장됐어요." : "사진이 갤러리에 저장됐어요.");
+    } catch (e: any) {
+      Alert.alert("오류", `다운로드 중 오류가 발생했어요.\n${e?.message ?? ""}`);
+    } finally {
+      setMediaDownloading(false);
+    }
   };
 
   const closeMenuModal = () => {
@@ -2640,13 +2671,8 @@ export default function MemberDetailScreen() {
           },
         },
       });
-    } catch {
-      // 카카오 실패 시 기본 공유로 폴백
-      try {
-        await Share.share({ message: text });
-      } catch {
-        Alert.alert("오류", "공유하기 중 오류가 발생했어요.");
-      }
+    } catch (e: any) {
+      Alert.alert("카카오 공유 실패", `code: ${e?.code ?? "-"}\nmessage: ${e?.message ?? String(e)}`);
     }
   };
 
@@ -6859,14 +6885,28 @@ export default function MemberDetailScreen() {
             >
               {mediaGalleryIndex + 1} / {mediaGallery.length}
             </Text>
-            <TouchableOpacity
-              onPress={() => setMediaGallery([])}
-              style={{ padding: 8 }}
-            >
-              <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
-                ✕
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => !mediaDownloading && handleDownloadMedia(mediaGallery[mediaGalleryIndex])}
+                style={{ padding: 8, opacity: mediaDownloading ? 0.5 : 1 }}
+              >
+                {mediaDownloading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+                    저장
+                  </Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setMediaGallery([])}
+                style={{ padding: 8 }}
+              >
+                <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView

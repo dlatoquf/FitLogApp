@@ -790,15 +790,8 @@ export default function TrainerHomeScreen() {
           buttonTitle: "FitLog 앱 설치하기",
         },
       });
-    } catch {
-      await Share.share({
-        message: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}\n\n📱 앱 설치: ${installUrl}`,
-      }).catch(() => {
-        Alert.alert("공유 실패", "코드를 복사해서 공유해주세요.", [
-          { text: "코드 복사", onPress: handleCopy },
-          { text: "닫기" },
-        ]);
-      });
+    } catch (e: any) {
+      Alert.alert("카카오 공유 실패", `code: ${e?.code ?? "-"}\nmessage: ${e?.message ?? String(e)}`);
     }
   };
 
