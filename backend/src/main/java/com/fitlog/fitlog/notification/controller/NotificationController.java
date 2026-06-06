@@ -4,6 +4,7 @@ import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.diet.repository.DietDayFeedbackRepository;
+import com.fitlog.fitlog.mission.repository.MissionRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
@@ -24,6 +25,7 @@ public class NotificationController {
     private final NotificationService notificationService;
     private final DietDayFeedbackRepository dietDayFeedbackRepository;
     private final WorkoutLogRepository workoutLogRepository;
+    private final MissionRepository missionRepository;
     private final UserRepository userRepository;
     private final JwtService jwtService;
 
@@ -32,13 +34,15 @@ public class NotificationController {
                                   UserRepository userRepository,
                                   JwtService jwtService,
                                   DietDayFeedbackRepository dietDayFeedbackRepository,
-                                  WorkoutLogRepository workoutLogRepository) {
+                                  WorkoutLogRepository workoutLogRepository,
+                                  MissionRepository missionRepository) {
         this.notificationRepository = notificationRepository;
         this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.dietDayFeedbackRepository = dietDayFeedbackRepository;
         this.workoutLogRepository = workoutLogRepository;
+        this.missionRepository = missionRepository;
     }
 
     // 내 알림 조회
@@ -72,8 +76,11 @@ public class NotificationController {
                                 if (l.getMember() != null) map.put("memberId", l.getMember().getId());
                             });
                         } else if ("MISSION".equals(n.getTargetType())) {
-                            // targetId = memberId 임을 명시적으로 표현
-                            map.put("memberId", n.getTargetId());
+                            // targetId가 missionId인 경우 mission 조회해서 실제 memberId 추출
+                            missionRepository.findById(n.getTargetId()).ifPresentOrElse(
+                                m -> { if (m.getMember() != null) map.put("memberId", m.getMember().getId()); },
+                                () -> map.put("memberId", n.getTargetId())
+                            );
                         }
                     }
                     // DIET_PHOTO: content에서 날짜 파싱 ("OO님이 2026-05-31 식단 사진을 등록했어요.")
