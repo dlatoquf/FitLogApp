@@ -1004,22 +1004,13 @@ export default function TrainerMoreScreen() {
           </TouchableOpacity>
           <View style={{ height: 1, backgroundColor: Colors.border }} />
           <TouchableOpacity
-            onPress={() => {
-              setTermsContent({ title: "이용약관", text: TERMS_TEXT });
-              setTermsVisible(true);
-            }}
+            onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/terms.html")}
           >
             <InfoRow label="이용약관" />
           </TouchableOpacity>
           <View style={{ height: 1, backgroundColor: Colors.border }} />
           <TouchableOpacity
-            onPress={() => {
-              setTermsContent({
-                title: "개인정보처리방침",
-                text: PRIVACY_TEXT,
-              });
-              setTermsVisible(true);
-            }}
+            onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/privacy.html")}
           >
             <InfoRow label="개인정보처리방침" />
           </TouchableOpacity>
