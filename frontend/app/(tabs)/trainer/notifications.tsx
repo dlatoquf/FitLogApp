@@ -116,7 +116,8 @@ export default function TrainerNotificationsScreen() {
 
         // ── 챌린지 완료 → 해당 회원 상세 페이지
         if (n.type === "MISSION_DONE") {
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any);
+            const id = n.memberId ?? n.targetId;
+            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}` as any);
             return;
         }
 
@@ -128,7 +129,8 @@ export default function TrainerNotificationsScreen() {
 
         // ── 회원 생일 당일 / 7일 전 → 해당 회원 상세 페이지
         if (n.type === "BIRTHDAY_TODAY" || n.type === "BIRTHDAY_WEEK") {
-            router.push("/(tabs)/trainer/home");
+            const id = n.memberId ?? n.targetId;
+            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}` as any);
             return;
         }
 

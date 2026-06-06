@@ -45,7 +45,8 @@ public class NotificationService {
         notificationRepository.save(notification);
 
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-            sendPushWithTarget(user.getFcmToken(), content, type, date, targetId);
+            long unreadCount = notificationRepository.countByUserAndIsReadFalse(user);
+            sendPushWithTarget(user.getFcmToken(), content, type, date, targetId, (int) unreadCount);
         }
     }
 
@@ -53,11 +54,34 @@ public class NotificationService {
         sendNotification(user, type, content, null, null, null);
     }
 
-    private void sendPush(String fcmToken, String body, String type, String date) {
-        sendPushWithTarget(fcmToken, body, type, date, null);
+    public void clearBadge(User user) {
+        if (user.getFcmToken() == null || user.getFcmToken().isBlank()) return;
+        if (firebaseCredentials == null) return;
+        try {
+            firebaseCredentials.refreshIfExpired();
+            String accessToken = firebaseCredentials.getAccessToken().getTokenValue();
+            String json = "{"
+                    + "\"message\": {"
+                    + "  \"token\": \"" + user.getFcmToken() + "\","
+                    + "  \"data\": {\"type\": \"BADGE_CLEAR\"},"
+                    + "  \"apns\": {\"payload\": {\"aps\": {\"badge\": 0, \"content-available\": 1}}},"
+                    + "  \"android\": {}"
+                    + "}"
+                    + "}";
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(FCM_URL))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            System.out.println("뱃지 초기화 FCM 예외: " + e.getMessage());
+        }
     }
 
-    private void sendPushWithTarget(String fcmToken, String body, String type, String date, Long targetId) {
+    private void sendPushWithTarget(String fcmToken, String body, String type, String date, Long targetId, int badge) {
         if (firebaseCredentials == null) {
             System.out.println("Firebase 미설정 - 푸시 전송 생략");
             return;
@@ -79,7 +103,7 @@ public class NotificationService {
                     + "  \"token\": \"" + fcmToken + "\","
                     + "  \"notification\": {\"title\": \"FitLog\", \"body\": \"" + escapeJson(body) + "\"},"
                     + "  \"data\": {" + dataField + "},"
-                    + "  \"apns\": {\"payload\": {\"aps\": {\"sound\": \"default\", \"badge\": 1}}},"
+                    + "  \"apns\": {\"payload\": {\"aps\": {\"sound\": \"default\", \"badge\": " + badge + "}}},"
                     + "  \"android\": {\"notification\": {\"sound\": \"default\"}}"
                     + "}"
                     + "}";

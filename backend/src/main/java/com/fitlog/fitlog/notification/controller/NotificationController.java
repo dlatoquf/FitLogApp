@@ -5,6 +5,7 @@ import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.diet.repository.DietDayFeedbackRepository;
 import com.fitlog.fitlog.notification.repository.NotificationRepository;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,17 +21,20 @@ import java.util.stream.Collectors;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final DietDayFeedbackRepository dietDayFeedbackRepository;
     private final WorkoutLogRepository workoutLogRepository;
     private final UserRepository userRepository;
     private final JwtService jwtService;
 
     public NotificationController(NotificationRepository notificationRepository,
+                                  NotificationService notificationService,
                                   UserRepository userRepository,
                                   JwtService jwtService,
                                   DietDayFeedbackRepository dietDayFeedbackRepository,
                                   WorkoutLogRepository workoutLogRepository) {
         this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.dietDayFeedbackRepository = dietDayFeedbackRepository;
@@ -67,6 +71,9 @@ public class NotificationController {
                                 if (l.getLogDate() != null) map.put("targetDate", l.getLogDate().toString());
                                 if (l.getMember() != null) map.put("memberId", l.getMember().getId());
                             });
+                        } else if ("MISSION".equals(n.getTargetType())) {
+                            // targetId = memberId 임을 명시적으로 표현
+                            map.put("memberId", n.getTargetId());
                         }
                     }
                     // DIET_PHOTO: content에서 날짜 파싱 ("OO님이 2026-05-31 식단 사진을 등록했어요.")
@@ -97,6 +104,7 @@ public class NotificationController {
     ) {
         User user = getUserFromToken(authorization);
         notificationRepository.markAllAsRead(user);
+        notificationService.clearBadge(user);
         return ResponseEntity.ok(Map.of("message", "모두 읽음 처리됐어요."));
     }
 
