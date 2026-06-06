@@ -2661,15 +2661,18 @@ export default function MemberDetailScreen() {
         ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
         : "https://fitlog.app/download";
     setSmsPromptData((p) => ({ ...p, visible: false }));
+    const safeText = String(text ?? "");
+    const safeUrl = String(inviteUrl ?? "https://fitlog.app");
     console.log("[Kakao] shareTextTemplate 시작");
-    console.log("[Kakao] inviteUrl:", inviteUrl);
+    console.log("[Kakao] safeText:", safeText);
+    console.log("[Kakao] safeUrl:", safeUrl);
     try {
       const result = await KakaoShare.shareTextTemplate({
         template: {
-          text,
+          text: safeText,
           link: {
-            mobileWebUrl: inviteUrl,
-            webUrl: inviteUrl,
+            mobileWebUrl: safeUrl,
+            webUrl: safeUrl,
           },
         },
       });

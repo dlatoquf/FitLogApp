@@ -35,8 +35,11 @@
         "LSApplicationQueriesSchemes": [
           "kakaokompassauth",
           "kakaolink",
-          "storykompassauth",
           "kakaotalk",
+          "kakaotalksharing",
+          "kakaoplus",
+          "storykompassauth",
+          "storylink",
           "kakaosharing"
         ],
         "NSAppTransportSecurity": {

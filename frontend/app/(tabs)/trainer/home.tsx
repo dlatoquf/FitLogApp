@@ -779,14 +779,17 @@ export default function TrainerHomeScreen() {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
     const installUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
+    const safeText = String(`안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}` ?? "");
+    const safeUrl = String(installUrl ?? "https://fitlog.app");
+    const safeWebUrl = String(APP_STORE_URL ?? "https://fitlog.app");
     console.log("[Kakao] shareTextTemplate 시작");
     try {
       const result = await shareTextTemplate({
         template: {
-          text: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
+          text: safeText,
           link: {
-            mobileWebUrl: installUrl,
-            webUrl: APP_STORE_URL,
+            mobileWebUrl: safeUrl,
+            webUrl: safeWebUrl,
           },
           buttonTitle: "FitLog 앱 설치하기",
         },
