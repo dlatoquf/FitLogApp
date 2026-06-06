@@ -779,8 +779,9 @@ export default function TrainerHomeScreen() {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
     const installUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
+    console.log("[Kakao] shareTextTemplate 시작");
     try {
-      await shareTextTemplate({
+      const result = await shareTextTemplate({
         template: {
           text: `안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`,
           link: {
@@ -790,8 +791,17 @@ export default function TrainerHomeScreen() {
           buttonTitle: "FitLog 앱 설치하기",
         },
       });
+      console.log("[Kakao] 성공:", JSON.stringify(result));
     } catch (e: any) {
-      Alert.alert("카카오 공유 실패", `code: ${e?.code ?? "-"}\nmessage: ${e?.message ?? String(e)}`);
+      console.log("[Kakao] 실패 전체:", JSON.stringify(e));
+      console.log("[Kakao] code:", e?.code);
+      console.log("[Kakao] message:", e?.message);
+      console.log("[Kakao] domain:", e?.domain);
+      console.log("[Kakao] userInfo:", JSON.stringify(e?.userInfo));
+      Alert.alert(
+        "카카오 공유 실패",
+        `code: ${e?.code ?? "-"}\ndomain: ${e?.domain ?? "-"}\nmessage: ${e?.message ?? String(e)}\nuserInfo: ${JSON.stringify(e?.userInfo ?? {})}`,
+      );
     }
   };
 

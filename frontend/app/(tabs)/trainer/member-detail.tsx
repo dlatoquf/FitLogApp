@@ -2661,8 +2661,10 @@ export default function MemberDetailScreen() {
         ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
         : "https://fitlog.app/download";
     setSmsPromptData((p) => ({ ...p, visible: false }));
+    console.log("[Kakao] shareTextTemplate 시작");
+    console.log("[Kakao] inviteUrl:", inviteUrl);
     try {
-      await KakaoShare.shareTextTemplate({
+      const result = await KakaoShare.shareTextTemplate({
         template: {
           text,
           link: {
@@ -2671,8 +2673,17 @@ export default function MemberDetailScreen() {
           },
         },
       });
+      console.log("[Kakao] 성공:", JSON.stringify(result));
     } catch (e: any) {
-      Alert.alert("카카오 공유 실패", `code: ${e?.code ?? "-"}\nmessage: ${e?.message ?? String(e)}`);
+      console.log("[Kakao] 실패 전체:", JSON.stringify(e));
+      console.log("[Kakao] code:", e?.code);
+      console.log("[Kakao] message:", e?.message);
+      console.log("[Kakao] domain:", e?.domain);
+      console.log("[Kakao] userInfo:", JSON.stringify(e?.userInfo));
+      Alert.alert(
+        "카카오 공유 실패",
+        `code: ${e?.code ?? "-"}\ndomain: ${e?.domain ?? "-"}\nmessage: ${e?.message ?? String(e)}\nuserInfo: ${JSON.stringify(e?.userInfo ?? {})}`,
+      );
     }
   };
 
