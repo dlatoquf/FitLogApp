@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { initializeKakaoSDK } from "@react-native-kakao/core";
 import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
 import { router, Stack, useRootNavigationState } from "expo-router";
@@ -144,6 +145,7 @@ export default function RootLayout() {
   }, [navigationState?.key, initialNotif]);
 
   useEffect(() => {
+    initializeKakaoSDK("e889ccffb6096521a6b49b9774f4d9ab");
     initFCM();
 
     const markAllNotificationsRead = async () => {

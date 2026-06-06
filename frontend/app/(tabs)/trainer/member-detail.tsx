@@ -2646,7 +2646,7 @@ export default function MemberDetailScreen() {
       ? exerciseNames.map((name) => `- ${name}`).join("\n")
       : "- 오늘 운동 기록";
 
-    return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요! 💪\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.\n\n운동 기록·식단·일정을 한 곳에서 관리할 수 있는 FitLog 앱도 함께 활용해보세요.`;
+    return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요!\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.\n\n운동 기록·식단·일정을 한 곳에서 관리할 수 있는 FitLog 앱도 함께 활용해보세요.`;
   };
 
   const shareManualWorkoutLog = async () => {

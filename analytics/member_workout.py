@@ -1,9 +1,13 @@
 import warnings
 warnings.filterwarnings('ignore')
 
+import os
 import pandas as pd
 import pymysql
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -11,11 +15,11 @@ app = FastAPI()
 # 1. DB 설정 및 연결 함수
 # ==========================================
 DB_CONFIG = {
-    "host": "switchyard.proxy.rlwy.net",
-    "user": "root",
-    "password": "AUjyFJnHTFFlZHmOyPLIoZiKWqTzhSYO",
-    "db": "railway",
-    "port": 48785
+    "host": os.getenv("DB_HOST", "localhost"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "db": os.getenv("DB_NAME"),
+    "port": int(os.getenv("DB_PORT", "3306"))
 }
 
 def get_db_connection():

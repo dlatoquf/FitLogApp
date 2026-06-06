@@ -149,18 +149,7 @@ export default function WorkoutScreen() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   // "date" = 날짜별, "exercise" = 운동별
   const [historyTab, setHistoryTab] = useState<"date" | "exercise">("date");
-  // 월 요약
   const [memberId, setMemberId] = useState<number | null>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryData, setSummaryData] = useState<{
-    monthly_workout_days: number;
-    top_2_workout_days: string[];
-  } | null>(null);
-  const [summaryLocked, setSummaryLocked] = useState(false);
-  const [summaryRadar, setSummaryRadar] = useState<
-    { target_body_part: string; part_percentage: number }[]
-  >([]);
   // 날짜별 - 입력한 날짜
   const [historyDateInput, setHistoryDateInput] = useState("");
   // 날짜별 - 해당 날짜 로그 결과
@@ -309,46 +298,6 @@ export default function WorkoutScreen() {
     } catch {}
   };
 
-  // ── 월 요약 모달 열기 ──
-  const openSummaryModal = async () => {
-    setShowSummaryModal(true);
-    setSummaryLoading(true);
-    setSummaryData(null);
-    setSummaryLocked(false);
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      let mid = memberId;
-      if (!mid) {
-        const meRes = await fetch(`${API_URL}/api/member/home`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
-        if (meRes.ok) {
-          const meData = await meRes.json();
-          mid = meData?.member?.id ?? null;
-          if (mid) setMemberId(mid);
-          if (meData?.member?.trainerPlan)
-            setTrainerPlan(meData.member.trainerPlan);
-        }
-      }
-      if (!mid) return;
-      const res = await fetch(
-        `${ANALYTICS_URL}/api/analytics/workout-habit/${mid}`,
-      );
-      const json = await res.json();
-      console.log("[월요약] API 응답:", JSON.stringify(json));
-      if (json.status === "success") {
-        setSummaryData(json.data.metrics);
-        setSummaryRadar(json.data.charts.radar_chart_data ?? []);
-      } else {
-        setSummaryLocked(true);
-      }
-    } catch (e) {
-      console.log("[월요약] 에러:", e);
-      setSummaryLocked(true);
-    } finally {
-      setSummaryLoading(false);
-    }
-  };
 
   // ── 날짜별 검색 (ref 사용 → 클로저 문제 없음) ──
   const searchByDate = (dateStr: string) => {
@@ -1444,25 +1393,6 @@ export default function WorkoutScreen() {
                 style={{ fontSize: 11, color: Colors.blue, fontWeight: "700" }}
               >
                 전체 운동 기록
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                openSummaryModal();
-              }}
-              style={{
-                borderWidth: 1,
-                borderColor: Colors.green + "55",
-                borderRadius: 8,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                backgroundColor: Colors.green + "11",
-              }}
-            >
-              <Text
-                style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}
-              >
-                {new Date().getMonth() + 1}월 요약
               </Text>
             </TouchableOpacity>
           </View>
@@ -3114,195 +3044,6 @@ export default function WorkoutScreen() {
         </View>
       </Modal>
 
-      {/* 월 요약 바텀 시트 */}
-      <Modal visible={showSummaryModal} transparent animationType="slide">
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
-          activeOpacity={1}
-          onPress={() => setShowSummaryModal(false)}
-        />
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            paddingHorizontal: 20,
-            paddingTop: 16,
-            paddingBottom: 40,
-            maxHeight: "70%",
-          }}
-        >
-          {/* 핸들 + 헤더 */}
-          <View style={{ alignItems: "center", marginBottom: 4 }}>
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: Colors.border,
-                marginBottom: 12,
-              }}
-            />
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
-          >
-            <Text
-              style={{ fontSize: 16, fontWeight: "800", color: Colors.text }}
-            >
-              {new Date().getMonth() + 1}월 운동 요약
-            </Text>
-            <TouchableOpacity onPress={() => setShowSummaryModal(false)}>
-              <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {summaryLoading ? (
-            <ActivityIndicator
-              color={Colors.green}
-              style={{ marginTop: 40, marginBottom: 40 }}
-            />
-          ) : summaryLocked ? (
-            <View style={{ alignItems: "center", paddingVertical: 40 }}>
-              <Text style={{ fontSize: 15, color: Colors.textMuted }}>
-                데이터를 불러올 수 없어요.
-              </Text>
-            </View>
-          ) : summaryData ? (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: 16,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 32,
-                      fontWeight: "900",
-                      color: Colors.blue,
-                    }}
-                  >
-                    {summaryData.monthly_workout_days}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: Colors.textMuted,
-                      marginTop: 4,
-                    }}
-                  >
-                    이번 달 운동한 날
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: 16,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 22,
-                      fontWeight: "900",
-                      color: Colors.green,
-                    }}
-                  >
-                    {summaryData.top_2_workout_days.length > 0
-                      ? summaryData.top_2_workout_days.join("  ·  ")
-                      : "-"}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: Colors.textMuted,
-                      marginTop: 4,
-                    }}
-                  >
-                    자주 운동한 요일
-                  </Text>
-                </View>
-              </View>
-              {summaryRadar.length > 0 && (
-                <View
-                  style={{
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: 16,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: Colors.text,
-                      marginBottom: 14,
-                    }}
-                  >
-                    부위별 운동 비율
-                  </Text>
-                  {summaryRadar.map((item) => (
-                    <View
-                      key={item.target_body_part}
-                      style={{ marginBottom: 12 }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          marginBottom: 4,
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, color: Colors.text }}>
-                          {item.target_body_part}
-                        </Text>
-                        <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-                          {item.part_percentage}%
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          height: 6,
-                          backgroundColor: Colors.border,
-                          borderRadius: 3,
-                        }}
-                      >
-                        <View
-                          style={{
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: Colors.green,
-                            width: `${item.part_percentage}%`,
-                          }}
-                        />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-          ) : null}
-        </View>
-      </Modal>
 
       {/* 갤러리 뷰어 모달 */}
       <Modal visible={mediaGallery.length > 0} transparent animationType="fade">
