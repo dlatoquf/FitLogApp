@@ -2684,7 +2684,7 @@ export default function TrainerScheduleScreen() {
                   onPress={() =>
                     addPersonalSchedule(
                       manualTime,
-                      selectedDate.toISOString().slice(0, 10),
+                      toDateKey(selectedDate),
                     )
                   }
                   disabled={addingPersonal}
