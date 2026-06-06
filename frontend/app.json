@@ -35,7 +35,9 @@
         "LSApplicationQueriesSchemes": [
           "kakaokompassauth",
           "kakaolink",
-          "storykompassauth"
+          "storykompassauth",
+          "kakaotalk",
+          "kakaosharing"
         ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
