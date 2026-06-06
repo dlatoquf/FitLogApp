@@ -1560,8 +1560,13 @@ export default function WorkoutScreen() {
             </View>
 
             {dayFitLogs.map((log) =>
-              renderWorkoutCard(log, Colors.blue, "개인 운동 완료", () =>
-                startEditPersonalLog(log),
+              renderWorkoutCard(
+                log,
+                Colors.blue,
+                "개인 운동 완료",
+                selectedDate === toDateKey(new Date())
+                  ? () => startEditPersonalLog(log)
+                  : undefined,
               ),
             )}
           </View>
