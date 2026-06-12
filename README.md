@@ -32,6 +32,7 @@ iOS · Android 크로스플랫폼 앱으로 제공되며, 트레이너와 회원
 | 결제 | 카카오페이 PG 연동 |
 | 소셜 로그인 | 카카오 로그인 |
 | 배포 | iOS App Store (TestFlight), Google Play Store (내부 테스트) |
+| 외부 연동 | Google Sheets API |
 | Tools | Git, GitHub |
 
 ---
@@ -59,6 +60,7 @@ iOS · Android 크로스플랫폼 앱으로 제공되며, 트레이너와 회원
 - **PT 관리** : PT 횟수 등록·차감·잔여 관리
 - **알림** : 신규 회원 연결, 수업 신청, 생일 알림 등 FCM 푸시 + 인앱 알림
 - **공지사항** : 전체 회원 대상 공지 발송
+- **데이터 내보내기** : 회원 운동 기록 및 PT 결제 내역 Google Sheets 내보내기
 
 ### 회원
 - **홈** : 오늘 수업 확인, 주간 운동 현황, PT 잔여 횟수
@@ -223,6 +225,7 @@ npx expo run:android
 - [x] FCM 푸시 알림 · 인앱 알림
 - [x] 카카오 로그인 · 카카오페이 결제
 - [x] AWS 인프라 구성 (EC2, RDS, S3)
+- [x] Google Sheets API 연동 (운동 기록 · 결제 내역 내보내기)
 - [x] iOS · Android 테스트 배포
 - [ ] App Store 정식 출시
 - [ ] Android 정식 출시
