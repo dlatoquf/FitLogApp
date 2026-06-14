@@ -128,6 +128,8 @@ export default function TrainerMoreScreen() {
           workDays: [0, 1, 2, 3, 4],
           startTime: "09:00",
           endTime: "22:00",
+          affiliateCode: "",
+          verifiedGymName: "",
         });
       } finally {
         setLoading(false);
