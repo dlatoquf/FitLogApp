@@ -99,6 +99,7 @@ export default function TrainerTabLayout() {
       <Tabs.Screen name="member-detail" options={{ href: null }} />
       <Tabs.Screen name="fitlog-write" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="guide" options={{ href: null }} />
       <Tabs.Screen name="member-notices" options={{ href: null }} />
     </Tabs>
