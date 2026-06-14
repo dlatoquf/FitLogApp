@@ -70,8 +70,7 @@ export default function TrainerMoreScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [inquiries, setInquiries] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
+  const fetchProfile = async () => {
       // RevenueCat 구독 상태 확인
       try {
         if (Purchases && typeof Purchases.getCustomerInfo === "function") {
@@ -134,7 +133,9 @@ export default function TrainerMoreScreen() {
       } finally {
         setLoading(false);
       }
-    };
+  };
+
+  useEffect(() => {
     fetchProfile();
   }, []);
 
