@@ -21,6 +21,9 @@ export default function SignupScreen() {
 
   useEffect(() => {
     const loadName = async () => {
+      const loginMethod = await AsyncStorage.getItem("loginMethod");
+      const isApple = loginMethod === "apple";
+
       const appleName = await AsyncStorage.getItem("appleProvidedName");
       if (appleName) {
         setName(appleName);
@@ -28,22 +31,24 @@ export default function SignupScreen() {
         await AsyncStorage.removeItem("appleProvidedName");
         return;
       }
-      // Apple 두 번째 로그인 시 — JWT로 DB에서 이름 조회
-      const jwt = await AsyncStorage.getItem("jwt");
-      if (jwt) {
-        try {
-          const { API_URL } = await import("../../constants/api");
-          const res = await fetch(`${API_URL}/api/me`, {
-            headers: { Authorization: `Bearer ${jwt}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.name) {
-              setName(data.name);
-              setIsAppleName(true);
+
+      // Apple 로그인이면 항상 이름 칸 숨김 — DB에서 이름 조회
+      if (isApple) {
+        setIsAppleName(true);
+        const jwt = await AsyncStorage.getItem("jwt");
+        if (jwt) {
+          try {
+            const { API_URL } = await import("../../constants/api");
+            const res = await fetch(`${API_URL}/api/me`, {
+              headers: { Authorization: `Bearer ${jwt}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.name) setName(data.name);
             }
-          }
-        } catch {}
+          } catch {}
+        }
+        await AsyncStorage.removeItem("loginMethod");
       }
     };
     loadName();

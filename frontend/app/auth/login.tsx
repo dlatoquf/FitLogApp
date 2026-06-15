@@ -253,6 +253,7 @@ export default function LoginScreen() {
 
       if (isNewUser || !role) {
         if (name) await AsyncStorage.setItem("appleProvidedName", name);
+        await AsyncStorage.setItem("loginMethod", "apple");
         router.replace("/auth/signup");
       } else {
         navigateByRole(role);
