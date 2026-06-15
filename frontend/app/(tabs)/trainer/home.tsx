@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { syncAllData } from "../../../hooks/useGoogleSheets";
 import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
@@ -410,13 +411,8 @@ export default function TrainerHomeScreen() {
 
   // ── 초대 버튼 핸들러 ──────────────────────────────────────────────────────
   const handleInvitePress = () => {
-    const plan = (data?.plan ?? "FREE").toUpperCase();
-    // FREE 플랜 5명 제한
-    if (plan === "FREE" && (data?.totalMembers ?? 0) >= 5) {
-      setPaymentVisible(true);
-    } else {
-      setInviteVisible(true);
-    }
+    // 전체 무료 제공 중 - 제한 없음
+    setInviteVisible(true);
   };
 
   const inviteDragGesture = Gesture.Pan()
@@ -482,26 +478,7 @@ export default function TrainerHomeScreen() {
         }
       } catch {}
 
-      // RevenueCat 초기화 + 트레이너 userId 연결
-      try {
-        if (Purchases && typeof Purchases.configure === "function") {
-          const revenueCatKey =
-            Platform.OS === "ios"
-              ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
-              : "goog_basbVZDtouCQZzqQwYIsKIlwCdx";
-          await Purchases.configure({
-            apiKey: revenueCatKey,
-          });
-          const jwt = await AsyncStorage.getItem("jwt");
-          if (jwt) {
-            const payload = JSON.parse(atob(jwt.split(".")[1]));
-            const userId = String(payload.sub ?? payload.userId ?? payload.id);
-            await Purchases.logIn(userId);
-          }
-        }
-      } catch (e) {
-        console.log("RevenueCat 초기화 실패:", e);
-      }
+      // RevenueCat 비활성화 (전체 무료 제공 중)
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
@@ -690,6 +667,8 @@ export default function TrainerHomeScreen() {
       setPayAmountInput("");
       setPayMemoInput("");
       fetchHome();
+      // Google Sheets 자동 동기화 (백그라운드)
+      syncAllData().catch(() => {});
       Alert.alert("완료", `${memberName}님 결제가 추가됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
@@ -700,15 +679,7 @@ export default function TrainerHomeScreen() {
 
   // 신규 회원 결제 등록 (manual_members 테이블에 저장)
   const addNewMemberPayment = async () => {
-    // FREE 플랜 회원 수 제한 체크
-    if (
-      (data?.plan ?? "FREE").toUpperCase() === "FREE" &&
-      (data?.totalMembers ?? 0) >= 5
-    ) {
-      setPayAddModal(false);
-      setPaymentVisible(true);
-      return;
-    }
+    // 전체 무료 제공 중 - 제한 없음
     if (!payNewName.trim()) {
       Alert.alert("알림", "회원 이름을 입력해주세요.");
       return;
@@ -876,77 +847,7 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(() => {
-                  const plan = (data?.plan ?? "FREE").toUpperCase();
-                  const trialEndDate = data?.trialEndDate;
-                  if (trialEndDate) {
-                    const ended = new Date(trialEndDate);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    ended.setHours(0, 0, 0, 0);
-                    const daysLeft = Math.max(
-                      0,
-                      Math.ceil(
-                        (ended.getTime() - today.getTime()) /
-                          (1000 * 60 * 60 * 24),
-                      ),
-                    );
-                    if (daysLeft > 0) return (
-                      <View
-                        style={{
-                          backgroundColor: "#FEF3C7",
-                          borderWidth: 1,
-                          borderColor: "#FCD34D",
-                          borderRadius: 999,
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            fontWeight: "800",
-                            color: "#D97706",
-                          }}
-                        >
-                          무료체험 {daysLeft}일
-                        </Text>
-                      </View>
-                    );
-                  }
-                  if (plan === "PRO") return (
-                    <View
-                      style={{
-                        backgroundColor: Colors.greenLight,
-                        borderWidth: 1,
-                        borderColor: Colors.green + "44",
-                        borderRadius: 999,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>
-                        PRO
-                      </Text>
-                    </View>
-                  );
-                  return (
-                    <View
-                      style={{
-                        backgroundColor: Colors.bgSub,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        borderRadius: 999,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>
-                        FREE
-                      </Text>
-                    </View>
-                  );
-                })()}
+              {/* 전체 무료 제공 중 - 플랜 뱃지 없음 */}
             </View>
           </View>
           <View
@@ -3249,7 +3150,7 @@ export default function TrainerHomeScreen() {
           현재는 UI만 구현된 상태 (Alert으로 준비 중 표시)
       ──────────────────────────────────────────────────────────────────────── */}
       <Modal
-        visible={paymentVisible}
+        visible={false}
         transparent
         animationType="slide"
         onRequestClose={() => setPaymentVisible(false)}

@@ -98,12 +98,18 @@ public class TrainerHomeService {
             entry.put("amount", c.getAmount() != null ? c.getAmount() : 0L);
             entry.put("memo", c.getMemo());
             entry.put("date", effDate.format(dateFmt));
+            entry.put("sortDate", effDate.toString()); // 정렬용 YYYY-MM-DD
             entry.put("contractId", c.getId());
             entry.put("manualMemberId", c.getManualMember() != null ? c.getManualMember().getId() : null);
             details.add(entry);
         });
 
-        details.sort((a, b) -> ((String) b.get("date")).compareTo((String) a.get("date")));
+        // 날짜 내림차순 (최신순), 같은 날짜면 contractId 내림차순
+        details.sort((a, b) -> {
+            int cmp = ((String) b.get("sortDate")).compareTo((String) a.get("sortDate"));
+            if (cmp != 0) return cmp;
+            return ((Long) b.get("contractId")).compareTo((Long) a.get("contractId"));
+        });
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("month", ym.toString());
@@ -185,9 +191,17 @@ public class TrainerHomeService {
                     c.getAmount() != null ? c.getAmount() : 0L,
                     c.getMemo(),
                     effDate.format(dateFmt),
+                    effDate.toString(),
                     c.getId(),
                     c.getManualMember() != null ? c.getManualMember().getId() : null
             ));
+        });
+
+        // 날짜 내림차순 정렬 (최신순), 같은 날짜면 contractId 내림차순
+        monthRevenueDetails.sort((a, b) -> {
+            int cmp = b.getSortDate().compareTo(a.getSortDate());
+            if (cmp != 0) return cmp;
+            return b.getContractId().compareTo(a.getContractId());
         });
 
         // 유료 구독 또는 무료 체험 기간이면 PRO로 처리

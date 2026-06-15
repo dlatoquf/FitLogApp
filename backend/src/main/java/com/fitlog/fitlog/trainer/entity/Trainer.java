@@ -82,6 +82,13 @@ public class Trainer {
     @Column(name = "gym_confirmed_at")
     private java.time.LocalDate gymConfirmedAt;
 
+    // Google Sheets 연동
+    @Column(name = "google_sheets_spreadsheet_id")
+    private String googleSheetsSpreadsheetId;
+
+    @Column(name = "google_sheets_token", columnDefinition = "TEXT")
+    private String googleSheetsToken;
+
     public Long getId() { return id; }
     public User getUser() { return user; }
     public String getGymName() { return gymName; }
@@ -121,6 +128,10 @@ public class Trainer {
     public void setGym(Gym gym) { this.gym = gym; }
     public java.time.LocalDate getGymConfirmedAt() { return gymConfirmedAt; }
     public void setGymConfirmedAt(java.time.LocalDate gymConfirmedAt) { this.gymConfirmedAt = gymConfirmedAt; }
+    public String getGoogleSheetsSpreadsheetId() { return googleSheetsSpreadsheetId; }
+    public void setGoogleSheetsSpreadsheetId(String id) { this.googleSheetsSpreadsheetId = id; }
+    public String getGoogleSheetsToken() { return googleSheetsToken; }
+    public void setGoogleSheetsToken(String token) { this.googleSheetsToken = token; }
 
     /** 제휴 헬스장이 유효하면 true (올해 1월 1일 이후에 확인한 경우) */
     public boolean isGymAffiliationActive() {

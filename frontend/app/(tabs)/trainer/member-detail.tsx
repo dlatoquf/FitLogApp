@@ -7004,9 +7004,9 @@ export default function MemberDetailScreen() {
         </View>
       </Modal>
 
-      {/* 업그레이드 바텀시트 */}
+      {/* 업그레이드 바텀시트 (비활성화 - 전체 무료 제공 중) */}
       <Modal
-        visible={paymentVisible}
+        visible={false}
         transparent
         animationType="slide"
         onRequestClose={() => setPaymentVisible(false)}

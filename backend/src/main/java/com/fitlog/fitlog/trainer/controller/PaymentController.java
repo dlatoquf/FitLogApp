@@ -8,6 +8,7 @@ import com.fitlog.fitlog.member.service.PtContractService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -40,13 +41,14 @@ public class PaymentController {
         );
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/history")
     public List<Map<String, Object>> getHistory(@RequestHeader("Authorization") String auth) {
         Long userId = jwtService.getUserIdFromToken(auth.replace("Bearer ", ""));
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너를 찾을 수 없습니다."));
 
-        List<PtContract> contracts = ptContractRepository.findAllByTrainerWithMember(trainer);
+        List<PtContract> contracts = ptContractRepository.findAllByTrainerWithAll(trainer);
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (PtContract c : contracts) {

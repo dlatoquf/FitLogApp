@@ -323,6 +323,41 @@ public class TrainerController {
         return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
     }
 
+    // PATCH /api/trainer/sheets-config — Google Sheets 연동 정보 저장
+    @PatchMapping("/trainer/sheets-config")
+    public ResponseEntity<Map<String, Object>> saveSheetConfig(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainer(authorization);
+        if (body.containsKey("spreadsheetId")) trainer.setGoogleSheetsSpreadsheetId(body.get("spreadsheetId"));
+        if (body.containsKey("token")) trainer.setGoogleSheetsToken(body.get("token"));
+        trainerRepository.save(trainer);
+        return ResponseEntity.ok(Map.of("message", "저장됐어요."));
+    }
+
+    // DELETE /api/trainer/sheets-config — Google Sheets 연동 해제
+    @DeleteMapping("/trainer/sheets-config")
+    public ResponseEntity<Map<String, Object>> deleteSheetConfig(
+            @RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        trainer.setGoogleSheetsSpreadsheetId(null);
+        trainer.setGoogleSheetsToken(null);
+        trainerRepository.save(trainer);
+        return ResponseEntity.ok(Map.of("message", "해제됐어요."));
+    }
+
+    // GET /api/trainer/sheets-config — Google Sheets 연동 정보 조회
+    @GetMapping("/trainer/sheets-config")
+    public ResponseEntity<Map<String, Object>> getSheetConfig(
+            @RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        return ResponseEntity.ok(Map.of(
+            "spreadsheetId", trainer.getGoogleSheetsSpreadsheetId() != null ? trainer.getGoogleSheetsSpreadsheetId() : "",
+            "token", trainer.getGoogleSheetsToken() != null ? trainer.getGoogleSheetsToken() : "",
+            "connected", trainer.getGoogleSheetsSpreadsheetId() != null
+        ));
+    }
+
     private Trainer getTrainer(String authorization) {
         String token = authorization.replace("Bearer ", "");
         Long userId = jwtService.getUserIdFromToken(token);

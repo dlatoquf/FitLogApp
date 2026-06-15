@@ -41,6 +41,10 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
                                                       @Param("from") LocalDate from,
                                                       @Param("to") LocalDate to);
 
+    // 트레이너 기준 전체 회원 운동일지 (해제된 회원 포함, Sheets 동기화용)
+    @Query("SELECT w FROM WorkoutLog w LEFT JOIN FETCH w.sets WHERE w.trainer = :trainer ORDER BY w.logDate ASC")
+    List<WorkoutLog> findAllByTrainer(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer);
+
     // OT→PT 전환 시 세션 수 카운트
     long countByManualMember(ManualMember mm);
 

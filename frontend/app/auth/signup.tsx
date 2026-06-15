@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +17,17 @@ type Role = "trainer" | "member" | null;
 export default function SignupScreen() {
   const [selectedRole, setSelectedRole] = useState<Role>(null);
   const [name, setName] = useState("");
+  const [isAppleName, setIsAppleName] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("appleProvidedName").then((saved) => {
+      if (saved) {
+        setName(saved);
+        setIsAppleName(true);
+        AsyncStorage.removeItem("appleProvidedName");
+      }
+    });
+  }, []);
 
   const canNext = selectedRole !== null && name.trim().length > 0;
 
@@ -183,16 +194,17 @@ export default function SignupScreen() {
             placeholder="이름을 입력하세요"
             placeholderTextColor={Colors.textPlaceholder}
             value={name}
-            onChangeText={setName}
+            onChangeText={isAppleName ? undefined : setName}
+            editable={!isAppleName}
             style={{
-              backgroundColor: Colors.bgSub,
+              backgroundColor: isAppleName ? Colors.bgSub : Colors.bgSub,
               borderWidth: 1.5,
               borderColor: name.trim() ? Colors.green : Colors.border,
               padding: 15,
               borderRadius: 12,
               marginBottom: 32,
               fontSize: 15,
-              color: Colors.text,
+              color: isAppleName ? Colors.textSub : Colors.text,
             }}
           />
 

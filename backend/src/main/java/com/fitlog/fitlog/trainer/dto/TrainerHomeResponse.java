@@ -110,16 +110,18 @@ public class TrainerHomeResponse {
         private int sessions;
         private long amount;
         private String memo;
-        private String date; // "5/25" 형식
+        private String date;     // "5/25" 형식 (표시용)
+        private String sortDate; // "YYYY-MM-DD" 형식 (정렬용)
         private Long contractId;
         private Long manualMemberId;
 
-        public MonthRevenueDetail(String memberName, int sessions, long amount, String memo, String date, Long contractId, Long manualMemberId) {
+        public MonthRevenueDetail(String memberName, int sessions, long amount, String memo, String date, String sortDate, Long contractId, Long manualMemberId) {
             this.memberName = memberName;
             this.sessions = sessions;
             this.amount = amount;
             this.memo = memo;
             this.date = date;
+            this.sortDate = sortDate;
             this.contractId = contractId;
             this.manualMemberId = manualMemberId;
         }
@@ -129,6 +131,7 @@ public class TrainerHomeResponse {
         public long getAmount() { return amount; }
         public String getMemo() { return memo; }
         public String getDate() { return date; }
+        public String getSortDate() { return sortDate; }
         public Long getContractId() { return contractId; }
         public Long getManualMemberId() { return manualMemberId; }
     }

@@ -45,7 +45,7 @@ public class NotificationService {
         notificationRepository.save(notification);
 
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
-            long unreadCount = notificationRepository.countByUserAndIsReadFalse(user);
+            long unreadCount = notificationRepository.countByUserAndIsReadFalseAndCreatedAtAfter(user, java.time.LocalDateTime.now().minusDays(7));
             sendPushWithTarget(user.getFcmToken(), content, type, date, targetId, (int) unreadCount);
         }
     }

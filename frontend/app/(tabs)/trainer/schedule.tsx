@@ -233,17 +233,18 @@ export default function TrainerScheduleScreen() {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
 
-        const [calRes, memoRes, slotSettingsRes, profileRes] = await Promise.all([
-          fetch(
-            `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
-            { headers },
-          ),
-          fetch(`${API_URL}/api/schedule/memo?yearMonth=${yearMonthStr}`, {
-            headers,
-          }),
-          fetch(`${API_URL}/api/trainer/slot-settings`, { headers }),
-          fetch(`${API_URL}/api/profile/trainer`, { headers }),
-        ]);
+        const [calRes, memoRes, slotSettingsRes, profileRes] =
+          await Promise.all([
+            fetch(
+              `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
+              { headers },
+            ),
+            fetch(`${API_URL}/api/schedule/memo?yearMonth=${yearMonthStr}`, {
+              headers,
+            }),
+            fetch(`${API_URL}/api/trainer/slot-settings`, { headers }),
+            fetch(`${API_URL}/api/profile/trainer`, { headers }),
+          ]);
         if (profileRes?.ok) {
           const profileData = await profileRes.json();
           if (profileData.startTime) {
@@ -292,19 +293,27 @@ export default function TrainerScheduleScreen() {
         setTimeout(() => {
           const effectiveOffset = slotOffset === 30 ? 30 : 0;
           const times = makeTimeOptions(effectiveOffset as 0 | 30);
-          const weekDateKeys = getWeekDatesForOffset(weekOffset).map((d) => toDateKey(d));
+          const weekDateKeys = getWeekDatesForOffset(weekOffset).map((d) =>
+            toDateKey(d),
+          );
           const weekSlotTimes = slots
             .filter((s: any) => weekDateKeys.includes(s.date))
             .map((s: any) => s.startTime.slice(0, 5));
-          const earliestSlot = weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
-          const scrollTarget = earliestSlot && earliestSlot < trainerStartTimeRef.current
-            ? earliestSlot
-            : trainerStartTimeRef.current;
+          const earliestSlot =
+            weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
+          const scrollTarget =
+            earliestSlot && earliestSlot < trainerStartTimeRef.current
+              ? earliestSlot
+              : trainerStartTimeRef.current;
           const startIdx = times.indexOf(scrollTarget);
-          if (startIdx > 0) weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
+          if (startIdx > 0)
+            weekScrollRef.current?.scrollTo({
+              y: startIdx * 47,
+              animated: false,
+            });
         }, 150);
       }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, slotOffset]),
   );
 
@@ -396,10 +405,12 @@ export default function TrainerScheduleScreen() {
     const weekSlotTimes = slots
       .filter((s) => weekDateKeys.includes(s.date))
       .map((s) => s.startTime.slice(0, 5));
-    const earliestSlot = weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
-    const scrollTarget = earliestSlot && earliestSlot < trainerStartTime
-      ? earliestSlot
-      : trainerStartTime;
+    const earliestSlot =
+      weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
+    const scrollTarget =
+      earliestSlot && earliestSlot < trainerStartTime
+        ? earliestSlot
+        : trainerStartTime;
     const startIdx = times.indexOf(scrollTarget);
     if (startIdx <= 0) return;
     const timer = setTimeout(() => {
@@ -731,7 +742,14 @@ export default function TrainerScheduleScreen() {
     return (
       <View>
         {/* 요일 헤더 */}
-        <View style={{ flexDirection: "row", marginBottom: 4 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            paddingBottom: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.border,
+          }}
+        >
           {DAYS_KR.map((d, i) => (
             <View key={d} style={{ flex: 1, alignItems: "center" }}>
               <Text
@@ -754,7 +772,14 @@ export default function TrainerScheduleScreen() {
 
         {/* 날짜 행 */}
         {rows.map((row, ri) => (
-          <View key={ri} style={{ flexDirection: "row", marginBottom: 4 }}>
+          <View
+            key={ri}
+            style={{
+              flexDirection: "row",
+              borderBottomWidth: 1,
+              borderBottomColor: Colors.border,
+            }}
+          >
             {row.map((day, ci) => {
               if (!day) return <View key={ci} style={{ flex: 1 }} />;
 
@@ -776,35 +801,33 @@ export default function TrainerScheduleScreen() {
                 <TouchableOpacity
                   key={ci}
                   onPress={() => setSelectedDate(cellDate)}
-                  disabled={!active && !isPast} // 미래 2주 이상은 비활성
-                  style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}
+                  disabled={!active && !isPast}
+                  style={{ flex: 1, alignItems: "center", paddingVertical: 8 }}
                 >
                   <View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
+                      width: 30,
+                      height: 30,
+                      borderRadius: 15,
                       backgroundColor: isSelected
                         ? Colors.green
-                        : isToday
-                          ? Colors.greenLight
-                          : "transparent",
+                        : "transparent",
                       borderWidth: isToday && !isSelected ? 1.5 : 0,
                       borderColor: Colors.green,
                       justifyContent: "center",
                       alignItems: "center",
                       opacity:
                         !active && !isPast
-                          ? 0.25
+                          ? 0.2
                           : isPast && !isSelected
-                            ? 0.45
+                            ? 0.4
                             : 1,
                     }}
                   >
                     <Text
                       style={{
                         fontSize: 13,
-                        fontWeight: "700",
+                        fontWeight: isToday || isSelected ? "800" : "500",
                         color: isSelected
                           ? "#fff"
                           : isToday
@@ -820,25 +843,18 @@ export default function TrainerScheduleScreen() {
                     </Text>
                   </View>
                   {/* 수업 점 */}
-                  <View
-                    style={{
-                      height: 5,
-                      marginTop: 2,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
-                    {dotColor && (
-                      <View
-                        style={{
-                          width: 4,
-                          height: 4,
-                          borderRadius: 99,
-                          backgroundColor: dotColor === "green" ? Colors.green : "#9CA3AF",
-                        }}
-                      />
-                    )}
-                  </View>
+                  {dotColor && (
+                    <View
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: 2,
+                        marginTop: 3,
+                        backgroundColor:
+                          dotColor === "green" ? Colors.green : "#9CA3AF",
+                      }}
+                    />
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -857,7 +873,7 @@ export default function TrainerScheduleScreen() {
     // 화면 너비 안에 월~일이 모두 들어오도록 계산
     const SCREEN_W = Dimensions.get("window").width;
     const TIME_W = 30;
-    const WEEK_GRID_PADDING = 64; // 화면 padding 20*2 + 주간 카드 padding 12*2
+    const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
     const SLOT_H = 46;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
@@ -989,7 +1005,8 @@ export default function TrainerScheduleScreen() {
               style={{
                 flexDirection: "row",
                 alignItems: "stretch",
-                marginBottom: 1,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
               }}
             >
               {/* 시간 라벨 */}
@@ -1017,7 +1034,9 @@ export default function TrainerScheduleScreen() {
                 const dk = toDateKey(d);
                 const slot = slotMap[`${dk}_${time}`];
                 const isConfirmed =
-                  slot?.status === "CONFIRMED" || slot?.status === "COMPLETED" || slot?.status === "NO_SHOW";
+                  slot?.status === "CONFIRMED" ||
+                  slot?.status === "COMPLETED" ||
+                  slot?.status === "NO_SHOW";
                 const isNoShowSlot = slot?.status === "NO_SHOW";
                 const isActive = isDateActive(d);
 
@@ -1031,9 +1050,9 @@ export default function TrainerScheduleScreen() {
                           setViewMode("month");
                         }}
                         style={{
-                          backgroundColor: isNoShowSlot ? "#9CA3AF" : sessionColor(
-                            slot.sessionType ?? "PT",
-                          ),
+                          backgroundColor: isNoShowSlot
+                            ? "#9CA3AF"
+                            : sessionColor(slot.sessionType ?? "PT"),
                           borderRadius: 0,
                           paddingVertical: 4,
                           paddingHorizontal: 3,
@@ -1051,9 +1070,12 @@ export default function TrainerScheduleScreen() {
                           }}
                           numberOfLines={1}
                         >
-                          {isNoShowSlot ? (slot.memberName ?? "노쇼") : isPersonalType(slot.sessionType ?? "")
-                            ? slot.note || sessionLabel(slot.sessionType ?? "")
-                            : (slot.memberName ?? "-")}
+                          {isNoShowSlot
+                            ? (slot.memberName ?? "노쇼")
+                            : isPersonalType(slot.sessionType ?? "")
+                              ? slot.note ||
+                                sessionLabel(slot.sessionType ?? "")
+                              : (slot.memberName ?? "-")}
                         </Text>
                         {isPersonalType(slot.sessionType ?? "") ? (
                           <Text
@@ -1095,13 +1117,13 @@ export default function TrainerScheduleScreen() {
                         ) : null}
                       </TouchableOpacity>
                     ) : isActive ? (
-                      // 빈 칸 (활성) — 배경만 살짝, + 없음
+                      // 빈 칸 (활성)
                       <TouchableOpacity
                         onPress={() => openWeeklyAdd(d, time, slot)}
                         style={{
-                          borderRadius: 0,
                           height: SLOT_H,
-                          backgroundColor: "#EFEFEF",
+                          borderRightWidth: 1,
+                          borderRightColor: Colors.border,
                         }}
                       />
                     ) : (
@@ -1109,8 +1131,9 @@ export default function TrainerScheduleScreen() {
                       <View
                         style={{
                           height: SLOT_H,
-                          borderRadius: 0,
-                          backgroundColor: "#F3F4F6",
+                          backgroundColor: "#F9FAFB",
+                          borderRightWidth: 1,
+                          borderRightColor: Colors.border,
                         }}
                       />
                     )}
@@ -1155,13 +1178,15 @@ export default function TrainerScheduleScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                backgroundColor: Colors.green,
+                backgroundColor: Colors.greenLight,
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 borderRadius: 12,
+                borderWidth: 1,
+                borderColor: Colors.green + "44",
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>
                 + 스케줄 추가
               </Text>
             </TouchableOpacity>
@@ -1175,7 +1200,9 @@ export default function TrainerScheduleScreen() {
         {daySlots.map((slot, idx) => {
           const isNoShowSlot = slot.status === "NO_SHOW";
           const isConfirmed =
-            slot.status === "CONFIRMED" || slot.status === "COMPLETED" || isNoShowSlot;
+            slot.status === "CONFIRMED" ||
+            slot.status === "COMPLETED" ||
+            isNoShowSlot;
           const isOpen = !isConfirmed;
 
           return (
@@ -1188,13 +1215,17 @@ export default function TrainerScheduleScreen() {
                 paddingVertical: 12,
                 paddingHorizontal: 14,
                 marginBottom: 6,
-                backgroundColor: isNoShowSlot ? "#F3F4F6" : !isConfirmed
-                  ? "#fff"
-                  : sessionBg(slot.sessionType ?? "PT"),
+                backgroundColor: isNoShowSlot
+                  ? "#F3F4F6"
+                  : !isConfirmed
+                    ? "#fff"
+                    : sessionBg(slot.sessionType ?? "PT"),
                 borderWidth: 1,
-                borderColor: isNoShowSlot ? "#D1D5DB" : !isConfirmed
-                  ? Colors.border
-                  : sessionBorder(slot.sessionType ?? "PT"),
+                borderColor: isNoShowSlot
+                  ? "#D1D5DB"
+                  : !isConfirmed
+                    ? Colors.border
+                    : sessionBorder(slot.sessionType ?? "PT"),
               }}
             >
               {/* 시간 */}
@@ -1233,7 +1264,9 @@ export default function TrainerScheduleScreen() {
                           fontSize: 13,
                           fontWeight: "800",
                           color: isNoShowSlot ? Colors.textMuted : Colors.text,
-                          textDecorationLine: isNoShowSlot ? "line-through" : "none",
+                          textDecorationLine: isNoShowSlot
+                            ? "line-through"
+                            : "none",
                         }}
                       >
                         {isPersonalType(slot.sessionType ?? "")
@@ -1241,8 +1274,23 @@ export default function TrainerScheduleScreen() {
                           : slot.memberName}
                       </Text>
                       {isNoShowSlot && (
-                        <View style={{ backgroundColor: "#9CA3AF33", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                          <Text style={{ fontSize: 9, fontWeight: "800", color: "#9CA3AF" }}>노쇼</Text>
+                        <View
+                          style={{
+                            backgroundColor: "#9CA3AF33",
+                            borderRadius: 4,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: "800",
+                              color: "#9CA3AF",
+                            }}
+                          >
+                            노쇼
+                          </Text>
                         </View>
                       )}
                       {(slot.sessionType === "OT" ||
@@ -1343,14 +1391,16 @@ export default function TrainerScheduleScreen() {
                     setAddModal(true);
                   }}
                   style={{
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.greenLight,
                     paddingHorizontal: 12,
                     paddingVertical: 6,
                     borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: Colors.green + "44",
                   }}
                 >
                   <Text
-                    style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}
+                    style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}
                   >
                     + 추가
                   </Text>
@@ -1377,9 +1427,9 @@ export default function TrainerScheduleScreen() {
               marginTop: 8,
               paddingVertical: 12,
               borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: Colors.green,
-              borderStyle: "dashed",
+              backgroundColor: Colors.greenLight,
+              borderWidth: 1,
+              borderColor: Colors.green + "44",
             }}
           >
             <Text
@@ -1422,37 +1472,33 @@ export default function TrainerScheduleScreen() {
         </View>
 
         {/* ── 뷰 모드 토글 ──────────────────────────────────────────────────── */}
-        <View style={{ alignItems: "center", marginBottom: 16 }}>
-          {/* 가운데: 월간/주간 토글 */}
-          <View
-            style={{
-              flexDirection: "row",
-              backgroundColor: Colors.bgSub,
-              borderRadius: 10,
-              padding: 3,
-              borderWidth: 1,
-              borderColor: Colors.border,
-            }}
-          >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          {/* 탭 언더라인 스타일 */}
+          <View style={{ flexDirection: "row" }}>
             {(["month", "week"] as const).map((mode) => (
               <TouchableOpacity
                 key={mode}
                 onPress={() => setViewMode(mode)}
                 style={{
-                  paddingHorizontal: 28,
-                  paddingVertical: 7,
-                  borderRadius: 8,
-                  backgroundColor: viewMode === mode ? "#fff" : "transparent",
-                  shadowColor: "#000",
-                  shadowOpacity: viewMode === mode ? 0.07 : 0,
-                  shadowRadius: viewMode === mode ? 4 : 0,
-                  elevation: viewMode === mode ? 2 : 0,
+                  paddingHorizontal: 4,
+                  paddingVertical: 6,
+                  marginRight: 20,
+                  borderBottomWidth: 2,
+                  borderBottomColor:
+                    viewMode === mode ? Colors.green : "transparent",
                 }}
               >
                 <Text
                   style={{
-                    fontSize: 13,
-                    fontWeight: "700",
+                    fontSize: 15,
+                    fontWeight: "800",
                     color: viewMode === mode ? Colors.text : Colors.textMuted,
                   }}
                 >
@@ -1462,16 +1508,13 @@ export default function TrainerScheduleScreen() {
             ))}
           </View>
 
-          {/* 오른쪽 끝: 정각/30분 설정 (absolute) */}
+          {/* 오른쪽: 정각/30분 설정 */}
           <TouchableOpacity
             onPress={() => setShowOffsetModal(true)}
             style={{
-              position: "absolute",
-              right: 0,
-              top: 0,
               paddingHorizontal: 10,
-              paddingVertical: 8,
-              borderRadius: 10,
+              paddingVertical: 6,
+              borderRadius: 8,
               backgroundColor: Colors.bgSub,
               borderWidth: 1,
               borderColor: Colors.border,
@@ -1483,7 +1526,6 @@ export default function TrainerScheduleScreen() {
             <Text style={{ fontSize: 11, color: Colors.textMuted }}>
               {slotOffset === 30 ? "30분" : "정각"}
             </Text>
-            <Text style={{ fontSize: 13 }}>⚙️</Text>
           </TouchableOpacity>
         </View>
 
@@ -1495,90 +1537,46 @@ export default function TrainerScheduleScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 16,
-                paddingHorizontal: 4,
+                marginBottom: 12,
               }}
             >
               <TouchableOpacity
                 onPress={() => goMonth(-1)}
-                style={{
-                  padding: 8,
-                  borderRadius: 10,
-                  backgroundColor: Colors.bgSub,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                }}
+                style={{ padding: 6 }}
               >
-                <Text style={{ fontSize: 16, color: Colors.text }}>‹</Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    color: Colors.textMuted,
+                    fontWeight: "300",
+                  }}
+                >
+                  ‹
+                </Text>
               </TouchableOpacity>
               <Text
-                style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}
+                style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}
               >
                 {viewYear}년 {viewMonth}월
               </Text>
               <TouchableOpacity
                 onPress={() => goMonth(1)}
-                style={{
-                  padding: 8,
-                  borderRadius: 10,
-                  backgroundColor: Colors.bgSub,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                }}
+                style={{ padding: 6 }}
               >
-                <Text style={{ fontSize: 16, color: Colors.text }}>›</Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    color: Colors.textMuted,
+                    fontWeight: "300",
+                  }}
+                >
+                  ›
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* ── 범례 ─────────────────────────────────────────────────────────── */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 14,
-                marginBottom: 10,
-                paddingHorizontal: 2,
-                alignItems: "center",
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-              >
-                <View
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 99,
-                    backgroundColor: Colors.green,
-                  }}
-                />
-                <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                  확정
-                </Text>
-              </View>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: Colors.textMuted,
-                  marginLeft: "auto",
-                }}
-              >
-                매주 월요일 오전 9시 자동 오픈
-              </Text>
-            </View>
-
             {/* ── 월간 캘린더 그리드 ───────────────────────────────────────────── */}
-            <View
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderRadius: 16,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                marginBottom: 16,
-              }}
-            >
-              {renderCalendar()}
-            </View>
+            <View style={{ marginBottom: 10 }}>{renderCalendar()}</View>
 
             {/* ── 월별 메모 ────────────────────────────────────────────────────── */}
             <TouchableOpacity
@@ -1587,18 +1585,16 @@ export default function TrainerScheduleScreen() {
                 setEditingMemo(true);
               }}
               style={{
-                backgroundColor: "#FFFBEB",
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderWidth: 1,
-                borderColor: "#F59E0B44",
-                marginBottom: 20,
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 10,
+                gap: 6,
+                paddingVertical: 8,
+                marginBottom: 14,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
               }}
             >
+              <Text style={{ fontSize: 11, color: Colors.textMuted }}>📝</Text>
               <Text
                 style={{
                   flex: 1,
@@ -1607,10 +1603,14 @@ export default function TrainerScheduleScreen() {
                 }}
                 numberOfLines={1}
               >
-                {monthMemo || `${viewMonth}월 메모 추가`}
+                {monthMemo || `${viewMonth}월 메모`}
               </Text>
               <Text
-                style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}
+                style={{
+                  fontSize: 11,
+                  fontWeight: "700",
+                  color: Colors.textMuted,
+                }}
               >
                 {monthMemo ? "수정" : "추가"}
               </Text>
@@ -1679,16 +1679,7 @@ export default function TrainerScheduleScreen() {
             </View>
 
             {/* ── 주간 그리드 ──────────────────────────────────────────────── */}
-            <View
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderRadius: 16,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                marginBottom: 16,
-              }}
-            >
+            <View style={{ marginBottom: 16 }}>
               {loading ? (
                 <ActivityIndicator
                   color={Colors.green}
@@ -1728,7 +1719,13 @@ export default function TrainerScheduleScreen() {
           >
             <TouchableOpacity
               onPress={() => setShowOffsetModal(false)}
-              style={{ position: "absolute", top: 12, right: 12, padding: 4, zIndex: 1 }}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                padding: 4,
+                zIndex: 1,
+              }}
             >
               <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
             </TouchableOpacity>
@@ -1751,7 +1748,8 @@ export default function TrainerScheduleScreen() {
                 marginBottom: 20,
               }}
             >
-              슬롯이 정각 또는 30분 단위로 생성돼요.{"\n"}변경 시 다음 주부터 적용돼요.
+              슬롯이 정각 또는 30분 단위로 생성돼요.{"\n"}변경 시 다음 주부터
+              적용돼요.
             </Text>
             <View style={{ gap: 10 }}>
               {(
@@ -2303,7 +2301,10 @@ export default function TrainerScheduleScreen() {
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0))
+                    .sort(
+                      (a: any, b: any) =>
+                        (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0),
+                    )
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
                         key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
@@ -2467,7 +2468,9 @@ export default function TrainerScheduleScreen() {
                 marginBottom: 4,
               }}
             >
-              {manualTimeFixed ? `${manualTime} 스케줄 추가` : `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 스케줄 추가`}
+              {manualTimeFixed
+                ? `${manualTime} 스케줄 추가`
+                : `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 스케줄 추가`}
             </Text>
             <Text
               style={{
@@ -2526,23 +2529,44 @@ export default function TrainerScheduleScreen() {
             {/* 시간 선택 - 주간 셀 탭 시 숨김, + 버튼 시 선택 가능 */}
             {!manualTimeFixed && (
               <>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                    marginBottom: 8,
+                  }}
+                >
                   시작 시간
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 20 }}
+                >
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {makeTimeOptions(slotOffset === 30 ? 30 : 0).map((t) => (
                       <TouchableOpacity
                         key={t}
                         onPress={() => setManualTime(t)}
                         style={{
-                          paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-                          backgroundColor: manualTime === t ? Colors.green : Colors.bgSub,
+                          paddingHorizontal: 14,
+                          paddingVertical: 8,
+                          borderRadius: 10,
+                          backgroundColor:
+                            manualTime === t ? Colors.green : Colors.bgSub,
                           borderWidth: 1,
-                          borderColor: manualTime === t ? Colors.green : Colors.border,
+                          borderColor:
+                            manualTime === t ? Colors.green : Colors.border,
                         }}
                       >
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: manualTime === t ? "#fff" : Colors.text }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: manualTime === t ? "#fff" : Colors.text,
+                          }}
+                        >
                           {t}
                         </Text>
                       </TouchableOpacity>
@@ -2682,10 +2706,7 @@ export default function TrainerScheduleScreen() {
                 />
                 <TouchableOpacity
                   onPress={() =>
-                    addPersonalSchedule(
-                      manualTime,
-                      toDateKey(selectedDate),
-                    )
+                    addPersonalSchedule(manualTime, toDateKey(selectedDate))
                   }
                   disabled={addingPersonal}
                   style={{
@@ -2735,7 +2756,10 @@ export default function TrainerScheduleScreen() {
                 >
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0))
+                    .sort(
+                      (a: any, b: any) =>
+                        (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0),
+                    )
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
                         key={`${m.isManual ? "manual" : "linked"}-${m.id}`}

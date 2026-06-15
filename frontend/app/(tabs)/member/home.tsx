@@ -102,6 +102,7 @@ export default function MemberHomeScreen() {
   const [missions, setMissions] = useState<
     { id: number; content: string; isDone: boolean; trainerName: string }[]
   >([]);
+  const [activeTab, setActiveTab] = useState<"공지" | "식단" | "운동">("공지");
 
   const fetchHome = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -383,49 +384,41 @@ export default function MemberHomeScreen() {
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/member/notifications")}
             style={{
-              flexDirection: "row",
+              width: 36,
+              height: 36,
+              justifyContent: "center",
               alignItems: "center",
-              gap: 6,
               backgroundColor:
                 notifications.filter((n) => !n.isRead).length > 0
                   ? "#EFF6FF"
                   : Colors.bgSub,
-              borderRadius: 20,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
+              borderRadius: 18,
               borderWidth: 1,
               borderColor:
                 notifications.filter((n) => !n.isRead).length > 0
                   ? Colors.blue + "44"
                   : Colors.border,
-              marginTop: 6,
             }}
           >
-            <View
-              style={{
-                width: 18,
-                height: 18,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
+            {/* 종 아이콘 */}
+            <View style={{ width: 16, height: 16, justifyContent: "center", alignItems: "center" }}>
               <View
                 style={{
-                  width: 12,
-                  height: 10,
+                  width: 10,
+                  height: 8,
                   backgroundColor:
                     notifications.filter((n) => !n.isRead).length > 0
                       ? Colors.blue
                       : Colors.textMuted,
-                  borderRadius: 6,
+                  borderRadius: 5,
                   borderBottomLeftRadius: 0,
                   borderBottomRightRadius: 0,
                 }}
               />
               <View
                 style={{
-                  width: 14,
-                  height: 3,
+                  width: 12,
+                  height: 2.5,
                   backgroundColor:
                     notifications.filter((n) => !n.isRead).length > 0
                       ? Colors.blue
@@ -435,9 +428,9 @@ export default function MemberHomeScreen() {
               />
               <View
                 style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 3,
+                  width: 4,
+                  height: 4,
+                  borderRadius: 2,
                   borderWidth: 1.5,
                   borderColor:
                     notifications.filter((n) => !n.isRead).length > 0
@@ -447,34 +440,18 @@ export default function MemberHomeScreen() {
                 }}
               />
             </View>
-            {notifications.filter((n) => !n.isRead).length > 0 ? (
+            {notifications.filter((n) => !n.isRead).length > 0 && (
               <View
                 style={{
+                  position: "absolute",
+                  top: 4,
+                  right: 4,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
                   backgroundColor: Colors.blue,
-                  borderRadius: 10,
-                  minWidth: 20,
-                  height: 20,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  paddingHorizontal: 5,
                 }}
-              >
-                <Text
-                  style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}
-                >
-                  {notifications.filter((n) => !n.isRead).length}
-                </Text>
-              </View>
-            ) : (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textMuted,
-                  fontWeight: "600",
-                }}
-              >
-                알림
-              </Text>
+              />
             )}
           </TouchableOpacity>
         </View>
@@ -674,37 +651,22 @@ export default function MemberHomeScreen() {
         </View>
 
         {/* 이번 주 내 수업 */}
-        <View
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: Colors.border,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "700",
-              color: Colors.text,
-              marginBottom: 10,
-            }}
-          >
-            이번 주 내 수업
-          </Text>
+        <View style={{
+          backgroundColor: Colors.bgSub,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: Colors.border,
+        }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: activeThisWeek.length > 0 ? 10 : 0 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}>이번 주 내 수업</Text>
+            {activeThisWeek.length > 0 && (
+              <Text style={{ fontSize: 11, color: Colors.blue, fontWeight: "600" }}>{activeThisWeek.length}개</Text>
+            )}
+          </View>
           {activeThisWeek.length === 0 ? (
-            <Text
-              style={{
-                fontSize: 13,
-                color: Colors.textMuted,
-                textAlign: "center",
-                paddingVertical: 8,
-              }}
-            >
-              이번 주 확정된 수업이 없어요
-            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 4 }}>이번 주 확정된 수업이 없어요</Text>
           ) : (
             activeThisWeek.map((s) => (
               <View
@@ -712,320 +674,251 @@ export default function MemberHomeScreen() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  marginBottom: 5,
                   backgroundColor: Colors.blueBg,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginBottom: 6,
+                  borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: Colors.blue + "44",
+                  borderColor: Colors.blue + "28",
+                  gap: 8,
                 }}
               >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: Colors.blue,
-                    marginRight: 10,
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.text,
-                    flex: 1,
-                  }}
-                >
-                  {s.date}
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.blue }} />
+                <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.text, flex: 1 }}>
+                  {s.date.slice(5)}
                 </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.blue,
-                  }}
-                >
-                  {s.startTime}
+                <Text style={{ fontSize: 13, color: Colors.blue, fontWeight: "700" }}>
+                  {formatTime(s.startTime)}
                 </Text>
               </View>
             ))
           )}
         </View>
 
-        {/* 트레이너 공지사항 */}
-        <TouchableOpacity
-          onPress={() => router.push("/(tabs)/member/notices" as any)}
-          style={{
-            backgroundColor: "#FFFBEB",
-            borderRadius: 14,
-            paddingVertical: 12,
-            paddingHorizontal: 14,
-            borderWidth: 1,
-            borderColor: "#FDE68A",
-            marginBottom: 12,
-          }}
-          activeOpacity={0.8}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 6,
-            }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}>
-              📢 트레이너 공지
-            </Text>
-            <Text style={{ fontSize: 11, color: "#B45309" }}>더보기 →</Text>
-          </View>
-          {latestNotice ? (
-            <>
-              <Text
-                style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
-                numberOfLines={2}
-              >
-                {latestNotice.content}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: Colors.textPlaceholder,
-                  marginTop: 4,
-                }}
-              >
-                {latestNotice.createdAt}
-              </Text>
-            </>
-          ) : (
-            <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-              아직 등록된 공지가 없어요
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* 트레이너 챌린지 */}
-        <View
-          style={{
-            backgroundColor: "#fff7ed",
-            borderRadius: 14,
-            paddingVertical: 8,
-            paddingHorizontal: 14,
-            borderWidth: 1,
-            borderColor: "#f9731644",
-            marginBottom: 12,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: missions.length > 0 ? 12 : 0,
-            }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: "800", color: "#f97316" }}>
-              트레이너 챌린지
-            </Text>
-            {missions.length > 0 && (
-              <Text
-                style={{ fontSize: 11, color: "#f9731699", marginLeft: "auto" }}
-              >
-                {missions.filter((m) => m.isDone).length}/{missions.length} 완료
-              </Text>
-            )}
-          </View>
-          {missions.length === 0 ? (
-            <Text
+        {/* 탭 바: 공지 | 식단 | 운동 */}
+        <View style={{
+          flexDirection: "row",
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
+          marginBottom: 14,
+        }}>
+          {(["공지", "식단", "운동"] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
               style={{
-                fontSize: 13,
-                color: "#f9731688",
-                textAlign: "center",
-                paddingVertical: 6,
+                flex: 1,
+                alignItems: "center",
+                paddingBottom: 10,
+                borderBottomWidth: 2,
+                borderBottomColor: activeTab === tab ? Colors.blue : "transparent",
               }}
             >
-              아직 트레이너가 챌린지를 내지 않았어요
-            </Text>
-          ) : (
-            <>
-              {missions.map((m) => (
-                <View
-                  key={m.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    paddingVertical: 10,
-                    paddingHorizontal: 2,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#f9731622",
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: "#f97316" }}>•</Text>
-                  <Text
+              <Text style={{
+                fontSize: 14,
+                fontWeight: activeTab === tab ? "700" : "500",
+                color: activeTab === tab ? Colors.blue : Colors.textMuted,
+              }}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 탭 콘텐츠 */}
+        {activeTab === "공지" && (
+          <View>
+            {/* 공지사항 */}
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/member/notices" as any)}
+              style={{
+                backgroundColor: "#FFFBEB",
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                borderWidth: 1,
+                borderColor: "#FDE68A",
+                marginBottom: 10,
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}>트레이너 공지</Text>
+                <Text style={{ fontSize: 11, color: "#B45309" }}>더보기 →</Text>
+              </View>
+              {latestNotice ? (
+                <>
+                  <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={2}>
+                    {latestNotice.content}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: Colors.textPlaceholder, marginTop: 4 }}>
+                    {latestNotice.createdAt}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ fontSize: 13, color: Colors.textMuted }}>아직 등록된 공지가 없어요</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* 챌린지 — 컴팩트 */}
+            <View style={{
+              backgroundColor: "#fff7ed",
+              borderRadius: 12,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderWidth: 1,
+              borderColor: "#f9731633",
+              marginBottom: 10,
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: missions.length > 0 ? 8 : 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#f97316" }}>챌린지</Text>
+                {missions.length > 0 && (
+                  <Text style={{ fontSize: 11, color: "#f9731699", marginLeft: "auto" }}>
+                    {missions.filter((m) => m.isDone).length}/{missions.length} 완료
+                  </Text>
+                )}
+              </View>
+              {missions.length === 0 ? (
+                <Text style={{ fontSize: 12, color: "#f9731688" }}>아직 챌린지가 없어요</Text>
+              ) : (
+                missions.map((m) => (
+                  <View
+                    key={m.id}
                     style={{
-                      flex: 1,
-                      fontSize: 14,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingVertical: 7,
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#f9731618",
+                    }}
+                  >
+                    <View style={{
+                      width: 18, height: 18, borderRadius: 9,
+                      backgroundColor: m.isDone ? "#f97316" : "transparent",
+                      borderWidth: 1.5, borderColor: "#f97316",
+                      justifyContent: "center", alignItems: "center",
+                    }}>
+                      {m.isDone && <Text style={{ fontSize: 10, color: "#fff", fontWeight: "700" }}>✓</Text>}
+                    </View>
+                    <Text style={{
+                      flex: 1, fontSize: 13,
                       color: m.isDone ? "#f9731688" : "#1c1c1e",
                       textDecorationLine: m.isDone ? "line-through" : "none",
                       fontWeight: "500",
-                      lineHeight: 20,
-                    }}
-                  >
-                    {m.content}
-                  </Text>
-                  {m.isDone ? (
-                    <View
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        backgroundColor: "#f9731622",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: "#f97316",
-                          fontWeight: "700",
-                        }}
+                    }}>
+                      {m.content}
+                    </Text>
+                    {!m.isDone && (
+                      <TouchableOpacity
+                        onPress={() => toggleMission(m.id)}
+                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: "#f97316", borderRadius: 6 }}
                       >
-                        완료 ✓
-                      </Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => toggleMission(m.id)}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        backgroundColor: "#f97316",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: "#fff",
-                          fontWeight: "700",
-                        }}
-                      >
-                        완료
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-              {missions.every((m) => m.isDone) && (
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: "#f97316",
-                    textAlign: "center",
-                    marginTop: 10,
-                    fontWeight: "700",
-                  }}
-                >
-                  모든 챌린지 완료! 정말 대단해요
+                        <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>완료</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))
+              )}
+              {missions.length > 0 && missions.every((m) => m.isDone) && (
+                <Text style={{ fontSize: 12, color: "#f97316", textAlign: "center", marginTop: 8, fontWeight: "700" }}>
+                  모두 완료! 🎉
                 </Text>
               )}
-            </>
-          )}
-        </View>
-
-        {/* 운동 피드백 */}
-        {latestWorkoutFeedback && (
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/member/workout" as any)}
-            style={{
-              backgroundColor: Colors.greenLight,
-              borderRadius: 14,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderWidth: 1,
-              borderColor: Colors.green + "44",
-              marginBottom: 10,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 4,
-              }}
-            >
-              <Text
-                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
-              >
-                트레이너 운동 피드백
-              </Text>
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: Colors.textMuted,
-                  marginLeft: "auto",
-                }}
-              >
-                {latestWorkoutFeedback.date}
-              </Text>
             </View>
-            <Text
-              style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }}
-              numberOfLines={2}
-            >
-              {latestWorkoutFeedback.content}
-            </Text>
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* 식단 피드백 — 챌린지 바로 아래 */}
-        {latestFeedback && (
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/member/diet")}
-            style={{
-              backgroundColor: Colors.greenLight,
-              borderRadius: 14,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderWidth: 1,
-              borderColor: Colors.green + "44",
-              marginBottom: 10,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 4,
-              }}
-            >
-              <Text
-                style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}
-              >
-                트레이너 식단 피드백
-              </Text>
-              <Text
+        {activeTab === "식단" && (
+          <View>
+            {latestFeedback ? (
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/member/diet")}
                 style={{
-                  fontSize: 10,
-                  color: Colors.textMuted,
-                  marginLeft: "auto",
+                  backgroundColor: Colors.greenLight,
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: Colors.green + "44",
+                  marginBottom: 10,
                 }}
               >
-                {latestFeedback.date}
-              </Text>
-            </View>
-            <Text
-              style={{ fontSize: 13, color: Colors.text, lineHeight: 18 }}
-              numberOfLines={2}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 식단 피드백</Text>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestFeedback.date}</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={3}>
+                  {latestFeedback.content}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>
+                  식단 피드백이 없어요
+                </Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                  트레이너가 식단 피드백을 남기면 여기에 표시돼요
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/member/diet")}
+              style={{
+                borderWidth: 1, borderColor: Colors.border,
+                borderRadius: 10, paddingVertical: 10,
+                alignItems: "center",
+              }}
             >
-              {latestFeedback.content}
-            </Text>
-          </TouchableOpacity>
+              <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: "600" }}>식단 전체 보기 →</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
+        {activeTab === "운동" && (
+          <View>
+            {latestWorkoutFeedback ? (
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/member/workout" as any)}
+                style={{
+                  backgroundColor: Colors.greenLight,
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: Colors.green + "44",
+                  marginBottom: 10,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 운동 피드백</Text>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestWorkoutFeedback.date}</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={3}>
+                  {latestWorkoutFeedback.content}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>
+                  운동 피드백이 없어요
+                </Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                  트레이너가 운동 피드백을 남기면 여기에 표시돼요
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/member/workout" as any)}
+              style={{
+                borderWidth: 1, borderColor: Colors.border,
+                borderRadius: 10, paddingVertical: 10,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: "600" }}>운동일지 전체 보기 →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
       </ScrollView>
 

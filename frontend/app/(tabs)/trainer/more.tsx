@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Clipboard,
@@ -21,7 +23,10 @@ import { Colors } from "../../../constants/Colors";
 import { API_URL, ENDPOINTS } from "../../../constants/api";
 import { PRIVACY_TEXT, TERMS_TEXT } from "../../../constants/terms";
 import { apiGet } from "../../../hooks/useApi";
+import { syncAllData, saveSheetConfigToDB, deleteSheetConfigFromDB, restoreSheetConfigFromDB, initializeSpreadsheet } from "../../../hooks/useGoogleSheets";
 import { TrainerProfile } from "../../../types";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -48,9 +53,30 @@ export default function TrainerMoreScreen() {
   const [affiliateVerifying, setAffiliateVerifying] = useState(false);
   const [isAffiliated, setIsAffiliated] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [plan, setPlan] = useState<"FREE" | "PRO">("PRO");
   const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
+
+  // 구글 시트 연동
+  const [sheetsConnected, setSheetsConnected] = useState(false);
+  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [syncingSheets, setSyncingSheets] = useState(false);
+  const googleHandledRef = React.useRef(false); // 알림 중복 방지
+
+  // Google OAuth (expo-auth-session/providers/google — 시스템 브라우저 사용, Google 정책 준수)
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    iosClientId: "419852916314-onsu7560soqob0037r4plm62902rgh1l.apps.googleusercontent.com",
+    androidClientId: "419852916314-dglb7btdsamc7fivm1j4ilfnvlkv3ss3.apps.googleusercontent.com",
+    webClientId: "419852916314-pendk3p11p1eam9acjulj9gclraheejv.apps.googleusercontent.com",
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive.file",
+    ],
+    extraParams: {
+      access_type: "offline",
+      prompt: "consent",
+    },
+  });
 
   // 이용약관 / 개인정보처리방침 모달
   const [termsVisible, setTermsVisible] = useState(false);
@@ -71,19 +97,8 @@ export default function TrainerMoreScreen() {
   const [inquiries, setInquiries] = useState<any[]>([]);
 
   const fetchProfile = async () => {
-      // RevenueCat 구독 상태 확인
-      try {
-        if (Purchases && typeof Purchases.getCustomerInfo === "function") {
-          const info = await Purchases.getCustomerInfo();
-          const isPro =
-            typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
-          if (isPro) setPlan("PRO");
-        }
-      } catch (e) {
-        console.log("RevenueCat 상태 확인 실패:", e);
-      }
-
-      // 백엔드 plan도 확인 (RevenueCat 미인식 시 대비)
+      // 전체 무료 제공 중 (인앱 결제 비활성화) - trial_end_date만 표시용으로 읽어옴
+      setPlan("PRO");
       try {
         const jwt = await AsyncStorage.getItem("jwt");
         const homeRes = await fetch(`${API_URL}/api/trainer/home`, {
@@ -91,7 +106,6 @@ export default function TrainerMoreScreen() {
         });
         if (homeRes.ok) {
           const homeData = await homeRes.json();
-          if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
           setTrialEndDate(homeData.trialEndDate ?? null);
         }
       } catch {}
@@ -137,7 +151,121 @@ export default function TrainerMoreScreen() {
 
   useEffect(() => {
     fetchProfile();
+    checkSheetsConnection();
   }, []);
+
+  // Google OAuth 응답 처리
+  useEffect(() => {
+    if (!googleResponse) return;
+    if (googleHandledRef.current) return; // 중복 처리 방지
+    googleHandledRef.current = true;
+
+    if (googleResponse.type === "success") {
+      const { authentication } = googleResponse;
+      if (authentication?.accessToken) {
+        handleGoogleAuthSuccess(authentication.accessToken, authentication.refreshToken ?? null);
+      } else {
+        Alert.alert("연동 실패", "Google 인증에 실패했어요. 다시 시도해주세요.");
+      }
+    } else if (googleResponse.type === "error") {
+      Alert.alert("연동 실패", googleResponse.error?.message ?? "Google 인증 오류");
+    }
+    // dismissed / cancel은 알림 없이 조용히 무시
+  }, [googleResponse]);
+
+  const handleGoogleAuthSuccess = async (accessToken: string, refreshToken: string | null) => {
+    try {
+      await AsyncStorage.setItem("google_sheets_token", accessToken);
+      await AsyncStorage.setItem("google_sheets_token_expiry", String(Date.now() + 3500 * 1000));
+      if (refreshToken) {
+        await AsyncStorage.setItem("google_sheets_refresh_token", refreshToken);
+      }
+
+      // 연동 즉시 스프레드시트 생성 (FitLog_000트레이너)
+      const trainerName = profile?.name ?? "트레이너";
+      const sheetId = await initializeSpreadsheet(trainerName);
+      if (sheetId) setSpreadsheetId(sheetId);
+
+      setSheetsConnected(true);
+      Alert.alert(
+        "연동 완료",
+        `Google Sheets가 연동됐어요.\nFitLog_${trainerName}트레이너 시트가 생성됐어요.\n\n기존 데이터를 동기화하려면 '기존 데이터 동기화'를 눌러주세요.`
+      );
+    } catch {
+      Alert.alert("오류", "토큰 저장 중 오류가 발생했어요.");
+    }
+  };
+
+  const checkSheetsConnection = async () => {
+    // 1) AsyncStorage에 토큰 있으면 그대로 사용
+    let token = await AsyncStorage.getItem("google_sheets_token");
+    let id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+
+    // 2) 없으면 DB에서 복원 시도 (다른 기기나 재설치 후)
+    if (!token) {
+      const restored = await restoreSheetConfigFromDB();
+      if (restored) {
+        token = await AsyncStorage.getItem("google_sheets_token");
+        id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+      }
+    }
+
+    setSheetsConnected(!!token);
+    setSpreadsheetId(id);
+  };
+
+  const connectGoogleSheets = async () => {
+    googleHandledRef.current = false; // 새 연동 시도마다 리셋
+    await googlePromptAsync();
+  };
+
+  const disconnectGoogleSheets = () => {
+    Alert.alert("연동 해제", "Google Sheets 연동을 해제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "해제",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.multiRemove([
+            "google_sheets_token",
+            "google_sheets_token_expiry",
+            "google_sheets_refresh_token",
+            "google_sheets_spreadsheet_id",
+          ]);
+          // DB에서도 삭제
+          await deleteSheetConfigFromDB();
+          setSheetsConnected(false);
+          setSpreadsheetId(null);
+        },
+      },
+    ]);
+  };
+
+  const openSpreadsheet = async () => {
+    const id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+    if (id) {
+      Linking.openURL(`https://docs.google.com/spreadsheets/d/${id}`);
+    } else {
+      Alert.alert("시트 없음", "아직 동기화된 데이터가 없어요.\n기존 데이터 동기화를 먼저 실행해주세요.");
+    }
+  };
+
+  const handleSyncAllData = async () => {
+    if (syncingSheets) return;
+    setSyncingSheets(true);
+    try {
+      const trainerName = profile?.name ?? "트레이너";
+      const result = await syncAllData(trainerName);
+      const id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+      setSpreadsheetId(id);
+
+      Alert.alert(result.success ? "동기화 완료" : "동기화 실패", result.message);
+    } catch {
+      Alert.alert("오류", "동기화 중 오류가 발생했어요.");
+    } finally {
+      setSyncingSheets(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -332,101 +460,64 @@ export default function TrainerMoreScreen() {
           더보기
         </Text>
 
-        {/* 프로필 카드 */}
+        {/* 프로필 + 코드 통합 카드 */}
         <View
           style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 16,
-            padding: 14,
-            marginBottom: 10,
+            backgroundColor: "#fff",
+            borderRadius: 20,
+            marginBottom: 16,
             borderWidth: 1,
             borderColor: Colors.border,
+            overflow: "hidden",
+            shadowColor: "#000",
+            shadowOpacity: 0.05,
+            shadowOffset: { width: 0, height: 2 },
+            shadowRadius: 8,
+            elevation: 2,
           }}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 10,
-            }}
-          >
+          {/* 상단: 아바타 + 이름/헬스장 + 수정 */}
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 18, gap: 14 }}>
             <View
               style={{
-                width: 46,
-                height: 46,
-                borderRadius: 14,
+                width: 54,
+                height: 54,
+                borderRadius: 17,
                 backgroundColor: Colors.green,
                 justifyContent: "center",
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 20, fontWeight: "900", color: "#fff" }}>
+              <Text style={{ fontSize: 22, fontWeight: "900", color: "#fff" }}>
                 {profile?.name?.[0] ?? "T"}
               </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontWeight: "900",
-                    color: Colors.text,
-                  }}
-                >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
-                {plan === "PRO" &&
-                  (trialEndDate ? (
-                    <View
-                      style={{
-                        backgroundColor: "#FEF3C7",
-                        borderWidth: 1,
-                        borderColor: "#FCD34D",
-                        paddingHorizontal: 7,
-                        paddingVertical: 2,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: "800",
-                          color: "#D97706",
-                        }}
-                      >
-                        무료체험
-                      </Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={{
-                        backgroundColor: Colors.green,
-                        paddingHorizontal: 7,
-                        paddingVertical: 2,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: "800",
-                          color: "#fff",
-                        }}
-                      >
-                        PRO
-                      </Text>
-                    </View>
-                  ))}
+                {plan === "PRO" && (
+                  <View
+                    style={{
+                      backgroundColor: trialEndDate ? "#FEF3C7" : Colors.green,
+                      borderWidth: trialEndDate ? 1 : 0,
+                      borderColor: "#FCD34D",
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "900", color: trialEndDate ? "#D97706" : "#fff" }}>
+                      {trialEndDate ? "무료체험" : "PRO"}
+                    </Text>
+                  </View>
+                )}
               </View>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                  {profile?.gymName ?? "-"}
-                </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.gymName ?? "-"}</Text>
                 {isAffiliated && (
-                  <View style={{ backgroundColor: Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <View style={{ backgroundColor: Colors.green + "20", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
                     <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.green }}>제휴</Text>
                   </View>
                 )}
@@ -435,391 +526,137 @@ export default function TrainerMoreScreen() {
             <TouchableOpacity
               onPress={() => setShowEditModal(true)}
               style={{
-                backgroundColor: "#fff",
                 borderWidth: 1,
                 borderColor: Colors.border,
-                paddingHorizontal: 13,
-                paddingVertical: 7,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
                 borderRadius: 10,
               }}
             >
-              <Text
-                style={{
-                  color: Colors.textSub,
-                  fontSize: 12,
-                  fontWeight: "800",
-                }}
-              >
-                수정
-              </Text>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub }}>수정</Text>
             </TouchableOpacity>
           </View>
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 6,
-              flexWrap: "wrap",
-              marginBottom: 8,
-            }}
-          >
+
+          {/* 요일 + 시간 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingBottom: 14, gap: 6, flexWrap: "wrap" }}>
             {(profile?.workDays || "").split(",").map((d) => (
               <View
                 key={d}
                 style={{
                   backgroundColor: Colors.greenLight,
-                  borderWidth: 1,
-                  borderColor: Colors.green + "44",
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 7,
+                  paddingHorizontal: 9,
+                  paddingVertical: 4,
+                  borderRadius: 8,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.green,
-                    fontWeight: "700",
-                  }}
-                >
-                  {d.trim()}
-                </Text>
+                <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>{d.trim()}</Text>
               </View>
             ))}
-          </View>
-          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-            {profile?.startTime} ~ {profile?.endTime}
-          </Text>
-        </View>
-        {/* 트레이너 코드 */}
-        <View
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 14,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            marginBottom: 14,
-            borderWidth: 1,
-            borderColor: Colors.border,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <View>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: Colors.textMuted,
-                marginBottom: 3,
-              }}
-            >
-              내 트레이너 코드
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: Colors.text,
-                letterSpacing: 2,
-              }}
-            >
-              {profile?.trainerCode ?? "---"}
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginLeft: 2 }}>
+              {profile?.startTime} ~ {profile?.endTime}
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={copyCode}
-            style={{
-              backgroundColor: Colors.green,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 9,
-            }}
-          >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
-              복사
-            </Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* 플랜 섹션 */}
-        <SectionHeader title="플랜" />
-        {plan === "PRO" && !trialEndDate ? (
-          // 정식 구독 PRO
-          <View
-            style={{
-              backgroundColor: Colors.greenLight,
-              borderRadius: 12,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: Colors.green + "44",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: Colors.green,
-                paddingHorizontal: 7,
-                paddingVertical: 2,
-                borderRadius: 6,
-              }}
-            >
-              <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>
-                PRO
+          {/* 구분선 */}
+          <View style={{ height: 1, backgroundColor: Colors.border }} />
+
+          {/* 트레이너 코드 */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14 }}>
+            <View>
+              <Text style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+                내 트레이너 코드
+              </Text>
+              <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.text, letterSpacing: 4 }}>
+                {profile?.trainerCode ?? "---"}
               </Text>
             </View>
-            <Text
-              style={{ fontSize: 13, fontWeight: "700", color: Colors.green, flex: 1 }}
-            >
-              PRO 플랜 구독 중 · 회원 무제한
-            </Text>
             <TouchableOpacity
-              onPress={() =>
-                Alert.alert(
-                  "구독 관리",
-                  "구독을 취소하면 현재 결제 기간 만료 후 무료 플랜(회원 5명)으로 전환돼요.",
-                  [
-                    { text: "닫기", style: "cancel" },
-                    {
-                      text: "구독 취소하기",
-                      style: "destructive",
-                      onPress: () => {
-                        const url = Platform.OS === "ios"
-                          ? "https://apps.apple.com/account/subscriptions"
-                          : "https://play.google.com/store/account/subscriptions";
-                        Linking.openURL(url);
-                      },
-                    },
-                  ]
-                )
-              }
+              onPress={copyCode}
+              style={{
+                backgroundColor: Colors.green,
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: 12,
+              }}
             >
-              <Text style={{ fontSize: 12, color: Colors.textMuted }}>구독 취소</Text>
+              <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>복사</Text>
             </TouchableOpacity>
           </View>
-        ) : plan === "PRO" && trialEndDate ? (
-          // 무료 체험 중
-          (() => {
-            const ended = new Date(trialEndDate);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            ended.setHours(0, 0, 0, 0);
-            const daysLeft = Math.max(
-              0,
-              Math.ceil(
-                (ended.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-              ),
-            );
-            return (
-              <View
-                style={{
-                  backgroundColor: "#FFFBEB",
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "#FCD34D",
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <View
-                      style={{
-                        backgroundColor: "#F59E0B",
-                        paddingHorizontal: 7,
-                        paddingVertical: 2,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text
-                        style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}
-                      >
-                        무료체험
-                      </Text>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: "#92400E",
-                      }}
-                    >
-                      {daysLeft}일 남았어요 · 회원 무제한 이용 중
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setPaymentVisible(true)}
-                    style={{
-                      backgroundColor: "#F59E0B",
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
-                      PRO 구독
-                    </Text>
-                  </TouchableOpacity>
+        </View>
+
+        {/* 플랜 */}
+        <FlatSectionHeader title="플랜" />
+        <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
+          <FlatRow
+            label="현재 플랜"
+            right={
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ backgroundColor: "#F59E0B", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>무료체험</Text>
                 </View>
-                <Text style={{ fontSize: 11, color: "#B45309" }}>
-                  체험 종료 후 무료 플랜(회원 5명)으로 전환돼요.{"\n"}구독하면
-                  계속 무제한으로 사용할 수 있어요.
-                </Text>
+                <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "700" }}>30일 무료 체험 중</Text>
               </View>
-            );
-          })()
-        ) : (
-          <View
-            style={{
-              backgroundColor: Colors.bgSub,
-              borderRadius: 14,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "800",
-                    color: Colors.text,
-                  }}
+            }
+          />
+        </View>
+
+        {/* 연동 */}
+        <FlatSectionHeader title="연동" />
+        <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
+          <FlatRow
+            label="Google Sheets"
+            sublabel={sheetsConnected ? "매출/운동일지 자동 업로드 중" : "연동하면 데이터를 자동으로 시트에 저장해요"}
+            right={
+              sheetsConnected ? (
+                <TouchableOpacity
+                  onPress={disconnectGoogleSheets}
+                  style={{ borderWidth: 1, borderColor: Colors.red + "88", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7 }}
                 >
-                  PRO 플랜
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.textMuted,
-                    marginTop: 2,
-                  }}
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.red }}>연동 해제</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={connectGoogleSheets}
+                  style={{ backgroundColor: Colors.green, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7 }}
                 >
-                  회원 무제한 · 월 14,900원 · 첫 가입 1개월 무료
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setPaymentVisible(true)}
-                style={{
-                  backgroundColor: Colors.green,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 10,
-                }}
-              >
-                <Text
-                  style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}
-                >
-                  PRO 구독
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ height: 1, backgroundColor: Colors.border }} />
-            <Text
-              style={{
-                fontSize: 11,
-                color: Colors.textMuted,
-                paddingHorizontal: 14,
-                paddingVertical: 9,
-              }}
-            >
-              현재 무료 플랜 · 회원 최대 5명
-            </Text>
-          </View>
-        )}
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>연동하기</Text>
+                </TouchableOpacity>
+              )
+            }
+          />
+          {sheetsConnected && (
+            <>
+              <FlatRow label="FitLog 데이터 시트 열기" onPress={openSpreadsheet} showArrow />
+              <FlatRow
+                label={syncingSheets ? "동기화 중..." : "기존 데이터 동기화"}
+                onPress={handleSyncAllData}
+                showArrow
+              />
+            </>
+          )}
+        </View>
 
         {/* 앱 정보 */}
-        <SectionHeader title="앱 정보" />
-        <View
-          style={{
-            backgroundColor: Colors.bgSub,
-            borderRadius: 14,
-            overflow: "hidden",
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: Colors.border,
-          }}
-        >
-          <InfoRow label="버전" value="1.0.0" />
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <TouchableOpacity
-            onPress={openGuide}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: 16,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: Colors.text }}>사용가이드</Text>
-            <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
-          </TouchableOpacity>
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <TouchableOpacity
-            onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/terms.html")}
-          >
-            <InfoRow label="이용약관" />
-          </TouchableOpacity>
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <TouchableOpacity
-            onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/privacy.html")}
-          >
-            <InfoRow label="개인정보처리방침" />
-          </TouchableOpacity>
-          <View style={{ height: 1, backgroundColor: Colors.border }} />
-          <TouchableOpacity
-            onPress={() => {
-              setInquiryTab("write");
-              setInquiryVisible(true);
-              fetchInquiries();
-            }}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: 16,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: Colors.text }}>문의하기</Text>
-            <Text style={{ fontSize: 16, color: Colors.textMuted }}>›</Text>
-          </TouchableOpacity>
+        <FlatSectionHeader title="앱 정보" />
+        <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
+          <FlatRow label="버전" right={<Text style={{ fontSize: 13, color: Colors.textMuted }}>1.0.0</Text>} />
+          <FlatRow label="사용가이드" onPress={openGuide} showArrow />
+          <FlatRow label="이용약관" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/terms.html")} showArrow />
+          <FlatRow label="개인정보처리방침" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/privacy.html")} showArrow />
+          <FlatRow
+            label="문의하기"
+            onPress={() => { setInquiryTab("write"); setInquiryVisible(true); fetchInquiries(); }}
+            showArrow
+            last
+          />
         </View>
 
         {/* 로그아웃 */}
         <TouchableOpacity
           onPress={handleLogout}
-          style={{
-            backgroundColor: Colors.redBg,
-            borderRadius: 14,
-            padding: 16,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: Colors.red + "44",
-          }}
+          style={{ paddingVertical: 16, borderTopWidth: 1, borderColor: Colors.border, marginTop: 8 }}
         >
-          <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red, textAlign: "center" }}>
             로그아웃
           </Text>
         </TouchableOpacity>
@@ -1162,9 +999,9 @@ export default function TrainerMoreScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
-        {/* 업그레이드 바텀시트 */}
+        {/* 업그레이드 바텀시트 (비활성화 - 전체 무료 제공 중) */}
         <Modal
-          visible={paymentVisible}
+          visible={false}
           transparent
           animationType="slide"
           onRequestClose={() => setPaymentVisible(false)}
@@ -1767,4 +1604,64 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
       )}
     </View>
   );
+}
+
+function FlatSectionHeader({ title }: { title: string }) {
+  return (
+    <Text
+      style={{
+        fontSize: 12,
+        fontWeight: "700",
+        color: Colors.textMuted,
+        marginTop: 20,
+        marginBottom: 4,
+        paddingHorizontal: 4,
+      }}
+    >
+      {title}
+    </Text>
+  );
+}
+
+function FlatRow({
+  label,
+  sublabel,
+  right,
+  onPress,
+  showArrow,
+  last,
+}: {
+  label: string;
+  sublabel?: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
+  showArrow?: boolean;
+  last?: boolean;
+}) {
+  const inner = (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 14,
+        paddingHorizontal: 4,
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: Colors.border,
+      }}
+    >
+      <View style={{ flex: 1, marginRight: 8 }}>
+        <Text style={{ fontSize: 14, color: Colors.text }}>{label}</Text>
+        {sublabel ? (
+          <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>{sublabel}</Text>
+        ) : null}
+      </View>
+      {right ?? (showArrow ? <Text style={{ fontSize: 18, color: Colors.textMuted }}>›</Text> : null)}
+    </View>
+  );
+
+  if (onPress) {
+    return <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity>;
+  }
+  return inner;
 }

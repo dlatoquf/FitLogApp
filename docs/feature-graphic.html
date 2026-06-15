@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card {
+      width: 1024px;
+      height: 500px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .bg-circle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(46, 139, 87, 0.06);
+    }
+    .bg-circle.c1 { width: 600px; height: 600px; top: -200px; right: -150px; }
+    .bg-circle.c2 { width: 400px; height: 400px; bottom: -180px; left: -100px; }
+    .tagline {
+      font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 22px;
+      font-weight: 500;
+      color: #888;
+      letter-spacing: 0.02em;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+    }
+    .logo-img {
+      width: 110px;
+      height: 110px;
+      border-radius: 24px;
+    }
+    .logo-text {
+      font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 80px;
+      font-weight: 800;
+      color: #2e8b57;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+    .sub {
+      font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: #aaa;
+      margin-top: 22px;
+      letter-spacing: 0.05em;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="bg-circle c1"></div>
+    <div class="bg-circle c2"></div>
+    <p class="tagline">기록이 곧 성장이다.</p>
+    <div class="logo-row">
+      <img class="logo-img" src="logo.png" />
+      <span class="logo-text">FitLog</span>
+    </div>
+    <p class="sub">트레이너와 회원을 하나의 기록으로 연결하다</p>
+  </div>
+</body>
+</html>

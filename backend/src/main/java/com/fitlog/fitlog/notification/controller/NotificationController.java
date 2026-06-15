@@ -100,7 +100,8 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-        long count = notificationRepository.countByUserAndIsReadFalse(user);
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        long count = notificationRepository.countByUserAndIsReadFalseAndCreatedAtAfter(user, sevenDaysAgo);
         return ResponseEntity.ok(Map.of("count", count));
     }
 

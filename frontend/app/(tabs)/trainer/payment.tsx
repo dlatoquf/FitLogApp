@@ -12,6 +12,7 @@ import {
 import { Colors } from "../../../constants/Colors";
 import { ENDPOINTS } from "../../../constants/api";
 import { apiGet, apiPost } from "../../../hooks/useApi";
+import { syncAllData } from "../../../hooks/useGoogleSheets";
 import { Member, PaymentHistory, PtPackage } from "../../../types";
 
 export default function TrainerPaymentScreen() {
@@ -62,9 +63,14 @@ export default function TrainerPaymentScreen() {
         packageId: selectedPackageId,
       });
       setShowModal(false);
+
+      // Google Sheets — 결제 등록 후 전체 동기화 (백그라운드)
+      syncAllData().catch(() => {});
+
       setSelectedMemberId(null);
       setSelectedPackageId(null);
       fetchData(true);
+
       Alert.alert("완료", "결제가 등록됐어요! 🎉");
     } catch (e: any) {
       Alert.alert("오류", e.message);

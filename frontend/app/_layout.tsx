@@ -4,7 +4,8 @@ import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
 import { router, Stack, useRootNavigationState } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Text, TouchableOpacity } from "react-native";
+import { Animated, AppState, Text, TouchableOpacity } from "react-native";
+import * as Notifications from "expo-notifications";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
@@ -144,8 +145,42 @@ export default function RootLayout() {
     setInitialNotif(null);
   }, [navigationState?.key, initialNotif]);
 
+  // 앱 포그라운드 진입 시 뱃지를 읽지 않은 알림 수로 동기화
   useEffect(() => {
+    const syncBadge = async () => {
+      console.log("[Badge] syncBadge 시작");
+      try {
+        const jwt = await AsyncStorage.getItem("jwt");
+        if (!jwt) { console.log("[Badge] JWT 없음, 스킵"); return; }
+        console.log("[Badge] unread-count API 호출");
+        const res = await fetch(`${API_URL}/api/notifications/unread-count`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        console.log("[Badge] API 응답 상태:", res.status);
+        if (res.ok) {
+          const data = await res.json();
+          const count = data.count ?? 0;
+          console.log("[Badge] 미읽음 수:", count);
+          await Notifications.setBadgeCountAsync(count);
+          console.log("[Badge] setBadgeCountAsync 완료:", count);
+        }
+      } catch (e) {
+        console.error("[Badge] 오류:", e);
+      }
+    };
+
+    syncBadge();
+    const sub = AppState.addEventListener("change", (state) => {
+      console.log("[AppState] 상태 변경:", state);
+      if (state === "active") syncBadge();
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    console.log("[Init] KakaoSDK 초기화 시작");
     initializeKakaoSDK("e889ccffb6096521a6b49b9774f4d9ab");
+    console.log("[Init] FCM 초기화 시작");
     initFCM();
 
     const markAllNotificationsRead = async () => {

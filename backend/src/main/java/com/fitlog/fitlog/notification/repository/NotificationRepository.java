@@ -19,8 +19,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             LocalDateTime createdAt
     );
 
-    // 안 읽은 알림 개수
-    long countByUserAndIsReadFalse(User user);
+    // 안 읽은 알림 개수 (7일 이내)
+    long countByUserAndIsReadFalseAndCreatedAtAfter(User user, LocalDateTime createdAt);
 
     // 전체 읽음 처리
     @Transactional

@@ -733,6 +733,30 @@ public class WorkoutLogController {
     }
 
     //  회원용: JWT → userId → member 한 번에
+    // ── Sheets 동기화: 트레이너의 전체 운동일지 (해제된 회원 포함, 30일 이내) ──
+    @Transactional(readOnly = true)
+    @GetMapping("/trainer/all")
+    public ResponseEntity<List<Map<String, Object>>> getAllLogsForTrainer(
+            @RequestHeader("Authorization") String authorization) {
+        User trainerUser = getUserFromToken(authorization);
+        Trainer trainer = trainerRepository.findByUser(trainerUser)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
+        List<WorkoutLog> logs = workoutLogRepository.findAllByTrainer(trainer);
+        List<Map<String, Object>> result = toResponse(logs);
+        // 회원 이름 추가
+        for (int i = 0; i < logs.size(); i++) {
+            WorkoutLog log = logs.get(i);
+            String memberName = null;
+            if (log.getMember() != null && log.getMember().getUser() != null) {
+                memberName = log.getMember().getUser().getName();
+            } else if (log.getMember() != null) {
+                memberName = "회원";
+            }
+            result.get(i).put("memberName", memberName);
+        }
+        return ResponseEntity.ok(result);
+    }
+
     private Member getMemberFromToken(String authorization) {
         String token = authorization.replace("Bearer ", "");
         Long userId  = jwtService.getUserIdFromToken(token);

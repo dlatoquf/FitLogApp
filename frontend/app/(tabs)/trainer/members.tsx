@@ -63,7 +63,7 @@ export default function TrainerMembersScreen() {
   const [allMembers, setAllMembers] = useState<DisplayMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [plan, setPlan] = useState<"FREE" | "PRO">("PRO");
   const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [search, setSearch] = useState("");
@@ -109,12 +109,8 @@ export default function TrainerMembersScreen() {
         fetch(`${API_URL}/api/trainer/home`, { headers }),
       ]);
 
-      if (homeRes.ok) {
-        const homeData = await homeRes.json();
-        if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
-        else setPlan("FREE");
-        setTrialEndDate(homeData.trialEndDate ?? null);
-      }
+      // 전체 무료 제공 중 - plan 항상 PRO
+      setPlan("PRO");
 
       const linked: DisplayMember[] = linkedRes.ok
         ? (await linkedRes.json()).map((m: any) => ({
@@ -238,11 +234,6 @@ export default function TrainerMembersScreen() {
 
   // ── 기존 회원 추가 ───────────────────────────────────────────────────────
   const addManualMember = async () => {
-    if (plan === "FREE" && allMembers.length >= 5) {
-      setAddModal(false);
-      setPaymentVisible(true);
-      return;
-    }
     if (!addName.trim()) {
       Alert.alert("알림", "이름을 입력해주세요.");
       return;
@@ -477,13 +468,6 @@ export default function TrainerMembersScreen() {
             {/* 회원 추가 버튼 */}
             <TouchableOpacity
               onPress={() => {
-                const activeCount = allMembers.filter(
-                  (m) => !isInactive(m),
-                ).length;
-                if (plan === "FREE" && activeCount >= 5) {
-                  setPaymentVisible(true);
-                  return;
-                }
                 setAddName("");
                 setAddPhone("");
                 setAddPt("");
@@ -695,20 +679,11 @@ export default function TrainerMembersScreen() {
           displayed.map((m, index) => {
             const color = ptColor(m.ptRemaining, m.ptTotal);
             const graceDaysLeft = ptGraceDaysLeft(m);
-            const isLocked = plan === "FREE" && index >= 5;
 
             return (
               <TouchableOpacity
                 key={m.key}
                 onPress={() => {
-                  if (isLocked) {
-                    Alert.alert(
-                      "PRO 플랜 필요",
-                      "무료 플랜은 회원 5명까지 관리할 수 있어요.\nPRO로 업그레이드하면 무제한으로 관리할 수 있어요.",
-                      [{ text: "확인" }]
-                    );
-                    return;
-                  }
                   if (m.isLinked) {
                     router.push(
                       `/(tabs)/trainer/member-detail?id=${m.id}` as any,
@@ -722,14 +697,13 @@ export default function TrainerMembersScreen() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: isLocked ? "#F9FAFB" : Colors.bgSub,
+                  backgroundColor: Colors.bgSub,
                   borderRadius: 10,
                   paddingVertical: 9,
                   paddingHorizontal: 12,
                   marginBottom: 6,
                   borderWidth: 1,
-                  borderColor: isLocked ? "#E5E7EB" : Colors.border,
-                  opacity: isLocked ? 0.5 : 1,
+                  borderColor: Colors.border,
                 }}
               >
                 {/* 아바타 */}
@@ -744,13 +718,9 @@ export default function TrainerMembersScreen() {
                     marginRight: 10,
                   }}
                 >
-                  {isLocked ? (
-                    <Text style={{ fontSize: 14 }}>🔒</Text>
-                  ) : (
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
-                      {m.name[0]}
-                    </Text>
-                  )}
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
+                    {m.name[0]}
+                  </Text>
                 </View>
 
                 {/* 이름 + 뱃지 + 메모 버튼 */}
@@ -835,32 +805,6 @@ export default function TrainerMembersScreen() {
                       </Text>
                     </>
                   ) : m.isLinked ? (
-                    plan === "FREE" ? (
-                      <View
-                        style={{
-                          backgroundColor: Colors.goldBg,
-                          borderWidth: 1,
-                          borderColor: Colors.gold + "44",
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 6,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 3,
-                        }}
-                      >
-                        <Text style={{ fontSize: 9, color: Colors.gold }}>🔒</Text>
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: Colors.gold,
-                            fontWeight: "700",
-                          }}
-                        >
-                          PT 미등록
-                        </Text>
-                      </View>
-                    ) : (
                     <TouchableOpacity
                       onPress={(e) => {
                         e.stopPropagation();
@@ -887,7 +831,6 @@ export default function TrainerMembersScreen() {
                         PT 미등록
                       </Text>
                     </TouchableOpacity>
-                    )
                   ) : (
                     <View
                       style={{
@@ -1593,9 +1536,9 @@ export default function TrainerMembersScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── 업그레이드 바텀시트 ──────────────────────────────────────────── */}
+      {/* ── 업그레이드 바텀시트 (비활성화 - 전체 무료 제공 중) ──────────────────────────────────────────── */}
       <Modal
-        visible={paymentVisible}
+        visible={false}
         transparent
         animationType="slide"
         onRequestClose={() => setPaymentVisible(false)}

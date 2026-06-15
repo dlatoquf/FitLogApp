@@ -28,7 +28,8 @@ public interface PtContractRepository extends JpaRepository<PtContract, Long> {
     List<PtContract> findAllByTrainerWithMember(@Param("trainer") Trainer trainer);
 
     // 연동+미연동 전체 계약 조회 (revenue 통합 계산용)
-    @Query("SELECT p FROM PtContract p LEFT JOIN FETCH p.member m LEFT JOIN FETCH m.user LEFT JOIN FETCH p.manualMember mm WHERE p.trainer = :trainer ORDER BY p.createdAt DESC")
+    // m.user는 @Transactional 세션 내 lazy load로 처리 (LEFT JOIN FETCH 체인 시 null 문제 회피)
+    @Query("SELECT DISTINCT p FROM PtContract p LEFT JOIN FETCH p.member m LEFT JOIN FETCH p.manualMember mm WHERE p.trainer = :trainer ORDER BY p.createdAt DESC")
     List<PtContract> findAllByTrainerWithAll(@Param("trainer") Trainer trainer);
 
     @Transactional

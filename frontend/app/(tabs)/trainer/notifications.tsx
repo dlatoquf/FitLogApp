@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     RefreshControl,
@@ -37,20 +38,20 @@ const NOTI_ICON: Record<string, string> = {
     GENERAL:           "🔔",
 };
 
-type TabKey = "전체" | "운동로그" | "식단" | "회원관리";
+type TabKey = "전체" | "수업" | "기록/피드백" | "회원/공지";
 
 const TABS: { key: TabKey; label: string }[] = [
-    { key: "전체",    label: "전체" },
-    { key: "운동로그", label: "운동로그" },
-    { key: "식단",    label: "식단" },
-    { key: "회원관리", label: "회원관리" },
+    { key: "전체",     label: "전체" },
+    { key: "수업",     label: "수업" },
+    { key: "기록/피드백", label: "기록/피드백" },
+    { key: "회원/공지", label: "회원/공지" },
 ];
 
 const TAB_TYPES: Record<TabKey, string[]> = {
-    전체:    [],
-    운동로그: ["WORKOUT_LOG", "MISSION_DONE"],
-    식단:    ["DIET_PHOTO"],
-    회원관리: ["NEW_MEMBER", "MEMBER_DELETED", "MEMBER_DISCONNECT", "BIRTHDAY_TODAY", "BIRTHDAY_WEEK", "SCHEDULE_REQUEST"],
+    전체:        [],
+    수업:        ["SCHEDULE_REQUEST"],
+    "기록/피드백": ["WORKOUT_LOG", "MISSION_DONE", "DIET_PHOTO"],
+    "회원/공지":  ["NEW_MEMBER", "MEMBER_DELETED", "MEMBER_DISCONNECT", "BIRTHDAY_TODAY", "BIRTHDAY_WEEK", "GENERAL"],
 };
 
 function formatTime(createdAt: string) {
@@ -144,7 +145,10 @@ export default function TrainerNotificationsScreen() {
         router.push("/(tabs)/trainer/home");
     };
 
-    useEffect(() => { fetchNotifications(); }, []);
+    useFocusEffect(useCallback(() => {
+        setActiveTab("전체");
+        fetchNotifications();
+    }, []));
 
     const filtered = activeTab === "전체"
         ? notifications
@@ -164,18 +168,18 @@ export default function TrainerNotificationsScreen() {
         <View style={{ flex: 1, backgroundColor: "#fff" }}>
             {/* 헤더 */}
             <View style={{
-                paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12,
+                paddingHorizontal: 20, paddingTop: 56, paddingBottom: 10,
                 borderBottomWidth: 1, borderBottomColor: Colors.border,
             }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                         <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 4 }}>
                             <Text style={{ fontSize: 20, color: Colors.text }}>←</Text>
                         </TouchableOpacity>
                         <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text }}>알림</Text>
                         {unreadCount > 0 && (
-                            <View style={{ backgroundColor: Colors.green, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
-                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>{unreadCount}</Text>
+                            <View style={{ backgroundColor: Colors.green, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>{unreadCount}</Text>
                             </View>
                         )}
                     </View>
@@ -191,9 +195,9 @@ export default function TrainerNotificationsScreen() {
                     </View>
                 </View>
 
-                {/* 탭 필터 */}
+                {/* 탭 */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, paddingHorizontal: 20 }}>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 6 }}>
                         {TABS.map(tab => {
                             const isActive = activeTab === tab.key;
                             const tabUnread = tab.key === "전체"
@@ -205,19 +209,19 @@ export default function TrainerNotificationsScreen() {
                                     onPress={() => setActiveTab(tab.key)}
                                     style={{
                                         flexDirection: "row", alignItems: "center", gap: 4,
-                                        paddingHorizontal: 14, paddingVertical: 7,
+                                        paddingHorizontal: 12, paddingVertical: 6,
                                         borderRadius: 20,
                                         backgroundColor: isActive ? Colors.text : Colors.bgSub,
                                         borderWidth: 1,
                                         borderColor: isActive ? Colors.text : Colors.border,
                                     }}
                                 >
-                                    <Text style={{ fontSize: 13, fontWeight: "600", color: isActive ? "#fff" : Colors.textSub }}>
+                                    <Text style={{ fontSize: 12, fontWeight: "600", color: isActive ? "#fff" : Colors.textSub }}>
                                         {tab.label}
                                     </Text>
                                     {tabUnread > 0 && (
                                         <View style={{ backgroundColor: Colors.green, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
-                                            <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{tabUnread}</Text>
+                                            <Text style={{ fontSize: 9, fontWeight: "700", color: "#fff" }}>{tabUnread}</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
@@ -232,10 +236,9 @@ export default function TrainerNotificationsScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchNotifications(true)} tintColor={Colors.green} />}
             >
                 {filtered.length === 0 ? (
-                    <View style={{ alignItems: "center", paddingVertical: 80 }}>
-                        <Text style={{ fontSize: 36, marginBottom: 12 }}>🔔</Text>
-                        <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 6 }}>알림이 없어요</Text>
-                        <Text style={{ fontSize: 13, color: Colors.textMuted }}>새 알림이 오면 여기에 표시돼요</Text>
+                    <View style={{ alignItems: "center", paddingVertical: 60 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>알림이 없어요</Text>
+                        <Text style={{ fontSize: 12, color: Colors.textMuted }}>새 알림이 오면 여기에 표시돼요</Text>
                     </View>
                 ) : (
                     filtered.map((n, idx) => (
@@ -244,40 +247,50 @@ export default function TrainerNotificationsScreen() {
                             onPress={() => handleNotificationPress(n)}
                             style={{
                                 flexDirection: "row",
-                                alignItems: "flex-start",
-                                gap: 12,
+                                alignItems: "center",
+                                gap: 10,
                                 paddingHorizontal: 20,
-                                paddingVertical: 14,
+                                paddingVertical: 10,
                                 backgroundColor: n.isRead ? "#fff" : Colors.greenLight,
-                                borderBottomWidth: idx === filtered.length - 1 ? 0 : 1,
+                                borderBottomWidth: 1,
                                 borderBottomColor: Colors.border,
                             }}
                         >
                             <View style={{
-                                width: 42, height: 42, borderRadius: 21,
+                                width: 36, height: 36, borderRadius: 18,
                                 backgroundColor: n.isRead ? Colors.bgSub : Colors.green + "22",
                                 justifyContent: "center", alignItems: "center",
-                                marginTop: 1,
+                                flexShrink: 0,
                             }}>
-                                <Text style={{ fontSize: 18 }}>{NOTI_ICON[n.type] ?? "🔔"}</Text>
+                                <Text style={{ fontSize: 16 }}>{NOTI_ICON[n.type] ?? "🔔"}</Text>
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={{
-                                    fontSize: 14, color: Colors.text,
+                                    fontSize: 13, color: Colors.text,
                                     fontWeight: n.isRead ? "400" : "600",
-                                    lineHeight: 20,
-                                }}>
+                                    lineHeight: 18,
+                                }} numberOfLines={2}>
                                     {n.content}
                                 </Text>
-                                <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
+                                <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
                                     {formatTime(n.createdAt)}
                                 </Text>
                             </View>
                             {!n.isRead && (
-                                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.green, marginTop: 8 }} />
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, flexShrink: 0 }} />
                             )}
                         </TouchableOpacity>
                     ))
+                )}
+
+                {/* 7일 만료 안내 */}
+                {filtered.length > 0 && (
+                    <View style={{ alignItems: "center", paddingVertical: 20, gap: 4 }}>
+                        <View style={{ width: 40, height: 1, backgroundColor: Colors.border }} />
+                        <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 6 }}>
+                            알림은 7일 후 자동으로 삭제돼요
+                        </Text>
+                    </View>
                 )}
             </ScrollView>
         </View>

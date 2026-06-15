@@ -15,6 +15,7 @@ import {
 import { Colors } from "../../../constants/Colors";
 import { API_URL, ENDPOINTS } from "../../../constants/api";
 import { apiGet, toDateKey } from "../../../hooks/useApi";
+import { uploadWorkoutLog } from "../../../hooks/useGoogleSheets";
 import { Exercise, ExerciseSet, Member } from "../../../types";
 
 const PRESET_EXERCISES = [
@@ -169,6 +170,15 @@ export default function FitLogWriteScreen() {
         const text = await res.text();
         throw new Error(text || "저장 실패");
       }
+
+      const memberName = members.find((m) => m.id === selectedMemberId)?.name ?? "회원";
+      uploadWorkoutLog({
+        memberName,
+        date,
+        exercises: validExercises,
+        memo: memo.trim() || undefined,
+        feedback: feedback.trim() || undefined,
+      });
 
       Alert.alert("완료", "FitLog가 저장됐어요! 🎉", [
         { text: "확인", onPress: () => router.back() },

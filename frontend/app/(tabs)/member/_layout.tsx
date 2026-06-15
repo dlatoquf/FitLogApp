@@ -6,7 +6,8 @@ import { Colors } from "../../../constants/Colors";
 
 export default function MemberTabLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === "android" ? Math.max(insets.bottom, 4) : 4;
+  const bottomPadding =
+    Platform.OS === "android" ? Math.max(insets.bottom, 4) : 4;
 
   return (
     <Tabs
@@ -106,6 +107,7 @@ export default function MemberTabLayout() {
       <Tabs.Screen name="schedule" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
       <Tabs.Screen name="notices" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
     </Tabs>
   );
 }
