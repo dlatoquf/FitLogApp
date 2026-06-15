@@ -179,34 +179,37 @@ export default function SignupScreen() {
             )}
           </Pressable>
 
-          {/* 이름 입력 */}
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "600",
-              color: Colors.textSub,
-              marginBottom: 6,
-            }}
-          >
-            이름
-          </Text>
-          <TextInput
-            placeholder="이름을 입력하세요"
-            placeholderTextColor={Colors.textPlaceholder}
-            value={name}
-            onChangeText={isAppleName ? undefined : setName}
-            editable={!isAppleName}
-            style={{
-              backgroundColor: isAppleName ? Colors.bgSub : Colors.bgSub,
-              borderWidth: 1.5,
-              borderColor: name.trim() ? Colors.green : Colors.border,
-              padding: 15,
-              borderRadius: 12,
-              marginBottom: 32,
-              fontSize: 15,
-              color: isAppleName ? Colors.textSub : Colors.text,
-            }}
-          />
+          {/* 이름 입력 — Apple 로그인이면 자동입력이므로 숨김 */}
+          {!isAppleName && (
+            <>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  color: Colors.textSub,
+                  marginBottom: 6,
+                }}
+              >
+                이름
+              </Text>
+              <TextInput
+                placeholder="이름을 입력하세요"
+                placeholderTextColor={Colors.textPlaceholder}
+                value={name}
+                onChangeText={setName}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderWidth: 1.5,
+                  borderColor: name.trim() ? Colors.green : Colors.border,
+                  padding: 15,
+                  borderRadius: 12,
+                  marginBottom: 32,
+                  fontSize: 15,
+                  color: Colors.text,
+                }}
+              />
+            </>
+          )}
 
           <View style={{ flex: 1 }} />
 
