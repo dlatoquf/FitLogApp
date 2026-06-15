@@ -623,6 +623,13 @@ export default function TrainerMoreScreen() {
               )
             }
           />
+          {!sheetsConnected && (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 16 }}>
+                💡 연동 시 Google 인증 화면에서 '고급' → '안전하지 않음으로 이동'을 눌러주세요. Google 앱 검증 진행 중으로 일시적으로 표시되는 안내입니다.
+              </Text>
+            </View>
+          )}
           {sheetsConnected && (
             <>
               <FlatRow label="FitLog 데이터 시트 열기" onPress={openSpreadsheet} showArrow />
