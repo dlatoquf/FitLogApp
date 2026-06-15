@@ -12,8 +12,8 @@ export const PLAY_STORE_URL =
 export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
 export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
-export const API_URL = "http://192.168.0.117:8080";
-export const ANALYTICS_URL = "http://192.168.0.182:8001";
+export const API_URL = "https://fitlog-api.duckdns.org";
+export const ANALYTICS_URL = "http://52.78.154.44:8001";
 /*운영 서버*/
 /*export const API_URL = "https://fitlog-api.duckdns.org";*/
 /*export const ANALYTICS_URL = "http://52.78.154.44:8001";*/
