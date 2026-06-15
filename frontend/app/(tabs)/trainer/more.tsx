@@ -496,22 +496,7 @@ export default function TrainerMoreScreen() {
                 <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
-                {plan === "PRO" && (
-                  <View
-                    style={{
-                      backgroundColor: trialEndDate ? "#FEF3C7" : Colors.green,
-                      borderWidth: trialEndDate ? 1 : 0,
-                      borderColor: "#FCD34D",
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                    }}
-                  >
-                    <Text style={{ fontSize: 10, fontWeight: "900", color: trialEndDate ? "#D97706" : "#fff" }}>
-                      {trialEndDate ? "무료체험" : "PRO"}
-                    </Text>
-                  </View>
-                )}
+                {/* 플랜 배지 — 추후 IAP 심사 통과 후 활성화 */}
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                 <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.gymName ?? "-"}</Text>
@@ -583,21 +568,11 @@ export default function TrainerMoreScreen() {
           </View>
         </View>
 
-        {/* 플랜 */}
-        <FlatSectionHeader title="플랜" />
+        {/* 플랜 — 추후 IAP 심사 통과 후 활성화 */}
+        {/* <FlatSectionHeader title="플랜" />
         <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
-          <FlatRow
-            label="현재 플랜"
-            right={
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <View style={{ backgroundColor: "#F59E0B", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>무료체험</Text>
-                </View>
-                <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "700" }}>30일 무료 체험 중</Text>
-              </View>
-            }
-          />
-        </View>
+          <FlatRow label="현재 플랜" right={null} />
+        </View> */}
 
         {/* 연동 */}
         <FlatSectionHeader title="연동" />
