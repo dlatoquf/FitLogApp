@@ -145,6 +145,13 @@ async function getOrCreateSpreadsheet(trainerName = "트레이너"): Promise<str
   const cached = await AsyncStorage.getItem(SPREADSHEET_ID_KEY);
   if (cached) return cached;
 
+  // AsyncStorage에 없으면 DB에서 복원 시도
+  const restored = await restoreSheetConfigFromDB();
+  if (restored) {
+    const fromDB = await AsyncStorage.getItem(SPREADSHEET_ID_KEY);
+    if (fromDB) return fromDB;
+  }
+
   const headers = await authHeaders();
   const res = await fetch(SHEETS_API, {
     method: "POST",
