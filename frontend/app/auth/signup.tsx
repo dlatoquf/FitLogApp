@@ -20,16 +20,36 @@ export default function SignupScreen() {
   const [isAppleName, setIsAppleName] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem("appleProvidedName").then((saved) => {
-      if (saved) {
-        setName(saved);
+    const loadName = async () => {
+      const appleName = await AsyncStorage.getItem("appleProvidedName");
+      if (appleName) {
+        setName(appleName);
         setIsAppleName(true);
-        AsyncStorage.removeItem("appleProvidedName");
+        await AsyncStorage.removeItem("appleProvidedName");
+        return;
       }
-    });
+      // Apple 두 번째 로그인 시 — JWT로 DB에서 이름 조회
+      const jwt = await AsyncStorage.getItem("jwt");
+      if (jwt) {
+        try {
+          const { API_URL } = await import("../../constants/api");
+          const res = await fetch(`${API_URL}/api/me`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.name) {
+              setName(data.name);
+              setIsAppleName(true);
+            }
+          }
+        } catch {}
+      }
+    };
+    loadName();
   }, []);
 
-  const canNext = selectedRole !== null && name.trim().length > 0;
+  const canNext = selectedRole !== null && (isAppleName || name.trim().length > 0);
 
   const handleNext = async () => {
     if (!canNext) return;
