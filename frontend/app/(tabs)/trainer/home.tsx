@@ -847,7 +847,14 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {/* 전체 무료 제공 중 - 플랜 뱃지 없음 */}
+              {data?.trialEndDate && (() => {
+                const days = Math.max(0, Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                return (
+                  <View style={{ backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FCD34D", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>무료체험 {days}일 남음</Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
           <View
