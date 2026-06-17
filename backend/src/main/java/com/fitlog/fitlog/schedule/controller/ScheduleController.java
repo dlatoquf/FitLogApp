@@ -227,7 +227,7 @@ public class ScheduleController {
 
     // ─── 트레이너: 월간 캘린더 조회 ──────────────────────────────────────────
     @GetMapping("/calendar/month")
-    public List<Map<String, Object>> getMonthlyCalendar(
+    public Map<String, Object> getMonthlyCalendar(
             @RequestHeader("Authorization") String auth,
             @RequestParam String yearMonth) {
         return scheduleService.getMonthlyCalendar(auth, yearMonth);

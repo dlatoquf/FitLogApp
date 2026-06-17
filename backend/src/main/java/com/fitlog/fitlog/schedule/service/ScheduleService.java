@@ -10,6 +10,7 @@ import com.fitlog.fitlog.notification.service.NotificationService;
 
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
+import com.fitlog.fitlog.schedule.repository.TrainerScheduleMemoRepository;
 
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
@@ -34,6 +35,7 @@ public class ScheduleService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final TrainerScheduleMemoRepository trainerScheduleMemoRepository;
 
     public ScheduleService(ScheduleRepository scheduleRepository,
                            TrainerRepository trainerRepository,
@@ -41,7 +43,8 @@ public class ScheduleService {
                            ManualMemberRepository manualMemberRepository,
                            JwtService jwtService,
                            UserRepository userRepository,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           TrainerScheduleMemoRepository trainerScheduleMemoRepository) {
         this.scheduleRepository = scheduleRepository;
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
@@ -49,6 +52,7 @@ public class ScheduleService {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.trainerScheduleMemoRepository = trainerScheduleMemoRepository;
     }
 
     // 슬롯 조회 (회원용)
@@ -129,9 +133,9 @@ public class ScheduleService {
         }).collect(Collectors.toList());
     }
 
-    // ─── 월간 캘린더 조회 (트레이너용) ───────────────────────────────────────
+    // ─── 월간 캘린더 조회 (트레이너용) — 메모 + slotOffset + startTime 통합 ───
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getMonthlyCalendar(String auth, String yearMonth) {
+    public Map<String, Object> getMonthlyCalendar(String auth, String yearMonth) {
         User user = getUserFromAuth(auth);
         Trainer trainer = trainerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
@@ -142,7 +146,7 @@ public class ScheduleService {
         List<Schedule> schedules = scheduleRepository.findByTrainerIdAndDateBetweenWithMember(
                 trainer.getId(), monthStart, monthEnd);
 
-        return schedules.stream().map(s -> {
+        List<Map<String, Object>> slots = schedules.stream().map(s -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id",          s.getId());
             map.put("scheduleId",  s.getId());
@@ -167,6 +171,20 @@ public class ScheduleService {
             }
             return map;
         }).collect(Collectors.toList());
+
+        // 메모
+        String memo = "";
+        try {
+            memo = trainerScheduleMemoRepository.findByTrainerAndYearMonth(trainer, yearMonth)
+                    .map(m -> m.getMemo() != null ? m.getMemo() : "").orElse("");
+        } catch (Exception ignored) {}
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("slots", slots);
+        result.put("memo", memo);
+        result.put("slotOffset", trainer.getSlotOffset());
+        result.put("startTime", trainer.getStartTime());
+        return result;
     }
 
     // 이번 주 슬롯 생성 (최초 진입 시)
