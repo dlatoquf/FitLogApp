@@ -842,10 +842,13 @@ export default function TrainerHomeScreen() {
       (async () => {
         try {
           const CURRENT_VERSION = "1.0.2";
+          console.log("[업데이트 체크] 시작 - 현재 버전:", CURRENT_VERSION);
           const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
           const json = await res.json();
           const latest = json.results?.[0]?.version;
+          console.log("[업데이트 체크] App Store 최신 버전:", latest);
           if (latest && latest > CURRENT_VERSION) {
+            console.log("[업데이트 체크] 업데이트 Alert 표시");
             Alert.alert(
               "업데이트 안내",
               `새 버전(${latest})이 출시됐어요!\n업데이트 후 이용해주세요.`,
@@ -855,7 +858,9 @@ export default function TrainerHomeScreen() {
               ],
             );
           }
-        } catch (_) {}
+        } catch (e) {
+          console.log("[업데이트 체크] 오류:", e);
+        }
       })();
     }, []),
   );
