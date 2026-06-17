@@ -11,6 +11,7 @@ import {
   Alert,
   Clipboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -830,6 +831,32 @@ export default function TrainerHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchHome();
+    }, []),
+  );
+
+  const updateChecked = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (updateChecked.current) return;
+      updateChecked.current = true;
+      (async () => {
+        try {
+          const CURRENT_VERSION = "1.0.2";
+          const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
+          const json = await res.json();
+          const latest = json.results?.[0]?.version;
+          if (latest && latest > CURRENT_VERSION) {
+            Alert.alert(
+              "업데이트 안내",
+              `새 버전(${latest})이 출시됐어요!\n업데이트 후 이용해주세요.`,
+              [
+                { text: "나중에" },
+                { text: "업데이트", onPress: () => Linking.openURL(APP_STORE_URL) },
+              ],
+            );
+          }
+        } catch (_) {}
+      })();
     }, []),
   );
 
