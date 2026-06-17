@@ -496,7 +496,8 @@ export default function TrainerMoreScreen() {
                 <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
-                {plan === "PRO" && (
+                {/* PRO/무료체험 배지 - App Store 심사 대응으로 비활성화 */}
+                {/* {plan === "PRO" && (
                   <View
                     style={{
                       backgroundColor: trialEndDate ? "#FEF3C7" : Colors.green,
@@ -511,7 +512,7 @@ export default function TrainerMoreScreen() {
                       {trialEndDate ? "무료체험" : "PRO"}
                     </Text>
                   </View>
-                )}
+                )} */}
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                 <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.gymName ?? "-"}</Text>
@@ -583,8 +584,8 @@ export default function TrainerMoreScreen() {
           </View>
         </View>
 
-        {/* 플랜 */}
-        <FlatSectionHeader title="플랜" />
+        {/* 플랜 - App Store 심사 대응으로 비활성화 */}
+        {/* <FlatSectionHeader title="플랜" />
         <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
           <FlatRow
             label="현재 플랜"
@@ -597,7 +598,7 @@ export default function TrainerMoreScreen() {
               </View>
             }
           />
-        </View>
+        </View> */}
 
         {/* 연동 */}
         <FlatSectionHeader title="연동" />

@@ -759,8 +759,10 @@ export default function TrainerHomeScreen() {
         template: {
           text: safeText,
           link: {
-            mobileWebUrl: safeUrl,
-            webUrl: safeWebUrl,
+            mobileWebUrl: APP_STORE_URL,
+            webUrl: APP_STORE_URL,
+            androidExecutionParams: "",
+            iosExecutionParams: "",
           },
           buttonTitle: "FitLog 앱 설치하기",
         },
@@ -847,14 +849,15 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {data?.trialEndDate && (() => {
+              {/* 무료체험 카운트다운 - App Store 심사 대응으로 비활성화 */}
+              {/* {data?.trialEndDate && (() => {
                 const days = Math.max(0, Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
                 return (
                   <View style={{ backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FCD34D", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
                     <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>무료체험 {days}일 남음</Text>
                   </View>
                 );
-              })()}
+              })()} */}
             </View>
           </View>
           <View
