@@ -14,9 +14,7 @@ export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
 export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 export const API_URL = "https://fitlog-api.duckdns.org";
 export const ANALYTICS_URL = "http://52.78.154.44:8001";
-/*운영 서버*/
-/*export const API_URL = "https://fitlog-api.duckdns.org";*/
-/*export const ANALYTICS_URL = "http://52.78.154.44:8001";*/
+
 /*카페 */
 /*export const API_URL = "http://192.168.45.99:8080";*/
 /*오ㅃㅏ집 */
@@ -89,5 +87,7 @@ export const ENDPOINTS = {
     packages: "/api/payment/packages",
     purchase: "/api/payment/purchase",
     history: "/api/payment/history",
+    deleteContract: (id: number) => `/api/payment/contracts/${id}`,
+    penalty: (id: number) => `/api/payment/contracts/${id}/penalty`,
   },
 };

@@ -63,6 +63,7 @@ public class PtContractService {
         PtContract contract = new PtContract();
         contract.setTrainer(trainer);
         contract.setMember(member);
+        contract.setMemberName(member.getUser().getName());
         contract.setTotalSessions(request.getSessions());
         contract.setRemainSessions(request.getSessions());
         contract.setAmount(request.getAmount());

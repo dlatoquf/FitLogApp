@@ -68,6 +68,8 @@ public class PaymentController {
                 item.put("memberName", c.getMember().getUser().getName());
             } else if (c.getManualMember() != null) {
                 item.put("memberName", c.getManualMember().getName());
+            } else if (c.getMemberName() != null) {
+                item.put("memberName", c.getMemberName());
             } else {
                 item.put("memberName", "알 수 없음");
             }
@@ -75,6 +77,47 @@ public class PaymentController {
             result.add(item);
         }
         return result;
+    }
+
+    @DeleteMapping("/contracts/{id}")
+    @Transactional
+    public ResponseEntity<Map<String, String>> deleteContract(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long id) {
+        Long userId = jwtService.getUserIdFromToken(auth.replace("Bearer ", ""));
+        Trainer trainer = trainerRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너를 찾을 수 없습니다."));
+        PtContract contract = ptContractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("계약 정보를 찾을 수 없습니다."));
+        if (!contract.getTrainer().getId().equals(trainer.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
+        }
+        ptContractRepository.delete(contract);
+        return ResponseEntity.ok(Map.of("message", "삭제되었습니다."));
+    }
+
+    @PatchMapping("/contracts/{id}/penalty")
+    @Transactional
+    public ResponseEntity<Map<String, String>> applyPenalty(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Long userId = jwtService.getUserIdFromToken(auth.replace("Bearer ", ""));
+        Trainer trainer = trainerRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너를 찾을 수 없습니다."));
+        PtContract contract = ptContractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("계약 정보를 찾을 수 없습니다."));
+        if (!contract.getTrainer().getId().equals(trainer.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
+        }
+        long penaltyAmount = body.containsKey("amount") ? ((Number) body.get("amount")).longValue() : 0L;
+        contract.setAmount(penaltyAmount);
+        contract.setMemo("위약금");
+        contract.setPaymentDate(java.time.LocalDate.now());
+        contract.setTotalSessions(0);
+        contract.setRemainSessions(0);
+        ptContractRepository.save(contract);
+        return ResponseEntity.ok(Map.of("message", "위약금이 적용되었습니다."));
     }
 
     @PostMapping("/purchase")

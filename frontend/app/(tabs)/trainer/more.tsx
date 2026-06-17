@@ -646,7 +646,7 @@ export default function TrainerMoreScreen() {
         {/* 앱 정보 */}
         <FlatSectionHeader title="앱 정보" />
         <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
-          <FlatRow label="버전" right={<Text style={{ fontSize: 13, color: Colors.textMuted }}>1.0.0</Text>} />
+          <FlatRow label="버전" right={<Text style={{ fontSize: 13, color: Colors.textMuted }}>1.0.2</Text>} />
           <FlatRow label="사용가이드" onPress={openGuide} showArrow />
           <FlatRow label="이용약관" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/terms.html")} showArrow />
           <FlatRow label="개인정보처리방침" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/privacy.html")} showArrow />

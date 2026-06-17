@@ -131,6 +131,99 @@ export default function TrainerHomeScreen() {
   const [memoEditText, setMemoEditText] = useState("");
   const [savingMemo, setSavingMemo] = useState(false);
 
+  // 결제 삭제 / 위약금 모달
+  const [penaltyModal, setPenaltyModal] = useState<{ contractId: number; memberName: string } | null>(null);
+  const [penaltyAmountInput, setPenaltyAmountInput] = useState("");
+  const [savingPenalty, setSavingPenalty] = useState(false);
+
+  const handleDeleteContract = (contractId: number) => {
+    Alert.alert(
+      "결제내역 삭제",
+      "결제내역이 사라집니다. 정말 삭제하시겠어요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const jwt = await AsyncStorage.getItem("jwt");
+              const res = await fetch(`${API_URL}/api/payment/contracts/${contractId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${jwt}` },
+              });
+              if (!res.ok) throw new Error("삭제 실패");
+              fetchHome();
+            } catch (e: any) {
+              Alert.alert("오류", e.message);
+            }
+          },
+        },
+        {
+          text: "환불 및 위약금",
+          onPress: () => {
+            setPenaltyAmountInput("");
+            setPenaltyModal({ contractId, memberName: "" });
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteContractWithName = (contractId: number, memberName: string) => {
+    Alert.alert(
+      "결제내역 삭제",
+      "결제내역이 사라집니다. 정말 삭제하시겠어요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const jwt = await AsyncStorage.getItem("jwt");
+              const res = await fetch(`${API_URL}/api/payment/contracts/${contractId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${jwt}` },
+              });
+              if (!res.ok) throw new Error("삭제 실패");
+              fetchHome();
+            } catch (e: any) {
+              Alert.alert("오류", e.message);
+            }
+          },
+        },
+        {
+          text: "환불 및 위약금",
+          onPress: () => {
+            setPenaltyAmountInput("");
+            setPenaltyModal({ contractId, memberName });
+          },
+        },
+      ],
+    );
+  };
+
+  const savePenalty = async () => {
+    if (!penaltyModal) return;
+    setSavingPenalty(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/payment/contracts/${penaltyModal.contractId}/penalty`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ amount: parseInt(penaltyAmountInput.replace(/,/g, "")) || 0 }),
+      });
+      if (!res.ok) throw new Error("위약금 적용 실패");
+      setPenaltyModal(null);
+      fetchHome();
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    } finally {
+      setSavingPenalty(false);
+    }
+  };
+
   // 결제 수정 모달
   const [editModal, setEditModal] = useState(false);
   const [editContractId, setEditContractId] = useState<number | null>(null);
@@ -1490,6 +1583,21 @@ export default function TrainerHomeScreen() {
                                         수정
                                       </Text>
                                     </TouchableOpacity>
+                                    {d.contractId != null && (
+                                      <TouchableOpacity
+                                        onPress={() => handleDeleteContractWithName(d.contractId!, d.memberName ?? "")}
+                                        style={{
+                                          borderRadius: 6,
+                                          borderWidth: 1,
+                                          borderColor: "#ffcccc",
+                                          paddingHorizontal: 7,
+                                          paddingVertical: 3,
+                                          backgroundColor: "#fff5f5",
+                                        }}
+                                      >
+                                        <Text style={{ fontSize: 10, color: "#e53e3e" }}>🗑</Text>
+                                      </TouchableOpacity>
+                                    )}
                                   </>
                                 ) : (
                                   <TouchableOpacity
@@ -1981,6 +2089,56 @@ export default function TrainerHomeScreen() {
                     </Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 위약금 입력 모달 ──────────────────────────────────────────────── */}
+      <Modal
+        visible={penaltyModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPenaltyModal(null)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 28 }}
+            activeOpacity={1}
+            onPress={() => setPenaltyModal(null)}
+          >
+            <TouchableOpacity activeOpacity={1} style={{ width: "100%" }}>
+              <View style={{ backgroundColor: "#fff", borderRadius: 18, padding: 22, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>환불 및 위약금</Text>
+                  <TouchableOpacity
+                    onPress={() => setPenaltyModal(null)}
+                    style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, justifyContent: "center", alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.textSub, marginBottom: 12 }}>
+                  기존 결제내역이 위약금 내역으로 변경됩니다.{"\n"}위약금으로 받은 금액을 입력하세요.
+                </Text>
+                <TextInput
+                  value={penaltyAmountInput}
+                  onChangeText={(v) => setPenaltyAmountInput(v.replace(/[^0-9]/g, ""))}
+                  placeholder="위약금 금액 (원)"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="numeric"
+                  style={{ backgroundColor: Colors.bgSub, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, padding: 14, fontSize: 16, color: Colors.text, marginBottom: 16 }}
+                />
+                <TouchableOpacity
+                  onPress={savePenalty}
+                  disabled={savingPenalty}
+                  style={{ backgroundColor: "#e53e3e", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                    {savingPenalty ? "저장 중..." : "위약금 적용"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>

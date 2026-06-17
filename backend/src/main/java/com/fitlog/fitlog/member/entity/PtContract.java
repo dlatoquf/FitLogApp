@@ -55,6 +55,10 @@ public class PtContract {
     @JoinColumn(name = "manual_member_id")
     private ManualMember manualMember;
 
+    // 미연동 회원 삭제 후에도 이름 보존
+    @Column(name = "member_name")
+    private String memberName;
+
     public Long getId() { return id; }
     public Trainer getTrainer() { return trainer; }
     public Member getMember() { return member; }
@@ -80,4 +84,6 @@ public class PtContract {
     public void setPaymentDate(java.time.LocalDate paymentDate) { this.paymentDate = paymentDate; }
     public ManualMember getManualMember() { return manualMember; }
     public void setManualMember(ManualMember manualMember) { this.manualMember = manualMember; }
+    public String getMemberName() { return memberName; }
+    public void setMemberName(String memberName) { this.memberName = memberName; }
 }

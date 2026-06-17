@@ -152,6 +152,7 @@ public class ManualMemberController {
                     PtContract contract = new PtContract();
                     contract.setTrainer(trainer);
                     contract.setManualMember(converted);
+                    contract.setMemberName(converted.getName());
                     contract.setTotalSessions(ptTotal);
                     contract.setRemainSessions(converted.getPtRemaining());
                     contract.setAmount(converted.getAmount());
@@ -207,6 +208,7 @@ public class ManualMemberController {
             PtContract contract = new PtContract();
             contract.setTrainer(trainer);
             contract.setManualMember(saved);
+            contract.setMemberName(saved.getName());
             contract.setTotalSessions(ptTotal);
             contract.setRemainSessions(body.get("ptRemaining") != null
                     ? ((Number) body.get("ptRemaining")).intValue() : ptTotal);
@@ -266,6 +268,7 @@ public class ManualMemberController {
         PtContract contract = new PtContract();
         contract.setTrainer(m.getTrainer());
         contract.setManualMember(m);
+        contract.setMemberName(m.getName());
         contract.setTotalSessions(sessions);
         contract.setRemainSessions(sessions);
         if (body.get("amount") != null) {
@@ -296,6 +299,13 @@ public class ManualMemberController {
     public ResponseEntity<Void> delete(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
+        manualMemberRepository.findById(id).ifPresent(m -> {
+            ptContractRepository.findByManualMember(m).forEach(c -> {
+                c.setMemberName(m.getName()); // 이름 보존
+                c.setManualMember(null);
+                ptContractRepository.save(c);
+            });
+        });
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

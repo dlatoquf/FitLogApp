@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -68,6 +69,7 @@ public class TrainerHomeService {
     private String contractMemberName(PtContract c) {
         if (c.getMember() != null) return c.getMember().getUser().getName();
         if (c.getManualMember() != null) return c.getManualMember().getName();
+        if (c.getMemberName() != null) return c.getMemberName(); // 삭제된 미연동 회원 이름 보존
         return "알 수 없음";
     }
 
@@ -132,11 +134,11 @@ public class TrainerHomeService {
         LocalDate monthStart = thisMonth.atDay(1);
         LocalDate monthEnd = thisMonth.atEndOfMonth();
 
-        // 연동 회원 + 미연동 회원 합산 (OT 회원 제외 — OT는 체험 회원으로 별도 관리)
+        // 연동 회원 + 미연동 회원 합산 (OT 회원 제외)
         int totalMembers = (int) (memberRepository.countByTrainer(trainer)
                 + manualMemberRepository.countNonOtByTrainer(trainer));
 
-        // 오늘 PT 목록 (연동 + 미연동 + OT 모두 포함)
+        // 오늘 PT 목록
         List<Schedule> todaySchedules = scheduleRepository.findTodayPtWithMember(trainer, today);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm");
         List<TrainerHomeResponse.TodayPt> todayPtList = todaySchedules.stream()
@@ -165,13 +167,9 @@ public class TrainerHomeService {
                 })
                 .collect(Collectors.toList());
 
-        // 이번 달 수업 수
+        // 이번 달 수업 수 / 노쇼 / 매출
         int monthSessions = scheduleRepository.countMonthSessions(trainer, monthStart, monthEnd);
-
-        // 이번 달 노쇼 수 (명시적 NO_SHOW 처리된 수업)
         int noShowCount = scheduleRepository.countNoShows(trainer, monthStart, monthEnd);
-
-        // 이번 달 매출 — pt_contracts 통합 조회 (연동 + 미연동 모두)
         List<PtContract> allContracts = ptContractRepository.findAllByTrainerWithAll(trainer);
         List<PtContract> monthContracts = filterByMonth(allContracts, thisMonth);
 
