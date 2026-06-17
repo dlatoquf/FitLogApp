@@ -761,8 +761,8 @@ export default function TrainerHomeScreen() {
           link: {
             mobileWebUrl: APP_STORE_URL,
             webUrl: APP_STORE_URL,
-            androidExecutionParams: "",
-            iosExecutionParams: "",
+            androidExecutionParams: `code=${code}`,
+            iosExecutionParams: `code=${code}`,
           },
           buttonTitle: "FitLog 앱 설치하기",
         },
