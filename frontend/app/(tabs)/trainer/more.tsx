@@ -196,21 +196,47 @@ export default function TrainerMoreScreen() {
   };
 
   const checkSheetsConnection = async () => {
-    // 1) AsyncStorage에 토큰 있으면 그대로 사용
-    let token = await AsyncStorage.getItem("google_sheets_token");
-    let id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      if (!jwt) { setSheetsConnected(false); setSpreadsheetId(null); return; }
 
-    // 2) 없으면 DB에서 복원 시도 (다른 기기나 재설치 후)
-    if (!token) {
-      const restored = await restoreSheetConfigFromDB();
-      if (restored) {
-        token = await AsyncStorage.getItem("google_sheets_token");
-        id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+      // 항상 서버 DB 상태를 우선 확인
+      const res = await fetch(`${API_URL}/api/trainer/sheets-config`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.connected && data.token && data.spreadsheetId) {
+          // DB에 연동 정보 있음 → AsyncStorage 동기화
+          await AsyncStorage.setItem("google_sheets_token", data.token);
+          await AsyncStorage.setItem("google_sheets_spreadsheet_id", data.spreadsheetId);
+          setSheetsConnected(true);
+          setSpreadsheetId(data.spreadsheetId);
+        } else {
+          // DB에 연동 정보 없음 → 로컬 캐시도 정리
+          await AsyncStorage.multiRemove([
+            "google_sheets_token",
+            "google_sheets_token_expiry",
+            "google_sheets_refresh_token",
+            "google_sheets_spreadsheet_id",
+          ]);
+          setSheetsConnected(false);
+          setSpreadsheetId(null);
+        }
+      } else {
+        // 서버 오류 시 로컬 AsyncStorage 폴백
+        const token = await AsyncStorage.getItem("google_sheets_token");
+        const id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+        setSheetsConnected(!!token);
+        setSpreadsheetId(id);
       }
+    } catch {
+      // 네트워크 오류 시 로컬 AsyncStorage 폴백
+      const token = await AsyncStorage.getItem("google_sheets_token");
+      const id = await AsyncStorage.getItem("google_sheets_spreadsheet_id");
+      setSheetsConnected(!!token);
+      setSpreadsheetId(id);
     }
-
-    setSheetsConnected(!!token);
-    setSpreadsheetId(id);
   };
 
   const connectGoogleSheets = async () => {
