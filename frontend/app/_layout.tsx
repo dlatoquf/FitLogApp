@@ -254,6 +254,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding/trainer" />
         <Stack.Screen name="(tabs)/member" />
         <Stack.Screen name="(tabs)/trainer" />
+        <Stack.Screen name="kakaolink" />
       </Stack>
       {banner && (
         <InAppBanner key={banner.key} title={banner.title} body={banner.body} type={banner.type} date={banner.date} targetId={banner.targetId} />
