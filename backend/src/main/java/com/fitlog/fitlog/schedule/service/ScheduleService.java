@@ -133,7 +133,13 @@ public class ScheduleService {
         }).collect(Collectors.toList());
     }
 
-    // ─── 월간 캘린더 조회 (트레이너용) — 메모 + slotOffset + startTime 통합 ───
+    // ─── 월간 캘린더 조회 (트레이너용) ───────────────────────────────────────
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getMonthlyCalendarList(String auth, String yearMonth) {
+        Map<String, Object> result = getMonthlyCalendar(auth, yearMonth);
+        return (List<Map<String, Object>>) result.get("slots");
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> getMonthlyCalendar(String auth, String yearMonth) {
         User user = getUserFromAuth(auth);

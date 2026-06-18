@@ -227,10 +227,10 @@ public class ScheduleController {
 
     // ─── 트레이너: 월간 캘린더 조회 ──────────────────────────────────────────
     @GetMapping("/calendar/month")
-    public Map<String, Object> getMonthlyCalendar(
+    public List<Map<String, Object>> getMonthlyCalendar(
             @RequestHeader("Authorization") String auth,
             @RequestParam String yearMonth) {
-        return scheduleService.getMonthlyCalendar(auth, yearMonth);
+        return scheduleService.getMonthlyCalendarList(auth, yearMonth);
     }
 
     // ─── 트레이너: 월별 메모 조회 / 저장 ─────────────────────────────────────

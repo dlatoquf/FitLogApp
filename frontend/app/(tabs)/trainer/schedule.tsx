@@ -233,21 +233,37 @@ export default function TrainerScheduleScreen() {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
 
-        const calRes = await fetch(
-          `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
-          { headers },
-        );
-        if (calRes.ok) {
-          const data = await calRes.json();
-          setSlots(data.slots ?? []);
-          setMonthMemo(data.memo ?? "");
-          if (data.startTime) {
-            const st = data.startTime.slice(0, 5);
+        const [calRes, memoRes, slotSettingsRes, profileRes] =
+          await Promise.all([
+            fetch(
+              `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
+              { headers },
+            ),
+            fetch(`${API_URL}/api/schedule/memo?yearMonth=${yearMonthStr}`, {
+              headers,
+            }),
+            fetch(`${API_URL}/api/trainer/slot-settings`, { headers }),
+            fetch(`${API_URL}/api/profile/trainer`, { headers }),
+          ]);
+        if (profileRes?.ok) {
+          const profileData = await profileRes.json();
+          if (profileData.startTime) {
+            const st = profileData.startTime.slice(0, 5);
             setTrainerStartTime(st);
             trainerStartTimeRef.current = st;
           }
+        }
+
+        if (calRes.ok) setSlots(await calRes.json());
+        if (memoRes?.ok) {
+          const data = await memoRes.json();
+          setMonthMemo(data.memo ?? "");
+        }
+        if (slotSettingsRes?.ok) {
+          const data = await slotSettingsRes.json();
           const off = data.slotOffset;
           if (off === null || off === undefined) {
+            // 미설정 → 모달 표시
             setSlotOffset(null);
             setShowOffsetModal(true);
           } else {
