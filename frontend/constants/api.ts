@@ -6,12 +6,12 @@
  */
 
 // ── DEV / TEST (현재 활성화) ──────────────────────────────────────
-export const API_URL = "http://192.168.0.182:8080"; // 집 와이파이
-export const ANALYTICS_URL = "http://localhost:8001";
+//export const API_URL = "http://192.168.0.182:8080"; // 집 와이파이
+//export const ANALYTICS_URL = "http://localhost:8001";
 
 // ── PROD (운영 배포 시 위 두 줄 주석 처리 후 아래 활성화) ──────────
-// export const API_URL = "https://fitlog-api.duckdns.org";
-// export const ANALYTICS_URL = "http://52.78.154.44:8001";
+export const API_URL = "https://fitlog-api.duckdns.org";
+export const ANALYTICS_URL = "http://52.78.154.44:8001";
 
 // ── 기타 환경 ─────────────────────────────────────────────────────
 // export const API_URL = "http://192.168.45.99:8080"; // 카페
@@ -19,7 +19,8 @@ export const ANALYTICS_URL = "http://localhost:8001";
 
 // ── 스토어 URL ─────────────────────────────────────────────────────
 export const APP_STORE_URL = "https://apps.apple.com/app/fitlog/id6769366090";
-export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
+export const PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
 
 // ── Cloudinary ─────────────────────────────────────────────────────
 export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";

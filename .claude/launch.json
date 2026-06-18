@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "instagram-concept",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8888"],
+      "port": 8888
+    },
+    {
+      "name": "feature-graphic",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8889", "--directory", "docs"],
+      "port": 8889
+    },
+    {
+      "name": "fitlog-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8890", "--directory", "/Users/imsaebyeol/Desktop/FitLog_Web"],
+      "port": 8890
+    }
+  ]
+}
