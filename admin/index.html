@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitLog Admin</title>
+  <style>
+    :root {
+      --green: #00c896;
+      --green-dark: #00a87e;
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #f0f2ff;
+      --muted: #7b82a8;
+      --red: #ff5c5c;
+      --blue: #5c9dff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── 로그인 ── */
+    #login-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; gap: 20px;
+    }
+    .login-logo { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    .login-logo span { color: var(--green); }
+    .login-sub { font-size: 13px; color: var(--muted); }
+    .login-box {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 32px 28px; width: 300px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .login-box input {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 13px 16px; color: var(--text); font-size: 18px; text-align: center;
+      letter-spacing: 6px; outline: none; width: 100%;
+    }
+    .login-box input:focus { border-color: var(--green); }
+    .login-box button {
+      background: var(--green); color: #000; font-weight: 700; font-size: 15px;
+      border: none; border-radius: 10px; padding: 13px; cursor: pointer; width: 100%;
+      transition: background 0.15s;
+    }
+    .login-box button:hover { background: var(--green-dark); }
+    #login-error { color: var(--red); font-size: 13px; min-height: 18px; text-align: center; }
+
+    /* ── 레이아웃 ── */
+    #admin-screen { display: none; }
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; z-index: 10;
+    }
+    .sidebar-logo {
+      padding: 24px 20px 20px; font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo span { color: var(--green); }
+    .nav { flex: 1; padding: 12px 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px; font-size: 14px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: all 0.15s; border-radius: 0;
+    }
+    .nav-item:hover { color: var(--text); background: var(--surface2); }
+    .nav-item.active { color: var(--green); background: rgba(0,200,150,0.08); border-right: 2px solid var(--green); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-footer { padding: 16px 20px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
+
+    .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+    .page-header { margin-bottom: 24px; }
+    .page-title { font-size: 22px; font-weight: 700; }
+    .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ── 통계 카드 ── */
+    .stats { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px 22px; flex: 1; min-width: 120px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--green); }
+
+    /* ── 테이블 ── */
+    .toolbar {
+      display: flex; gap: 10px; margin-bottom: 16px; align-items: center;
+    }
+    .search-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 14px; color: var(--text); font-size: 14px; outline: none;
+    }
+    .search-input:focus { border-color: var(--green); }
+    .search-input::placeholder { color: var(--muted); }
+    .refresh-btn {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); padding: 10px 16px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+
+    .table-wrap {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .badge-trainer { background: rgba(0,200,150,0.15); color: var(--green); }
+    .badge-member  { background: rgba(92,157,255,0.15); color: var(--blue); }
+    .badge-null    { background: rgba(123,130,168,0.15); color: var(--muted); }
+    .badge-active  { background: rgba(0,200,150,0.15); color: var(--green); }
+    .badge-deleted { background: rgba(255,92,92,0.15); color: var(--red); }
+
+    .loading, .empty {
+      text-align: center; padding: 60px; color: var(--muted); font-size: 14px;
+    }
+    .updated { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar-logo, .nav-item span, .sidebar-footer { display: none; }
+      .nav-icon { margin: 0 auto; }
+      .main { margin-left: 60px; padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-logo">Fit<span>Log</span></div>
+  <div class="login-sub">관리자 전용 페이지</div>
+  <div class="login-box">
+    <input id="pw-input" type="password" placeholder="••••••" maxlength="10" />
+    <div id="login-error"></div>
+    <button onclick="login()">로그인</button>
+  </div>
+</div>
+
+<div id="admin-screen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">Fit<span>Log</span></div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="switchTab('users', this)">
+        <span class="nav-icon">👤</span><span>유저</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('trainers', this)">
+        <span class="nav-icon">🏋️</span><span>트레이너</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('members', this)">
+        <span class="nav-icon">🙋</span><span>회원</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('payments', this)">
+        <span class="nav-icon">💳</span><span>PT 결제</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer" id="last-updated"></div>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title" id="page-title">유저</div>
+      <div class="page-sub" id="page-sub"></div>
+    </div>
+    <div class="stats" id="stats-area"></div>
+    <div class="toolbar">
+      <input class="search-input" id="search-input" type="text" placeholder="이름 또는 이메일 검색..." oninput="renderTable()" />
+      <button class="refresh-btn" onclick="loadData()">↻ 새로고침</button>
+    </div>
+    <div class="table-wrap">
+      <div id="table-area"><div class="loading">불러오는 중...</div></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const API = 'https://fitlog-api.duckdns.org';
+  let pw = '';
+  let currentTab = 'users';
+  let allData = { users: [], trainers: [], members: [], payments: [] };
+
+  const tabMeta = {
+    users:    { title: '유저', sub: '전체 가입 유저 목록' },
+    trainers: { title: '트레이너', sub: '등록된 트레이너 목록' },
+    members:  { title: '회원', sub: '등록된 회원 목록' },
+    payments: { title: 'PT 결제내역', sub: '전체 결제 및 위약금 내역' },
+  };
+
+  document.getElementById('pw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+
+  function login() {
+    const input = document.getElementById('pw-input').value.trim();
+    if (input === '364900') {
+      pw = input;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('admin-screen').style.display = 'block';
+      loadData();
+    } else {
+      document.getElementById('login-error').textContent = '비밀번호가 틀렸습니다.';
+    }
+  }
+
+  function switchTab(tab, el) {
+    currentTab = tab;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('page-title').textContent = tabMeta[tab].title;
+    document.getElementById('page-sub').textContent = tabMeta[tab].sub;
+    document.getElementById('search-input').value = '';
+    renderStats();
+    renderTable();
+  }
+
+  async function loadData() {
+    document.getElementById('table-area').innerHTML = '<div class="loading">불러오는 중...</div>';
+    try {
+      const [users, trainers, members, payments] = await Promise.all([
+        fetch(`${API}/api/admin/users?pw=${pw}`).then(r => r.json()),
+        fetch(`${API}/api/admin/trainers?pw=${pw}`).then(r => r.json()),
+        fetch(`${API}/api/admin/members?pw=${pw}`).then(r => r.json()),
+        fetch(`${API}/api/admin/payments?pw=${pw}`).then(r => r.json()),
+      ]);
+      allData = { users, trainers, members, payments };
+      document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
+      document.getElementById('page-title').textContent = tabMeta[currentTab].title;
+      document.getElementById('page-sub').textContent = tabMeta[currentTab].sub;
+      renderStats();
+      renderTable();
+    } catch {
+      document.getElementById('table-area').innerHTML = '<div class="empty">서버 연결 오류</div>';
+    }
+  }
+
+  function renderStats() {
+    const el = document.getElementById('stats-area');
+    if (currentTab === 'users') {
+      const t = allData.users.filter(u => u.role === 'TRAINER').length;
+      const m = allData.users.filter(u => u.role === 'MEMBER').length;
+      const n = allData.users.filter(u => !u.role).length;
+      el.innerHTML = stat('전체', allData.users.length) + stat('트레이너', t) + stat('회원', m) + stat('미설정', n);
+    } else if (currentTab === 'trainers') {
+      el.innerHTML = stat('전체 트레이너', allData.trainers.length);
+    } else if (currentTab === 'members') {
+      const active = allData.members.filter(m => m.status === 'ACTIVE').length;
+      el.innerHTML = stat('전체 회원', allData.members.length) + stat('활성', active);
+    } else if (currentTab === 'payments') {
+      const total = allData.payments.reduce((s, p) => s + (p.amount || 0), 0);
+      el.innerHTML = stat('결제 건수', allData.payments.length) + stat('총 매출', total.toLocaleString() + '원');
+    }
+  }
+
+  function stat(label, value) {
+    return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+  }
+
+  function renderTable() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const el = document.getElementById('table-area');
+
+    if (currentTab === 'users') {
+      const data = allData.users.filter(u => match(u.name, u.email, q));
+      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      el.innerHTML = `<table><thead><tr>
+        <th>ID</th><th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th>상태</th>
+      </tr></thead><tbody>${data.map(u => `<tr>
+        <td style="color:var(--muted)">${u.id}</td>
+        <td><b>${u.name || '-'}</b></td>
+        <td style="color:var(--muted)">${u.email || '-'}</td>
+        <td><span class="badge ${u.role === 'TRAINER' ? 'badge-trainer' : u.role === 'MEMBER' ? 'badge-member' : 'badge-null'}">${u.role || '미설정'}</span></td>
+        <td style="color:var(--muted)">${u.createdAt || '-'}</td>
+        <td><span class="badge ${u.deleted ? 'badge-deleted' : 'badge-active'}">${u.deleted ? '삭제됨' : '정상'}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'trainers') {
+      const data = allData.trainers.filter(t => match(t.name, t.email, q));
+      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      el.innerHTML = `<table><thead><tr>
+        <th>ID</th><th>이름</th><th>이메일</th><th>헬스장</th><th>트레이너 코드</th><th>회원 수</th><th>플랜</th>
+      </tr></thead><tbody>${data.map(t => `<tr>
+        <td style="color:var(--muted)">${t.id}</td>
+        <td><b>${t.name || '-'}</b></td>
+        <td style="color:var(--muted)">${t.email || '-'}</td>
+        <td>${t.gymName || '-'}</td>
+        <td><span class="badge badge-trainer">${t.trainerCode || '-'}</span></td>
+        <td>${t.memberCount}</td>
+        <td>${t.plan || '-'}</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'members') {
+      const data = allData.members.filter(m => match(m.name, m.email, q) || (m.trainerName||'').toLowerCase().includes(q));
+      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      el.innerHTML = `<table><thead><tr>
+        <th>ID</th><th>이름</th><th>이메일</th><th>트레이너</th><th>잔여 PT</th><th>전체 PT</th><th>상태</th>
+      </tr></thead><tbody>${data.map(m => `<tr>
+        <td style="color:var(--muted)">${m.id}</td>
+        <td><b>${m.name || '-'}</b></td>
+        <td style="color:var(--muted)">${m.email || '-'}</td>
+        <td>${m.trainerName || '-'}</td>
+        <td>${m.ptRemaining ?? '-'}</td>
+        <td>${m.ptTotal ?? '-'}</td>
+        <td><span class="badge ${m.status === 'ACTIVE' ? 'badge-active' : 'badge-deleted'}">${m.status || '-'}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'payments') {
+      const data = allData.payments.filter(p => match(p.memberName, p.trainerName, q));
+      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      el.innerHTML = `<table><thead><tr>
+        <th>ID</th><th>트레이너</th><th>회원</th><th>금액</th><th>횟수</th><th>메모</th><th>결제일</th><th>상태</th>
+      </tr></thead><tbody>${data.map(p => `<tr>
+        <td style="color:var(--muted)">${p.id}</td>
+        <td>${p.trainerName || '-'}</td>
+        <td><b>${p.memberName || '-'}</b></td>
+        <td><b style="color:var(--green)">${(p.amount||0).toLocaleString()}원</b></td>
+        <td>${p.sessions}회</td>
+        <td style="color:var(--muted)">${p.memo || '-'}</td>
+        <td style="color:var(--muted)">${p.paidAt || '-'}</td>
+        <td>${p.status || '-'}</td>
+      </tr>`).join('')}</tbody></table>`;
+    }
+  }
+
+  function match(a, b, q) {
+    return (a||'').toLowerCase().includes(q) || (b||'').toLowerCase().includes(q);
+  }
+</script>
+</body>
+</html>
