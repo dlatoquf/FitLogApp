@@ -1,35 +1,35 @@
 /**
  * FitLog API 설정
- * 개발 환경에 맞게 API_URL을 수정하세요.
+ *
+ * ─── 환경별 API_URL 설정 ───────────────────────────────────────────
+ *  [DEV / TEST]  로컬 맥에서 백엔드 실행 시 현재 와이파이 IP로 변경
+ *  [PROD]        운영 서버 배포 시 duckdns URL 사용 (기본값)
+ * ──────────────────────────────────────────────────────────────────
  */
 
-// Cloudinary 설정
-// 앱스토어/플레이스토어 출시 후 실제 URL로 업데이트 필요
-export const APP_STORE_URL = "https://apps.apple.com/app/fitlog/id6769366090";
-export const PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
-
-export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
-export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
-export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
+// ── 운영 (PROD) ───────────────────────────────────────────────────
 export const API_URL = "https://fitlog-api.duckdns.org";
 export const ANALYTICS_URL = "http://52.78.154.44:8001";
 
-/*카페 */
-/*export const API_URL = "http://192.168.45.99:8080";*/
-/*오ㅃㅏ집 */
-/*export const API_URL = "http://192.168.219.155:8080";*/
-/*본가*/
-/*export const API_URL = "http://192.168.219.129:8080";*/
-/*export const ANALYTICS_URL = "http://192.168.219.129:8001";*/
-/*테스트 서버 (TestFlight)*/
-/*export const API_URL = "https://fitlog-api.duckdns.org";*/
-/*export const ANALYTICS_URL = "http://52.78.154.44:8001";*/
-/*운영 서버*/
-/*export const API_URL = "https://fitlog-api.duckdns.org";*/
-/*개발 - 맥 로컬 (Android 에뮬레이터)*/
-/*export const API_URL = "http://10.0.2.2:8080";*/
+// ── 개발 / 테스트 (DEV / TEST) — 사용 시 위 항목 주석 처리 ────────
+// 집
+// export const API_URL = "http://192.168.0.182:8080";
+// 카페
+// export const API_URL = "http://192.168.45.99:8080";
+// Android 에뮬레이터
+// export const API_URL = "http://10.0.2.2:8080";
+// export const ANALYTICS_URL = "http://localhost:8001";
 
+// ── 스토어 URL ─────────────────────────────────────────────────────
+export const APP_STORE_URL = "https://apps.apple.com/app/fitlog/id6769366090";
+export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
+
+// ── Cloudinary ─────────────────────────────────────────────────────
+export const CLOUDINARY_CLOUD_NAME = "djb0wt8ov";
+export const CLOUDINARY_UPLOAD_PRESET = "fitlog_upload";
+export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
+
+// ── 엔드포인트 ─────────────────────────────────────────────────────
 export const ENDPOINTS = {
   // 인증
   auth: {
