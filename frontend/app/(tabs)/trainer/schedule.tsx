@@ -1164,9 +1164,9 @@ export default function TrainerScheduleScreen() {
       return (
         <View style={{ alignItems: "center", paddingVertical: 32, gap: 12 }}>
           <Text style={{ fontSize: 13, color: Colors.textMuted }}>
-            {selectedPast ? "지난 날이에요" : "이날 스케줄이 없어요"}
+            이날 스케줄이 없어요
           </Text>
-          {selectedActive && (
+          {(selectedActive || selectedPast) && (
             <TouchableOpacity
               onPress={async () => {
                 if (members.length === 0) await fetchMembers();
@@ -1382,8 +1382,8 @@ export default function TrainerScheduleScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* 추가 버튼 (비어있음, 활성 날짜만) */}
-              {isOpen && selectedActive && (
+              {/* 추가 버튼 (비어있음) */}
+              {isOpen && (selectedActive || selectedPast) && (
                 <TouchableOpacity
                   onPress={async () => {
                     if (members.length === 0) await fetchMembers();
@@ -1411,7 +1411,7 @@ export default function TrainerScheduleScreen() {
         })}
 
         {/* 슬롯 있을 때도 하단에 추가 버튼 */}
-        {selectedActive && (
+        {(selectedActive || selectedPast) && (
           <TouchableOpacity
             onPress={async () => {
               if (members.length === 0) await fetchMembers();
