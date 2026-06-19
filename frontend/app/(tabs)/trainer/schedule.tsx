@@ -2287,10 +2287,7 @@ export default function TrainerScheduleScreen() {
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .sort(
-                      (a: any, b: any) =>
-                        (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0),
-                    )
+                    .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
                         key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
@@ -2742,10 +2739,7 @@ export default function TrainerScheduleScreen() {
                 >
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .sort(
-                      (a: any, b: any) =>
-                        (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0),
-                    )
+                    .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
                         key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
