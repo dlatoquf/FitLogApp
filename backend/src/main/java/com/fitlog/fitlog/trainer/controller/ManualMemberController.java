@@ -236,9 +236,13 @@ public class ManualMemberController {
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
         if (body.get("sessions") != null) {
             int newSessions = ((Number) body.get("sessions")).intValue();
-            int diff = newSessions - (m.getPtTotal() != null ? m.getPtTotal() : 0);
             m.setPtTotal(newSessions);
-            m.setPtRemaining(Math.max(0, (m.getPtRemaining() != null ? m.getPtRemaining() : 0) + diff));
+            if (body.get("ptRemaining") != null) {
+                m.setPtRemaining(((Number) body.get("ptRemaining")).intValue());
+            } else {
+                int diff = newSessions - (m.getPtTotal() != null ? m.getPtTotal() : 0);
+                m.setPtRemaining(Math.max(0, (m.getPtRemaining() != null ? m.getPtRemaining() : 0) + diff));
+            }
         }
         if (body.get("amount") != null) {
             m.setAmount(((Number) body.get("amount")).longValue());

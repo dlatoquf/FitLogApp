@@ -1412,6 +1412,9 @@ export default function MemberDetailScreen() {
   })();
 
   const [showPTEdit, setShowPTEdit] = useState(false);
+  const [showPtDirectEdit, setShowPtDirectEdit] = useState(false);
+  const [ptDirectForm, setPtDirectForm] = useState({ remaining: "", total: "" });
+  const [savingPtDirect, setSavingPtDirect] = useState(false);
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const menuModalY = useRef(new Animated.Value(0)).current;
@@ -2800,6 +2803,43 @@ export default function MemberDetailScreen() {
     }
   };
 
+  const savePtDirect = async () => {
+    const remaining = Number(ptDirectForm.remaining);
+    const total = Number(ptDirectForm.total);
+    if (isNaN(remaining) || isNaN(total) || remaining < 0 || total < 0) {
+      Alert.alert("오류", "올바른 숫자를 입력해주세요.");
+      return;
+    }
+    if (remaining > total) {
+      Alert.alert("오류", "잔여 PT는 총 횟수보다 클 수 없어요.");
+      return;
+    }
+    try {
+      setSavingPtDirect(true);
+      const jwt = await AsyncStorage.getItem("jwt");
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` };
+      if (type === "manual") {
+        await fetch(`${API_URL}/api/trainer/manual-members/${memberId}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ sessions: total, ptRemaining: remaining }),
+        });
+      } else {
+        await fetch(`${API_URL}/api/trainer/members/${memberId}/pt`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ ptTotal: total, ptRemaining: remaining }),
+        });
+      }
+      setShowPtDirectEdit(false);
+      fetchMember();
+    } catch {
+      Alert.alert("오류", "수정에 실패했어요.");
+    } finally {
+      setSavingPtDirect(false);
+    }
+  };
+
   if (loading || !member || renderedMemberId !== memberId) {
     return (
       <View
@@ -4065,6 +4105,25 @@ export default function MemberDetailScreen() {
                 </View>
               )}
             </View>
+            <TouchableOpacity
+              onPress={() => {
+                setPtDirectForm({
+                  remaining: String(member.ptRemaining ?? 0),
+                  total: String(member.ptTotal ?? 0),
+                });
+                setShowPtDirectEdit(true);
+              }}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+                backgroundColor: Colors.bgSub,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>✏️ 수정</Text>
+            </TouchableOpacity>
           </View>
           {member.ptTotal > 0 && (
             <>
@@ -6320,6 +6379,52 @@ export default function MemberDetailScreen() {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* PT 직접 수정 모달 */}
+      <Modal
+        visible={showPtDirectEdit}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPtDirectEdit(false)}
+      >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }} activeOpacity={1} onPress={() => setShowPtDirectEdit(false)} />
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}>
+            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>PT 횟수 수정</Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 20 }}>잔여 PT와 총 횟수를 직접 수정해요</Text>
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSub, marginBottom: 6 }}>잔여 PT</Text>
+                <TextInput
+                  value={ptDirectForm.remaining}
+                  onChangeText={(v) => setPtDirectForm((p) => ({ ...p, remaining: v.replace(/[^0-9]/g, "") }))}
+                  keyboardType="numeric"
+                  style={{ backgroundColor: Colors.bgSub, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: "700", color: "#4A90FF", textAlign: "center" }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSub, marginBottom: 6 }}>총 횟수</Text>
+                <TextInput
+                  value={ptDirectForm.total}
+                  onChangeText={(v) => setPtDirectForm((p) => ({ ...p, total: v.replace(/[^0-9]/g, "") }))}
+                  keyboardType="numeric"
+                  style={{ backgroundColor: Colors.bgSub, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: "700", color: Colors.text, textAlign: "center" }}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={savePtDirect}
+              disabled={savingPtDirect}
+              style={{ backgroundColor: Colors.green, borderRadius: 14, paddingVertical: 16, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>
+                {savingPtDirect ? "저장 중..." : "저장"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* PT 수정 모달 */}
