@@ -336,8 +336,8 @@ export default function TrainerScheduleScreen() {
               moved: m.moved === true,
               isManual: false,
             }))
-            // 연결해제·타 트레이너 이동·PT 미등록 제외
-            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0)
+            // 연결해제·타 트레이너 이동·PT 미등록·잔여 없음 제외
+            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0 && m.ptRemaining > 0)
         : [];
       const manual = manualRes.ok
         ? (await manualRes.json())
@@ -348,8 +348,8 @@ export default function TrainerScheduleScreen() {
               ptTotal: m.ptTotal ?? 0,
               isManual: true,
             }))
-            // PT 미등록(ptTotal=0) 미연동 회원 제외
-            .filter((m: any) => m.ptTotal > 0)
+            // PT 미등록·잔여 없음 미연동 회원 제외
+            .filter((m: any) => m.ptTotal > 0 && m.ptRemaining > 0)
         : [];
       setMembers([...linked, ...manual].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     } catch (e) {
