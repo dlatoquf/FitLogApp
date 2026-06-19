@@ -2819,22 +2819,24 @@ export default function MemberDetailScreen() {
       const jwt = await AsyncStorage.getItem("jwt");
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` };
       if (type === "manual") {
-        await fetch(`${API_URL}/api/trainer/manual-members/${memberId}`, {
+        const res = await fetch(`${API_URL}/api/trainer/manual-members/${memberId}`, {
           method: "PUT",
           headers,
           body: JSON.stringify({ sessions: total, ptRemaining: remaining }),
         });
+        if (!res.ok) throw new Error(`미연동 수정 실패 (${res.status})`);
       } else {
-        await fetch(`${API_URL}/api/trainer/members/${memberId}/pt`, {
+        const res = await fetch(`${API_URL}/api/trainer/members/${memberId}/pt`, {
           method: "PUT",
           headers,
           body: JSON.stringify({ ptTotal: total, ptRemaining: remaining }),
         });
+        if (!res.ok) throw new Error(`연동 수정 실패 (${res.status})`);
       }
       setShowPtDirectEdit(false);
       fetchMember();
-    } catch {
-      Alert.alert("오류", "수정에 실패했어요.");
+    } catch (e: any) {
+      Alert.alert("오류", e.message ?? "수정에 실패했어요.");
     } finally {
       setSavingPtDirect(false);
     }
