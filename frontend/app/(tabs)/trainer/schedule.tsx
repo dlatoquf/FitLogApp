@@ -816,12 +816,7 @@ export default function TrainerScheduleScreen() {
                       borderColor: Colors.green,
                       justifyContent: "center",
                       alignItems: "center",
-                      opacity:
-                        !active && !isPast
-                          ? 0.2
-                          : isPast && !isSelected
-                            ? 0.4
-                            : 1,
+                      opacity: !active && !isPast ? 0.2 : 1,
                     }}
                   >
                     <Text
@@ -1122,7 +1117,7 @@ export default function TrainerScheduleScreen() {
                         onPress={() => openWeeklyAdd(d, time, slot)}
                         style={{
                           height: SLOT_H,
-                          backgroundColor: isActive ? "transparent" : "#F9FAFB",
+                          backgroundColor: "transparent",
                           borderRightWidth: 1,
                           borderRightColor: Colors.border,
                         }}
