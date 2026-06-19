@@ -4492,7 +4492,7 @@ export default function MemberDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              {isToday && dayPtLogs.length === 0 && (
+              {dayPtLogs.length === 0 && (
                 <TouchableOpacity
                   onPress={() => {
                     fetchFitLogHistory();
