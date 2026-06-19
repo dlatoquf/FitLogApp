@@ -144,11 +144,40 @@
     .page-btn:disabled { opacity: 0.3; cursor: default; }
     .page-info { font-size: 13px; color: var(--muted); padding: 0 8px; }
 
+    /* ── 모바일 상단 탭바 ── */
+    .mobile-topbar {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .mobile-topbar-logo {
+      font-size: 16px; font-weight: 800; padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mobile-topbar-logo span { color: var(--green); }
+    .mobile-tabs {
+      display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .mobile-tabs::-webkit-scrollbar { display: none; }
+    .mobile-tab {
+      flex: 1; min-width: 70px; padding: 10px 4px; text-align: center;
+      font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer;
+      border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s;
+    }
+    .mobile-tab.active { color: var(--green); border-bottom-color: var(--green); }
+    .mobile-tab-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
     @media (max-width: 768px) {
-      .sidebar { width: 60px; }
-      .sidebar-logo, .nav-item span, .sidebar-footer { display: none; }
-      .nav-icon { margin: 0 auto; }
-      .main { margin-left: 60px; padding: 20px 16px; }
+      .sidebar { display: none; }
+      .mobile-topbar { display: block; }
+      .main { margin-left: 0; padding: 16px 14px; padding-top: 96px; }
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 480px; }
+      .stat-card { min-width: 100px; padding: 14px 16px; }
+      .stat-value { font-size: 22px; }
+      .page-title { font-size: 18px; }
+      .toolbar { flex-wrap: wrap; }
+      .search-input { min-width: 0; }
     }
   </style>
 </head>
@@ -165,6 +194,25 @@
 </div>
 
 <div id="admin-screen">
+  <!-- 모바일 상단 탭바 -->
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-logo">Fit<span>Log</span> <span style="font-size:11px;color:var(--muted);font-weight:500;">Admin</span></div>
+    <div class="mobile-tabs">
+      <div class="mobile-tab active" onclick="switchTab('users', this)" data-tab="users">
+        <span class="mobile-tab-icon">👤</span>유저
+      </div>
+      <div class="mobile-tab" onclick="switchTab('trainers', this)" data-tab="trainers">
+        <span class="mobile-tab-icon">🏋️</span>트레이너
+      </div>
+      <div class="mobile-tab" onclick="switchTab('members', this)" data-tab="members">
+        <span class="mobile-tab-icon">🙋</span>회원
+      </div>
+      <div class="mobile-tab" onclick="switchTab('payments', this)" data-tab="payments">
+        <span class="mobile-tab-icon">💳</span>PT결제
+      </div>
+    </div>
+  </div>
+
   <aside class="sidebar">
     <div class="sidebar-logo">Fit<span>Log</span></div>
     <nav class="nav">
@@ -236,7 +284,13 @@
     currentTab = tab;
     currentPage = 1;
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    el.closest('.nav-item').classList.add('active');
+    el.closest('.nav-item, .mobile-tab').classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(`'${tab}'`)) n.classList.add('active');
+    });
+    document.querySelectorAll('.mobile-tab').forEach(n => {
+      n.classList.toggle('active', n.dataset.tab === tab);
+    });
     document.getElementById('page-title').textContent = tabMeta[tab].title;
     document.getElementById('page-sub').textContent = tabMeta[tab].sub;
     document.getElementById('search-input').value = '';
