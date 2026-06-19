@@ -9,6 +9,7 @@ import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -38,6 +39,7 @@ public class AdminController {
         return ADMIN_PASSWORD.equals(pw);
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/users")
     public ResponseEntity<?> getUsers(@RequestParam String pw) {
         if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
@@ -57,6 +59,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/trainers")
     public ResponseEntity<?> getTrainers(@RequestParam String pw) {
         if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
@@ -76,6 +79,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/members")
     public ResponseEntity<?> getMembers(@RequestParam String pw) {
         if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
@@ -96,6 +100,7 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/payments")
     public ResponseEntity<?> getPayments(@RequestParam String pw) {
         if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));

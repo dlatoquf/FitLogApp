@@ -129,6 +129,21 @@
     }
     .updated { font-size: 12px; color: var(--muted); margin-left: auto; }
 
+    /* 페이지네이션 */
+    .pagination {
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; margin-top: 16px;
+    }
+    .page-btn {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); padding: 7px 12px; font-size: 13px; cursor: pointer;
+      transition: all 0.15s; min-width: 36px; text-align: center;
+    }
+    .page-btn:hover { border-color: var(--green); color: var(--green); }
+    .page-btn.active { background: var(--green); border-color: var(--green); color: #000; font-weight: 700; }
+    .page-btn:disabled { opacity: 0.3; cursor: default; }
+    .page-info { font-size: 13px; color: var(--muted); padding: 0 8px; }
+
     @media (max-width: 768px) {
       .sidebar { width: 60px; }
       .sidebar-logo, .nav-item span, .sidebar-footer { display: none; }
@@ -182,13 +197,16 @@
     <div class="table-wrap">
       <div id="table-area"><div class="loading">불러오는 중...</div></div>
     </div>
+    <div class="pagination" id="pagination"></div>
   </main>
 </div>
 
 <script>
   const API = 'https://fitlog-api.duckdns.org';
+  const PAGE_SIZE = 20;
   let pw = '';
   let currentTab = 'users';
+  let currentPage = 1;
   let allData = { users: [], trainers: [], members: [], payments: [] };
 
   const tabMeta = {
@@ -216,8 +234,9 @@
 
   function switchTab(tab, el) {
     currentTab = tab;
+    currentPage = 1;
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    el.classList.add('active');
+    el.closest('.nav-item').classList.add('active');
     document.getElementById('page-title').textContent = tabMeta[tab].title;
     document.getElementById('page-sub').textContent = tabMeta[tab].sub;
     document.getElementById('search-input').value = '';
@@ -253,7 +272,8 @@
       const n = allData.users.filter(u => !u.role).length;
       el.innerHTML = stat('전체', allData.users.length) + stat('트레이너', t) + stat('회원', m) + stat('미설정', n);
     } else if (currentTab === 'trainers') {
-      el.innerHTML = stat('전체 트레이너', allData.trainers.length);
+      const totalMembers = allData.trainers.reduce((s, t) => s + (t.memberCount || 0), 0);
+      el.innerHTML = stat('전체 트레이너', allData.trainers.length) + stat('총 회원 수', totalMembers);
     } else if (currentTab === 'members') {
       const active = allData.members.filter(m => m.status === 'ACTIVE').length;
       el.innerHTML = stat('전체 회원', allData.members.length) + stat('활성', active);
@@ -272,11 +292,12 @@
     const el = document.getElementById('table-area');
 
     if (currentTab === 'users') {
-      const data = allData.users.filter(u => match(u.name, u.email, q));
-      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      const filtered = (Array.isArray(allData.users) ? allData.users : []).filter(u => match(u.name, u.email, q));
+      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
+      const { items, total, totalPages } = paginate(filtered);
       el.innerHTML = `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th>상태</th>
-      </tr></thead><tbody>${data.map(u => `<tr>
+      </tr></thead><tbody>${items.map(u => `<tr>
         <td style="color:var(--muted)">${u.id}</td>
         <td><b>${u.name || '-'}</b></td>
         <td style="color:var(--muted)">${u.email || '-'}</td>
@@ -284,13 +305,15 @@
         <td style="color:var(--muted)">${u.createdAt || '-'}</td>
         <td><span class="badge ${u.deleted ? 'badge-deleted' : 'badge-active'}">${u.deleted ? '삭제됨' : '정상'}</span></td>
       </tr>`).join('')}</tbody></table>`;
+      renderPagination(total, totalPages);
 
     } else if (currentTab === 'trainers') {
-      const data = allData.trainers.filter(t => match(t.name, t.email, q));
-      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      const filtered = (Array.isArray(allData.trainers) ? allData.trainers : []).filter(t => match(t.name, t.email, q));
+      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
+      const { items, total, totalPages } = paginate(filtered);
       el.innerHTML = `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>헬스장</th><th>트레이너 코드</th><th>회원 수</th><th>플랜</th>
-      </tr></thead><tbody>${data.map(t => `<tr>
+      </tr></thead><tbody>${items.map(t => `<tr>
         <td style="color:var(--muted)">${t.id}</td>
         <td><b>${t.name || '-'}</b></td>
         <td style="color:var(--muted)">${t.email || '-'}</td>
@@ -299,13 +322,15 @@
         <td>${t.memberCount}</td>
         <td>${t.plan || '-'}</td>
       </tr>`).join('')}</tbody></table>`;
+      renderPagination(total, totalPages);
 
     } else if (currentTab === 'members') {
-      const data = allData.members.filter(m => match(m.name, m.email, q) || (m.trainerName||'').toLowerCase().includes(q));
-      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      const filtered = (Array.isArray(allData.members) ? allData.members : []).filter(m => match(m.name, m.email, q) || (m.trainerName||'').toLowerCase().includes(q));
+      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
+      const { items, total, totalPages } = paginate(filtered);
       el.innerHTML = `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>트레이너</th><th>잔여 PT</th><th>전체 PT</th><th>상태</th>
-      </tr></thead><tbody>${data.map(m => `<tr>
+      </tr></thead><tbody>${items.map(m => `<tr>
         <td style="color:var(--muted)">${m.id}</td>
         <td><b>${m.name || '-'}</b></td>
         <td style="color:var(--muted)">${m.email || '-'}</td>
@@ -314,13 +339,15 @@
         <td>${m.ptTotal ?? '-'}</td>
         <td><span class="badge ${m.status === 'ACTIVE' ? 'badge-active' : 'badge-deleted'}">${m.status || '-'}</span></td>
       </tr>`).join('')}</tbody></table>`;
+      renderPagination(total, totalPages);
 
     } else if (currentTab === 'payments') {
-      const data = allData.payments.filter(p => match(p.memberName, p.trainerName, q));
-      if (!data.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+      const filtered = (Array.isArray(allData.payments) ? allData.payments : []).filter(p => match(p.memberName, p.trainerName, q));
+      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
+      const { items, total, totalPages } = paginate(filtered);
       el.innerHTML = `<table><thead><tr>
         <th>ID</th><th>트레이너</th><th>회원</th><th>금액</th><th>횟수</th><th>메모</th><th>결제일</th><th>상태</th>
-      </tr></thead><tbody>${data.map(p => `<tr>
+      </tr></thead><tbody>${items.map(p => `<tr>
         <td style="color:var(--muted)">${p.id}</td>
         <td>${p.trainerName || '-'}</td>
         <td><b>${p.memberName || '-'}</b></td>
@@ -330,11 +357,46 @@
         <td style="color:var(--muted)">${p.paidAt || '-'}</td>
         <td>${p.status || '-'}</td>
       </tr>`).join('')}</tbody></table>`;
+      renderPagination(total, totalPages);
     }
   }
 
   function match(a, b, q) {
     return (a||'').toLowerCase().includes(q) || (b||'').toLowerCase().includes(q);
+  }
+
+  function paginate(data) {
+    const total = data.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return { items: data.slice(start, start + PAGE_SIZE), total, totalPages };
+  }
+
+  function renderPagination(total, totalPages) {
+    const el = document.getElementById('pagination');
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+    let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + 4);
+    if (end - start < 4) start = Math.max(1, end - 4);
+
+    if (start > 1) html += `<button class="page-btn" onclick="goPage(1)">1</button>${start > 2 ? '<span class="page-info">…</span>' : ''}`;
+    for (let i = start; i <= end; i++) {
+      html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    }
+    if (end < totalPages) html += `${end < totalPages-1 ? '<span class="page-info">…</span>' : ''}<button class="page-btn" onclick="goPage(${totalPages})">${totalPages}</button>`;
+
+    html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+    html += `<span class="page-info">${total}개</span>`;
+    el.innerHTML = html;
+  }
+
+  function goPage(p) {
+    currentPage = p;
+    renderTable();
   }
 </script>
 </body>
