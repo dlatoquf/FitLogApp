@@ -4122,7 +4122,7 @@ export default function MemberDetailScreen() {
                 borderColor: Colors.border,
               }}
             >
-              <Text style={{ fontSize: 12, color: Colors.textMuted }}>✏️ 수정</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>수정</Text>
             </TouchableOpacity>
           </View>
           {member.ptTotal > 0 && (

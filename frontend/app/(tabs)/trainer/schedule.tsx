@@ -1116,22 +1116,13 @@ export default function TrainerScheduleScreen() {
                           </Text>
                         ) : null}
                       </TouchableOpacity>
-                    ) : isActive ? (
-                      // 빈 칸 (활성)
+                    ) : (
+                      // 빈 칸 (활성 + 과거 모두 터치 가능)
                       <TouchableOpacity
                         onPress={() => openWeeklyAdd(d, time, slot)}
                         style={{
                           height: SLOT_H,
-                          borderRightWidth: 1,
-                          borderRightColor: Colors.border,
-                        }}
-                      />
-                    ) : (
-                      // 과거 빈 칸
-                      <View
-                        style={{
-                          height: SLOT_H,
-                          backgroundColor: "#F9FAFB",
+                          backgroundColor: isActive ? "transparent" : "#F9FAFB",
                           borderRightWidth: 1,
                           borderRightColor: Colors.border,
                         }}
