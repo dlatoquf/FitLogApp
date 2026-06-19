@@ -351,7 +351,7 @@ export default function TrainerScheduleScreen() {
             // PT 미등록(ptTotal=0) 미연동 회원 제외
             .filter((m: any) => m.ptTotal > 0)
         : [];
-      setMembers([...linked, ...manual]);
+      setMembers([...linked, ...manual].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     } catch (e) {
       console.error("fetchMembers error:", e);
     }
