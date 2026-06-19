@@ -3,7 +3,7 @@
     "name": "FitLog",
     "slug": "FitLogApp",
     "displayName": "FitLog",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "splash": {
@@ -16,7 +16,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "2",
+      "buildNumber": "3",
       "bundleIdentifier": "com.anonymous.FitLogApp",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {

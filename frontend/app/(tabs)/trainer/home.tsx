@@ -841,7 +841,7 @@ export default function TrainerHomeScreen() {
       updateChecked.current = true;
       (async () => {
         try {
-          const CURRENT_VERSION = "1.0.2";
+          const CURRENT_VERSION = "1.0.3";
           console.log("[업데이트 체크] 시작 - 현재 버전:", CURRENT_VERSION);
           const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
           const json = await res.json();
@@ -886,8 +886,8 @@ export default function TrainerHomeScreen() {
           link: {
             mobileWebUrl: APP_STORE_URL,
             webUrl: APP_STORE_URL,
-            androidExecutionParams: `code=${code}`,
-            iosExecutionParams: `code=${code}`,
+            androidExecutionParams: { code },
+            iosExecutionParams: { code },
           },
           buttonTitle: "FitLog 앱 설치하기",
         },

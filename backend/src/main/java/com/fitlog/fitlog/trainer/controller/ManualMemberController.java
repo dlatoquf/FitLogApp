@@ -267,6 +267,11 @@ public class ManualMemberController {
         m.setPtTotal((m.getPtTotal() != null ? m.getPtTotal() : 0) + sessions);
         m.setPtRemaining((m.getPtRemaining() != null ? m.getPtRemaining() : 0) + sessions);
         m.setPtEndedAt(null); // 재결제 시 비활성화 타이머 초기화
+        // OT 회원이 PT 결제 시 memo를 결제 메모 또는 null로 변경
+        if ("OT".equalsIgnoreCase(m.getMemo())) {
+            String paymentMemo = body.containsKey("memo") ? (String) body.get("memo") : null;
+            m.setMemo(paymentMemo != null && !paymentMemo.isBlank() ? paymentMemo : null);
+        }
         manualMemberRepository.save(m);
 
         // PtContract 생성 (월별 매출 추적)

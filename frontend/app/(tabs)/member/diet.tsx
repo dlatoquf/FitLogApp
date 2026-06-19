@@ -141,7 +141,7 @@ export default function MemberDietScreen() {
       setSelectedDate(new Date());
       scrollRef.current?.scrollTo({ y: 0, animated: false });
       fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
 
@@ -172,7 +172,7 @@ export default function MemberDietScreen() {
       }
     };
     fetchWeekDiet();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekOffset]);
 
   // ── 사진 비율 자동 계산 ─────────────────────────────────────────────────────
@@ -455,7 +455,13 @@ export default function MemberDietScreen() {
                       {d.getDate()}
                     </Text>
                   </View>
-                  <View style={{ height: 6, justifyContent: "center", alignItems: "center" }}>
+                  <View
+                    style={{
+                      height: 6,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
                     {hasDiet && (
                       <View
                         style={{

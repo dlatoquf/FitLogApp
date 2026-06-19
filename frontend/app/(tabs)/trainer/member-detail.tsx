@@ -29,16 +29,15 @@ import {
   PanResponder,
   Platform,
   ScrollView,
-  Share,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Purchases from "react-native-purchases";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import {
   API_URL,
@@ -1413,7 +1412,10 @@ export default function MemberDetailScreen() {
 
   const [showPTEdit, setShowPTEdit] = useState(false);
   const [showPtDirectEdit, setShowPtDirectEdit] = useState(false);
-  const [ptDirectForm, setPtDirectForm] = useState({ remaining: "", total: "" });
+  const [ptDirectForm, setPtDirectForm] = useState({
+    remaining: "",
+    total: "",
+  });
   const [savingPtDirect, setSavingPtDirect] = useState(false);
   const [memberActionLoading, setMemberActionLoading] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -1542,17 +1544,31 @@ export default function MemberDetailScreen() {
       const cleanUrl = media.url.split("?")[0];
       const urlExt = cleanUrl.split(".").pop()?.toLowerCase();
       const ext = isVideo
-        ? (["mp4", "mov", "m4v"].includes(urlExt ?? "") ? urlExt : "mp4")
-        : (["jpg", "jpeg", "png", "webp", "heic"].includes(urlExt ?? "") ? urlExt : "jpg");
+        ? ["mp4", "mov", "m4v"].includes(urlExt ?? "")
+          ? urlExt
+          : "mp4"
+        : ["jpg", "jpeg", "png", "webp", "heic"].includes(urlExt ?? "")
+          ? urlExt
+          : "jpg";
       const cacheDir = FileSystem.cacheDirectory ?? "file:///tmp/";
       const fileUri = `${cacheDir}fitlog_${Date.now()}.${ext}`;
-      const downloadResumable = FileSystem.createDownloadResumable(media.url, fileUri);
+      const downloadResumable = FileSystem.createDownloadResumable(
+        media.url,
+        fileUri,
+      );
       const result = await downloadResumable.downloadAsync();
-      if (!result || result.status !== 200) throw new Error(`HTTP ${result?.status}`);
+      if (!result || result.status !== 200)
+        throw new Error(`HTTP ${result?.status}`);
       await MediaLibrary.saveToLibraryAsync(result.uri);
-      Alert.alert("저장 완료", isVideo ? "영상이 갤러리에 저장됐어요." : "사진이 갤러리에 저장됐어요.");
+      Alert.alert(
+        "저장 완료",
+        isVideo ? "영상이 갤러리에 저장됐어요." : "사진이 갤러리에 저장됐어요.",
+      );
     } catch (e: any) {
-      Alert.alert("오류", `다운로드 중 오류가 발생했어요.\n${e?.message ?? ""}`);
+      Alert.alert(
+        "오류",
+        `다운로드 중 오류가 발생했어요.\n${e?.message ?? ""}`,
+      );
     } finally {
       setMediaDownloading(false);
     }
@@ -2517,6 +2533,7 @@ export default function MemberDetailScreen() {
         missions: ptMissions.filter((m) => m.trim().length > 0),
         exercises: exercisesWithMedia,
         keepMediaIds,
+        ...(isManual && !editingFitLogId ? { workoutType: isOt ? "OT" : "PT" } : {}),
       };
       // 연동 회원만 memberId 필드 전달 (미연동은 URL로 식별)
       if (!isManual && !editingFitLogId) body.memberId = memberId;
@@ -2622,7 +2639,10 @@ export default function MemberDetailScreen() {
     }
   };
 
-  const buildManualWorkoutShareText = (data: typeof smsPromptData) => {
+  const buildManualWorkoutShareText = (
+    data: typeof smsPromptData,
+    code?: string,
+  ) => {
     const memberName = member?.user?.name ?? "회원";
 
     const exerciseNames = Array.from(
@@ -2633,7 +2653,11 @@ export default function MemberDetailScreen() {
       ? exerciseNames.map((name) => `- ${name}`).join("\n")
       : "- 오늘 운동 기록";
 
-    return `${memberName}님, 오늘 운동로그가 작성되었습니다.\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은\nFitLog 앱에서 확인할 수 있어요.`;
+    const codeText = code
+      ? `\n\n아직 FitLog 앱이 없으시다면 설치 후 회원가입 시\n트레이너 코드 [${code}] 를 입력해주세요.`
+      : "";
+
+    return `${memberName}님, 오늘 운동로그가 작성되었습니다.\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은\nFitLog 앱에서 확인할 수 있어요.${codeText}`;
   };
 
   // OT 체험 수업 카카오 공유 메시지 빌드
@@ -2649,20 +2673,22 @@ export default function MemberDetailScreen() {
       ? exerciseNames.map((name) => `- ${name}`).join("\n")
       : "- 오늘 운동 기록";
 
-    return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요!\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.\n\n운동 기록·식단·일정을 한 곳에서 관리할 수 있는 FitLog 앱도 함께 활용해보세요.`;
+    return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요!\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.`;
   };
 
   const shareManualWorkoutLog = async () => {
+    const code = trainerInviteCode.trim();
     const text = isOt
       ? buildOtShareText()
-      : buildManualWorkoutShareText(smsPromptData);
-    // OT는 앱 설치 안내 없음 — PT 미연동만 앱 링크 포함
-    const code = trainerInviteCode.trim();
+      : buildManualWorkoutShareText(smsPromptData, code || undefined);
+    // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함
     const inviteUrl = isOt
       ? "https://fitlog.app"
-      : code
-        ? `https://fitlog.app/download?trainerCode=${encodeURIComponent(code)}`
-        : "https://fitlog.app/download";
+      : "https://apps.apple.com/app/fitlog/id6769366090";
+    const executionParams = {
+      memberId: String(memberId),
+      ...(isManual ? { memberType: "manual" } : {}),
+    };
     setSmsPromptData((p) => ({ ...p, visible: false }));
     const safeText = String(text ?? "");
     const safeUrl = String(inviteUrl ?? "https://fitlog.app");
@@ -2676,6 +2702,10 @@ export default function MemberDetailScreen() {
           link: {
             mobileWebUrl: safeUrl,
             webUrl: safeUrl,
+            ...(executionParams && {
+              iosExecutionParams: executionParams,
+              androidExecutionParams: executionParams,
+            }),
           },
         },
       });
@@ -2817,20 +2847,29 @@ export default function MemberDetailScreen() {
     try {
       setSavingPtDirect(true);
       const jwt = await AsyncStorage.getItem("jwt");
-      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` };
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${jwt}`,
+      };
       if (type === "manual") {
-        const res = await fetch(`${API_URL}/api/trainer/manual-members/${memberId}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({ sessions: total, ptRemaining: remaining }),
-        });
+        const res = await fetch(
+          `${API_URL}/api/trainer/manual-members/${memberId}`,
+          {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({ sessions: total, ptRemaining: remaining }),
+          },
+        );
         if (!res.ok) throw new Error(`미연동 수정 실패 (${res.status})`);
       } else {
-        const res = await fetch(`${API_URL}/api/trainer/members/${memberId}/pt`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({ ptTotal: total, ptRemaining: remaining }),
-        });
+        const res = await fetch(
+          `${API_URL}/api/trainer/members/${memberId}/pt`,
+          {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({ ptTotal: total, ptRemaining: remaining }),
+          },
+        );
         if (!res.ok) throw new Error(`연동 수정 실패 (${res.status})`);
       }
       setShowPtDirectEdit(false);
@@ -4124,7 +4163,9 @@ export default function MemberDetailScreen() {
                 borderColor: Colors.border,
               }}
             >
-              <Text style={{ fontSize: 12, color: Colors.textMuted }}>수정</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                수정
+              </Text>
             </TouchableOpacity>
           </View>
           {member.ptTotal > 0 && (
@@ -4492,7 +4533,7 @@ export default function MemberDetailScreen() {
                       color: Colors.green,
                     }}
                   >
-                    + PT 등록
+                    + 운동일지 등록
                   </Text>
                 </TouchableOpacity>
               )}
@@ -6390,36 +6431,130 @@ export default function MemberDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowPtDirectEdit(false)}
       >
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }} activeOpacity={1} onPress={() => setShowPtDirectEdit(false)} />
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}>
-            <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 16 }} />
-            <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>PT 횟수 수정</Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 20 }}>잔여 PT와 총 횟수를 직접 수정해요</Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)" }}
+            activeOpacity={1}
+            onPress={() => setShowPtDirectEdit(false)}
+          />
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: Math.max(insets.bottom, 24),
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: Colors.border,
+                borderRadius: 99,
+                alignSelf: "center",
+                marginBottom: 16,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "800",
+                color: Colors.text,
+                marginBottom: 4,
+              }}
+            >
+              PT 횟수 수정
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: Colors.textMuted,
+                marginBottom: 20,
+              }}
+            >
+              잔여 PT와 총 횟수를 직접 수정해요
+            </Text>
             <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSub, marginBottom: 6 }}>잔여 PT</Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: Colors.textSub,
+                    marginBottom: 6,
+                  }}
+                >
+                  잔여 PT
+                </Text>
                 <TextInput
                   value={ptDirectForm.remaining}
-                  onChangeText={(v) => setPtDirectForm((p) => ({ ...p, remaining: v.replace(/[^0-9]/g, "") }))}
+                  onChangeText={(v) =>
+                    setPtDirectForm((p) => ({
+                      ...p,
+                      remaining: v.replace(/[^0-9]/g, ""),
+                    }))
+                  }
                   keyboardType="numeric"
-                  style={{ backgroundColor: Colors.bgSub, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: "700", color: "#4A90FF", textAlign: "center" }}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1.5,
+                    borderColor: Colors.border,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 18,
+                    fontWeight: "700",
+                    color: "#4A90FF",
+                    textAlign: "center",
+                  }}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSub, marginBottom: 6 }}>총 횟수</Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: Colors.textSub,
+                    marginBottom: 6,
+                  }}
+                >
+                  총 횟수
+                </Text>
                 <TextInput
                   value={ptDirectForm.total}
-                  onChangeText={(v) => setPtDirectForm((p) => ({ ...p, total: v.replace(/[^0-9]/g, "") }))}
+                  onChangeText={(v) =>
+                    setPtDirectForm((p) => ({
+                      ...p,
+                      total: v.replace(/[^0-9]/g, ""),
+                    }))
+                  }
                   keyboardType="numeric"
-                  style={{ backgroundColor: Colors.bgSub, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, padding: 14, fontSize: 18, fontWeight: "700", color: Colors.text, textAlign: "center" }}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderWidth: 1.5,
+                    borderColor: Colors.border,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 18,
+                    fontWeight: "700",
+                    color: Colors.text,
+                    textAlign: "center",
+                  }}
                 />
               </View>
             </View>
             <TouchableOpacity
               onPress={savePtDirect}
               disabled={savingPtDirect}
-              style={{ backgroundColor: Colors.green, borderRadius: 14, paddingVertical: 16, alignItems: "center" }}
+              style={{
+                backgroundColor: Colors.green,
+                borderRadius: 14,
+                paddingVertical: 16,
+                alignItems: "center",
+              }}
             >
               <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>
                 {savingPtDirect ? "저장 중..." : "저장"}
@@ -7006,15 +7141,22 @@ export default function MemberDetailScreen() {
             >
               {mediaGalleryIndex + 1} / {mediaGallery.length}
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
               <TouchableOpacity
-                onPress={() => !mediaDownloading && handleDownloadMedia(mediaGallery[mediaGalleryIndex])}
+                onPress={() =>
+                  !mediaDownloading &&
+                  handleDownloadMedia(mediaGallery[mediaGalleryIndex])
+                }
                 style={{ padding: 8, opacity: mediaDownloading ? 0.5 : 1 }}
               >
                 {mediaDownloading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+                  <Text
+                    style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                  >
                     저장
                   </Text>
                 )}
@@ -7023,7 +7165,9 @@ export default function MemberDetailScreen() {
                 onPress={() => setMediaGallery([])}
                 style={{ padding: 8 }}
               >
-                <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}>
+                <Text
+                  style={{ color: "#fff", fontSize: 22, fontWeight: "700" }}
+                >
                   ✕
                 </Text>
               </TouchableOpacity>

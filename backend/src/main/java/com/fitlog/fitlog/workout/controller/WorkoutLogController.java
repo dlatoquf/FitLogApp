@@ -195,15 +195,19 @@ public class WorkoutLogController {
         java.time.LocalDate logDate = java.time.LocalDate.parse((String) body.get("date"));
         log.setLogDate(logDate);
 
-        // 해당 날짜 CONFIRMED 스케줄의 session_type으로 workout_type 결정
-        // 스케줄이 없으면 회원 메모로 판단
-        String workoutType = scheduleRepository
-                .findByTrainerAndDateAndStatus(trainer, logDate, "CONFIRMED")
-                .stream()
-                .filter(s -> s.getManualMember() != null && s.getManualMember().getId().equals(mm.getId()))
-                .findFirst()
-                .map(s -> s.getSessionType() != null ? s.getSessionType() : "PT")
-                .orElse("OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "") ? "OT" : "PT");
+        // 프론트에서 명시적으로 보낸 workoutType 우선, 없으면 스케줄→메모 순으로 결정
+        String workoutType;
+        if (body.containsKey("workoutType") && body.get("workoutType") != null) {
+            workoutType = (String) body.get("workoutType");
+        } else {
+            workoutType = scheduleRepository
+                    .findByTrainerAndDateAndStatus(trainer, logDate, "CONFIRMED")
+                    .stream()
+                    .filter(s -> s.getManualMember() != null && s.getManualMember().getId().equals(mm.getId()))
+                    .findFirst()
+                    .map(s -> s.getSessionType() != null ? s.getSessionType() : "PT")
+                    .orElse("OT".equalsIgnoreCase(mm.getMemo() != null ? mm.getMemo() : "") ? "OT" : "PT");
+        }
         log.setWorkoutType(workoutType);
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());

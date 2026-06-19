@@ -1,26 +1,9 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
 
+// 딥링크 처리는 _layout.tsx handleDeepLink 에서 담당
+// 이 화면은 Expo Router가 kakaolink 경로로 자동 라우팅할 때만 렌더링됨
 export default function KakaoLinkHandler() {
-  const params = useLocalSearchParams();
-
-  useEffect(() => {
-    const code = params.code as string | undefined;
-    (async () => {
-      if (code) {
-        await AsyncStorage.setItem("pendingInviteCode", code.toUpperCase());
-      }
-      // 로그인 여부 확인 후 적절한 화면으로 이동
-      const jwt = await AsyncStorage.getItem("jwt");
-      if (jwt) {
-        router.replace("/(tabs)/member/home" as any);
-      } else {
-        router.replace("/auth" as any);
-      }
-    })();
-  }, []);
-
+  useEffect(() => {}, []);
   return <View />;
 }

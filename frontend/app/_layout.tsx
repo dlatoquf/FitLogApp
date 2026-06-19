@@ -4,12 +4,12 @@ import messaging from "@react-native-firebase/messaging";
 import * as Linking from "expo-linking";
 import { router, Stack, useRootNavigationState } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Text, TouchableOpacity } from "react-native";
+import { Alert, Animated, AppState, Text, TouchableOpacity } from "react-native";
 import * as Notifications from "expo-notifications";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
-import { API_URL } from "../constants/api";
+import { API_URL, APP_STORE_URL } from "../constants/api";
 
 
 async function initFCM() {
@@ -222,16 +222,52 @@ export default function RootLayout() {
       });
     });
 
-    // 카카오 공유 딥링크: kakaoe889...://kakaolink?code=ABC123
+    // 카카오 공유 딥링크: kakaoe889...://kakaolink?code=ABC123 or ?memberId=123
     const handleDeepLink = ({ url }: { url: string }) => {
       try {
         if (!url.includes("kakaolink")) return;
         const query = url.split("?")[1] ?? "";
         const params = new URLSearchParams(query);
         const code = params.get("code");
-        if (code) {
-          AsyncStorage.setItem("pendingInviteCode", code.toUpperCase());
-        }
+        const memberId = params.get("memberId");
+        const memberType = params.get("memberType");
+
+        console.log("[DeepLink] url:", url, "memberId:", memberId, "code:", code);
+
+        AsyncStorage.multiGet(["jwt", "role"]).then(([jwtEntry, roleEntry]) => {
+          const jwt = jwtEntry[1];
+          const role = roleEntry[1];
+
+          if (memberId) {
+            // 운동로그 공유 링크
+            if (role === "TRAINER") {
+              router.push({
+                pathname: "/(tabs)/trainer/member-detail",
+                params: {
+                  id: memberId,
+                  ...(memberType === "manual" ? { type: "manual" } : {}),
+                  initialTab: "1",
+                },
+              } as any);
+            } else {
+              Linking.openURL(APP_STORE_URL);
+            }
+          } else if (code) {
+            // 회원초대 링크
+            AsyncStorage.setItem("pendingInviteCode", code.toUpperCase());
+            if (role === "TRAINER") {
+              Alert.alert(
+                "회원 전용",
+                "이 링크는 회원 가입용입니다.\n회원에게 공유해주세요!",
+                [{ text: "확인", onPress: () => router.replace("/(tabs)/trainer/home" as any) }],
+              );
+            } else if (jwt) {
+              router.replace("/(tabs)/member/home" as any);
+            } else {
+              router.replace("/auth" as any);
+            }
+          }
+        });
       } catch {}
     };
 
