@@ -668,6 +668,13 @@ export default function TrainerMoreScreen() {
                 onPress={handleSyncAllData}
                 showArrow
               />
+              <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 18 }}>
+                  💡 처음 연동했다면 <Text style={{ fontWeight: "700", color: Colors.text }}>기존 데이터 동기화</Text>를 눌러{"\n"}
+                  {'    '}지금까지의 데이터를 시트에 업로드하세요.{"\n"}
+                  {'    '}이후 신규 데이터는 자동으로 업로드됩니다.
+                </Text>
+              </View>
             </>
           )}
         </View>

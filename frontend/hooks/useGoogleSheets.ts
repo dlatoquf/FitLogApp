@@ -481,10 +481,12 @@ export async function syncAllData(trainerName = "트레이너"): Promise<{ succe
     const authHead0 = await authHeaders();
     const infoRes0 = await fetch(`${SHEETS_API}/${spreadsheetId}`, { headers: authHead0 });
     const info0 = await infoRes0.json();
-    const badSheets = (info0.sheets ?? []).filter((s: any) =>
-      ["회원", "Sheet1", "매출", "_temp"].includes(s.properties.title)
+    const allSheets0: any[] = info0.sheets ?? [];
+    const badSheets = allSheets0.filter((s: any) =>
+      ["회원", "Sheet1", "매출", "_temp", "시트1"].includes(s.properties.title)
     );
-    if (badSheets.length > 0) {
+    if (badSheets.length > 0 && badSheets.length < allSheets0.length) {
+      // 다른 시트가 있으면 바로 삭제
       await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
         method: "POST",
         headers: authHead0,
@@ -492,6 +494,28 @@ export async function syncAllData(trainerName = "트레이너"): Promise<{ succe
           requests: badSheets.map((s: any) => ({ deleteSheet: { sheetId: s.properties.sheetId } })),
         }),
       });
+    } else if (badSheets.length > 0 && badSheets.length === allSheets0.length) {
+      // 전부 bad sheet인 경우 → 더미 추가 후 삭제
+      const tempRes = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+        method: "POST", headers: authHead0,
+        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: "_sync_temp" } } }] }),
+      });
+      const tempData = await tempRes.json();
+      const tempId = tempData.replies?.[0]?.addSheet?.properties?.sheetId;
+      await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+        method: "POST", headers: authHead0,
+        body: JSON.stringify({ requests: badSheets.map((s: any) => ({ deleteSheet: { sheetId: s.properties.sheetId } })) }),
+      });
+      // 더미도 나중에 삭제 (실제 시트 생긴 후)
+      if (tempId !== undefined) {
+        const info4 = await (await fetch(`${SHEETS_API}/${spreadsheetId}`, { headers: authHead0 })).json();
+        if ((info4.sheets?.length ?? 0) > 1) {
+          await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+            method: "POST", headers: authHead0,
+            body: JSON.stringify({ requests: [{ deleteSheet: { sheetId: tempId } }] }),
+          });
+        }
+      }
     }
 
     // 1. 매출 전체 동기화 (연도별 시트: YYYY_매출표)
