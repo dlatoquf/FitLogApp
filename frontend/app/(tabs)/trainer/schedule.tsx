@@ -1199,18 +1199,18 @@ export default function TrainerScheduleScreen() {
                             ? (slot.note ?? sessionLabel(slot.sessionType ?? ""))
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
-                        {!isPersonalType(slot.sessionType ?? "") && (
-                          <Text
-                            style={{ fontSize: CELL_SUB_FONT, color: "#ffffffcc", textAlign: "center" }}
-                            numberOfLines={1}
-                          >
-                            {slot.note
-                              ? slot.note
-                              : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
-                                ? "OT"
-                                : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : ""}
-                          </Text>
-                        )}
+                        {!isPersonalType(slot.sessionType ?? "") && (() => {
+                          const sub = slot.note
+                            ? slot.note
+                            : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
+                              ? "OT"
+                              : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : "";
+                          return sub ? (
+                            <Text style={{ fontSize: CELL_SUB_FONT, color: "#ffffffcc", textAlign: "center" }} numberOfLines={1}>
+                              {sub}
+                            </Text>
+                          ) : null;
+                        })()}
                       </TouchableOpacity>
                     ) : (
                       // 빈 칸 (활성 + 과거 모두 터치 가능)
