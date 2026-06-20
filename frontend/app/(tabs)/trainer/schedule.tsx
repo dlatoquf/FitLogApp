@@ -976,7 +976,10 @@ export default function TrainerScheduleScreen() {
               <TouchableOpacity
                 key={dk}
                 onPress={() => {
-                  setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+                  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                  setSelectedDate(target);
+                  setViewYear(target.getFullYear());
+                  setViewMonth(target.getMonth() + 1);
                   setViewMode("month");
                 }}
                 style={{
@@ -1096,7 +1099,10 @@ export default function TrainerScheduleScreen() {
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
                         onPress={() => {
-                          setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+                          const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                          setSelectedDate(target);
+                          setViewYear(target.getFullYear());
+                          setViewMonth(target.getMonth() + 1);
                           setViewMode("month");
                         }}
                         onLongPress={() => {
