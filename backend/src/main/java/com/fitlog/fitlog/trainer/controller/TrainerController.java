@@ -401,6 +401,24 @@ public class TrainerController {
         return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
     }
 
+    // POST /api/trainer/members/{memberId}/reactivate — 비활성 회원 재활성화 (INACTIVE → ACTIVE)
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/trainer/members/{memberId}/reactivate")
+    public ResponseEntity<Map<String, Object>> reactivateMember(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long memberId) {
+        Trainer trainer = getTrainer(authorization);
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (member.getTrainer() == null || !trainer.getId().equals(member.getTrainer().getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
+        }
+        member.setStatus(Member.Status.ACTIVE);
+        member.setPtEndedAt(null);
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("message", "회원이 재활성화됐어요."));
+    }
+
     // PATCH /api/trainer/sheets-config — Google Sheets 연동 정보 저장
     @PatchMapping("/trainer/sheets-config")
     public ResponseEntity<Map<String, Object>> saveSheetConfig(
