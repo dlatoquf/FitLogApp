@@ -11,4 +11,8 @@ public interface DietPhotoFeedbackRepository extends JpaRepository<DietPhotoFeed
     @Modifying
     @Query("DELETE FROM DietPhotoFeedback f WHERE f.trainer.id = :trainerId")
     void deleteByTrainerId(@Param("trainerId") Long trainerId);
+
+    @Modifying
+    @Query("DELETE FROM DietPhotoFeedback f WHERE f.dietPhoto.member.id = :memberId")
+    void deleteByMemberId(@Param("memberId") Long memberId);
 }
