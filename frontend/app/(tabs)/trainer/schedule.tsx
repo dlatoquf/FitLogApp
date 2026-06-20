@@ -949,7 +949,7 @@ export default function TrainerScheduleScreen() {
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
-    const SLOT_H = 36;
+    const SLOT_H = 28;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
@@ -1148,7 +1148,7 @@ export default function TrainerScheduleScreen() {
                         }}
                       >
                         <Text
-                          style={{ fontSize: 10, fontWeight: "800", color: "#fff", textAlign: "center" }}
+                          style={{ fontSize: 11, fontWeight: "900", color: "#fff", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
@@ -1156,7 +1156,7 @@ export default function TrainerScheduleScreen() {
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
                         <Text
-                          style={{ fontSize: 8, color: "#ffffffcc", textAlign: "center" }}
+                          style={{ fontSize: 9, color: "#ffffffcc", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")

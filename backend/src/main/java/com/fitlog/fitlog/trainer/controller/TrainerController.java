@@ -340,8 +340,8 @@ public class TrainerController {
         if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
-        // 연동만 해제 — 회원 데이터는 회원 계정에 속하므로 삭제하지 않음
-        member.setStatus(Member.Status.INACTIVE);
+        // 트레이너 참조만 제거 — 회원 계정과 데이터는 유지
+        member.setTrainer(null);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);
         return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
