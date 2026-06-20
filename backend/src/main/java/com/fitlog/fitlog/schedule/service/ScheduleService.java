@@ -18,6 +18,7 @@ import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.ZoneId;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -64,7 +65,7 @@ public class ScheduleService {
         Trainer trainer = member.getTrainer();
         if (trainer == null) return Collections.emptyList();
 
-        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
+        LocalDate nextMonday = LocalDate.now(ZoneId.of("Asia/Seoul")).with(DayOfWeek.MONDAY).plusWeeks(1);
         LocalDate nextSunday = nextMonday.plusDays(6);
 
         return scheduleRepository.findByTrainerAndDateBetween(trainer, nextMonday, nextSunday)
@@ -211,7 +212,7 @@ public class ScheduleService {
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
         // 첫 가입(슬롯이 전혀 없음): 이번 주 슬롯도 함께 생성
-        LocalDate thisMonday = LocalDate.now().with(DayOfWeek.MONDAY);
+        LocalDate thisMonday = LocalDate.now(ZoneId.of("Asia/Seoul")).with(DayOfWeek.MONDAY);
         LocalDate thisSunday = thisMonday.plusDays(6);
         boolean noSlotsAtAll = scheduleRepository
                 .findIdsByTrainerAndDateBetween(trainer, thisMonday, thisSunday)
@@ -383,7 +384,7 @@ public class ScheduleService {
         Trainer trainer = trainerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("트레이너 없음"));
 
-        return scheduleRepository.findTodayConfirmedWithMember(trainer, LocalDate.now())
+        return scheduleRepository.findTodayConfirmedWithMember(trainer, LocalDate.now(ZoneId.of("Asia/Seoul")))
                 .stream()
                 .map(s -> {
                     Map<String, Object> m = new HashMap<>();
@@ -406,7 +407,7 @@ public class ScheduleService {
     // 트레이너 계정 최초 생성 시 이번주 슬롯 자동 생성
     @Transactional
     public void generateCurrentWeekSlotsIfAbsent(Trainer trainer) {
-        LocalDate monday = LocalDate.now().with(DayOfWeek.MONDAY);
+        LocalDate monday = LocalDate.now(ZoneId.of("Asia/Seoul")).with(DayOfWeek.MONDAY);
         LocalDate sunday = monday.plusDays(6);
 
         boolean alreadyExists = scheduleRepository
@@ -452,7 +453,7 @@ public class ScheduleService {
 
     @Transactional
     public void generateNextWeekSlots(Trainer trainer, List<Map<String, String>> customDayTimes) {
-        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
+        LocalDate nextMonday = LocalDate.now(ZoneId.of("Asia/Seoul")).with(DayOfWeek.MONDAY).plusWeeks(1);
         LocalDate nextSunday = nextMonday.plusDays(6);
 
         List<Long> existingIds = scheduleRepository
@@ -523,7 +524,7 @@ public class ScheduleService {
     // 다음 주 OPEN 슬롯이 없을 때만 트레이너 기본 설정으로 생성, 회원 ID 반환
     @Transactional
     public List<Long> autoOpenNextWeekIfNotOpen(Trainer trainer) {
-        LocalDate nextMonday = LocalDate.now().with(DayOfWeek.MONDAY).plusWeeks(1);
+        LocalDate nextMonday = LocalDate.now(ZoneId.of("Asia/Seoul")).with(DayOfWeek.MONDAY).plusWeeks(1);
         LocalDate nextSunday = nextMonday.plusDays(6);
 
         // 이미 OPEN 슬롯 있으면 스킵 (수동 오픈 또는 이전 cron 실행)

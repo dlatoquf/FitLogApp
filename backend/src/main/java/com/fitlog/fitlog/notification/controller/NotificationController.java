@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,7 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        LocalDateTime sevenDaysAgo = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(7);
 
         return notificationRepository
                 .findByUserAndCreatedAtAfterOrderByCreatedAtDesc(user, sevenDaysAgo)
@@ -100,7 +101,7 @@ public class NotificationController {
             @RequestHeader("Authorization") String authorization
     ) {
         User user = getUserFromToken(authorization);
-        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        LocalDateTime sevenDaysAgo = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(7);
         long count = notificationRepository.countByUserAndIsReadFalseAndCreatedAtAfter(user, sevenDaysAgo);
         return ResponseEntity.ok(Map.of("count", count));
     }

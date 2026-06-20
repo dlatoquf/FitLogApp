@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -140,7 +141,7 @@ public class ScheduleController {
             if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
                 int newRemaining = member.getPtRemaining() - 1;
                 member.setPtRemaining(newRemaining);
-                if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
+                if (newRemaining == 0) member.setPtEndedAt(LocalDate.now(ZoneId.of("Asia/Seoul")));
                 memberRepository.save(member);
             }
         } else if (schedule.getManualMember() != null) {
@@ -148,7 +149,7 @@ public class ScheduleController {
             if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
                 int newRemaining = mm.getPtRemaining() - 1;
                 mm.setPtRemaining(newRemaining);
-                if (newRemaining == 0) mm.setPtEndedAt(java.time.LocalDate.now());
+                if (newRemaining == 0) mm.setPtEndedAt(LocalDate.now(ZoneId.of("Asia/Seoul")));
                 manualMemberRepository.save(mm);
             }
         }
@@ -200,7 +201,7 @@ public class ScheduleController {
             if (member.getPtRemaining() != null && member.getPtRemaining() > 0) {
                 int newRemaining = member.getPtRemaining() - 1;
                 member.setPtRemaining(newRemaining);
-                if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
+                if (newRemaining == 0) member.setPtEndedAt(LocalDate.now(ZoneId.of("Asia/Seoul")));
                 memberRepository.save(member);
             }
             if (member.getNotifSchedule()) {
@@ -217,7 +218,7 @@ public class ScheduleController {
             if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
                 int newRemaining = mm.getPtRemaining() - 1;
                 mm.setPtRemaining(newRemaining);
-                if (newRemaining == 0) mm.setPtEndedAt(java.time.LocalDate.now());
+                if (newRemaining == 0) mm.setPtEndedAt(LocalDate.now(ZoneId.of("Asia/Seoul")));
                 manualMemberRepository.save(mm);
             }
         }

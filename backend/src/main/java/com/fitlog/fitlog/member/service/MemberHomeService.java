@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.Objects;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,7 +49,7 @@ public class MemberHomeService {
         result.put("ptRemaining", member.getPtRemaining() != null ? member.getPtRemaining() : 0);
         result.put("ptTotal", member.getPtTotal() != null ? member.getPtTotal() : 0);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
         // 식단은 사진 기반으로 전환 — 칼로리 집계 제거
@@ -125,7 +126,7 @@ public class MemberHomeService {
     public List<Map<String, Object>> getMyThisWeek(String authorization) {
         Member member = getMember(authorization);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
         boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
