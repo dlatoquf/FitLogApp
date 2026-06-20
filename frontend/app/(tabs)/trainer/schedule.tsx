@@ -948,9 +948,9 @@ export default function TrainerScheduleScreen() {
     // 화면 너비 안에 월~일이 모두 들어오도록 계산
     const SCREEN_W = Dimensions.get("window").width;
     const TIME_W = 30;
-    const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
+    const WEEK_GRID_PADDING = 40; // 화면 padding 20*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
-    const SLOT_H = 34;
+    const SLOT_H = 30;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
@@ -988,7 +988,7 @@ export default function TrainerScheduleScreen() {
       } else {
         setSessionType("PT");
         setOtName("");
-        setSelectedDays([toDateKey(selectedDate)]);
+        setSelectedDays([toDateKey(d)]); // selectedDate state는 아직 이전 값이므로 d 직접 사용
         setManualModal(true);
       }
     };
