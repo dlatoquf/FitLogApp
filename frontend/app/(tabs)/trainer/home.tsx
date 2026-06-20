@@ -1233,7 +1233,7 @@ export default function TrainerHomeScreen() {
                     }}
                   >
                     <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                      목표 수정
+                      이번달 목표 수정
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1400,28 +1400,25 @@ export default function TrainerHomeScreen() {
                       {/* 목표 수정 & 결제 추가 (이번 달만) */}
                       {isCurrentMonth && (
                         <>
-                          {data?.goalSessions == null && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setGoalSessionsInput("");
-                                setGoalRevenueInput(
-                                  data?.goalRevenue != null
-                                    ? data.goalRevenue.toLocaleString()
-                                    : "",
-                                );
-                                setGoalModal(true);
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  color: Colors.textMuted,
-                                }}
-                              >
-                                목표 수정
-                              </Text>
-                            </TouchableOpacity>
-                          )}
+                          <TouchableOpacity
+                            onPress={() => {
+                              setGoalSessionsInput(
+                                data?.goalSessions != null
+                                  ? String(data.goalSessions)
+                                  : "",
+                              );
+                              setGoalRevenueInput(
+                                data?.goalRevenue != null
+                                  ? data.goalRevenue.toLocaleString()
+                                  : "",
+                              );
+                              setGoalModal(true);
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                              이번달 매출 수정
+                            </Text>
+                          </TouchableOpacity>
                           <TouchableOpacity
                             onPress={handlePayButtonPress}
                             style={{
