@@ -697,7 +697,7 @@ export default function TrainerMembersScreen() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: Colors.bgSub,
+                  backgroundColor: "#fff",
                   borderRadius: 10,
                   paddingVertical: 9,
                   paddingHorizontal: 12,
@@ -774,17 +774,23 @@ export default function TrainerMembersScreen() {
                     style={{
                       alignSelf: "flex-start",
                       borderWidth: 1,
-                      borderColor: Colors.border,
+                      borderColor: m.memo ? Colors.green + "66" : Colors.border,
                       borderRadius: 6,
                       paddingHorizontal: 7,
                       paddingVertical: 2,
-                      backgroundColor: "#fff",
+                      backgroundColor: m.memo ? Colors.greenLight : "#fff",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 3,
                     }}
                   >
+                    {m.memo ? (
+                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.green }} />
+                    ) : null}
                     <Text
                       style={{
                         fontSize: 10,
-                        color: Colors.textSub,
+                        color: m.memo ? Colors.green : Colors.textSub,
                         fontWeight: "700",
                       }}
                     >
@@ -1437,15 +1443,13 @@ export default function TrainerMembersScreen() {
                     <View
                       key={memo.id}
                       style={{
-                        backgroundColor: Colors.bgSub,
+                        backgroundColor: "#fff",
                         borderRadius: 10,
                         paddingVertical: 8,
                         paddingHorizontal: 10,
                         marginBottom: i < memos.length - 1 ? 6 : 0,
                         borderWidth: 1,
                         borderColor: Colors.border,
-                        borderLeftWidth: 3,
-                        borderLeftColor: Colors.green,
                         flexDirection: "row",
                         alignItems: "flex-start",
                       }}
