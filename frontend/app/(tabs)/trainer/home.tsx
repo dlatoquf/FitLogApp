@@ -118,6 +118,7 @@ export default function TrainerHomeScreen() {
 
   // 목표 설정 모달
   const [goalModal, setGoalModal] = useState(false);
+  const [goalModalMode, setGoalModalMode] = useState<"sessions" | "revenue" | "both">("both");
   const [goalSessionsInput, setGoalSessionsInput] = useState("");
   const [goalRevenueInput, setGoalRevenueInput] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
@@ -591,10 +592,12 @@ export default function TrainerHomeScreen() {
           Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify({
-          goalSessions: goalSessionsInput ? parseInt(goalSessionsInput) : null,
-          goalRevenue: goalRevenueInput
-            ? parseInt(goalRevenueInput.replace(/,/g, ""))
-            : null,
+          goalSessions: goalModalMode !== "revenue"
+            ? (goalSessionsInput ? parseInt(goalSessionsInput) : null)
+            : data?.goalSessions ?? null,
+          goalRevenue: goalModalMode !== "sessions"
+            ? (goalRevenueInput ? parseInt(goalRevenueInput.replace(/,/g, "")) : null)
+            : data?.goalRevenue ?? null,
         }),
       });
       if (!res.ok) throw new Error("저장 실패");
@@ -1224,11 +1227,7 @@ export default function TrainerHomeScreen() {
                   <TouchableOpacity
                     onPress={() => {
                       setGoalSessionsInput(String(data?.goalSessions ?? ""));
-                      setGoalRevenueInput(
-                        (data?.goalRevenue ?? 0) > 0
-                          ? data!.goalRevenue!.toLocaleString()
-                          : "",
-                      );
+                      setGoalModalMode("sessions");
                       setGoalModal(true);
                     }}
                   >
@@ -1402,16 +1401,12 @@ export default function TrainerHomeScreen() {
                         <>
                           <TouchableOpacity
                             onPress={() => {
-                              setGoalSessionsInput(
-                                data?.goalSessions != null
-                                  ? String(data.goalSessions)
-                                  : "",
-                              );
                               setGoalRevenueInput(
                                 data?.goalRevenue != null
                                   ? data.goalRevenue.toLocaleString()
                                   : "",
                               );
+                              setGoalModalMode("revenue");
                               setGoalModal(true);
                             }}
                           >
@@ -2469,84 +2464,70 @@ export default function TrainerHomeScreen() {
 
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>
-                목표 설정
+                {goalModalMode === "sessions" ? "목표 수업 수정" : goalModalMode === "revenue" ? "목표 매출 수정" : "목표 설정"}
               </Text>
               <View style={{ backgroundColor: Colors.greenLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.green + "44" }}>
                 <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>월 단위</Text>
               </View>
             </View>
-            <Text
-              style={{
-                fontSize: 13,
-                color: Colors.textMuted,
-                marginBottom: 24,
-              }}
-            >
-              매달 초기화돼요 · 목표 수업 수와 목표 매출을 입력해주세요
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
+              매달 초기화돼요
             </Text>
 
             {/* 목표 수업 수 */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: Colors.textSub,
-                marginBottom: 8,
-              }}
-            >
-              월 목표 수업 수 (회)
-            </Text>
-            <TextInput
-              value={goalSessionsInput}
-              onChangeText={setGoalSessionsInput}
-              keyboardType="number-pad"
-              placeholder="예: 80"
-              placeholderTextColor={Colors.textMuted}
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                padding: 14,
-                fontSize: 16,
-                color: Colors.text,
-                marginBottom: 16,
-              }}
-            />
+            {(goalModalMode === "sessions" || goalModalMode === "both") && (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                  월 목표 수업 수 (회)
+                </Text>
+                <TextInput
+                  value={goalSessionsInput}
+                  onChangeText={setGoalSessionsInput}
+                  keyboardType="number-pad"
+                  placeholder="예: 80"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 14,
+                    fontSize: 16,
+                    color: Colors.text,
+                    marginBottom: 24,
+                  }}
+                />
+              </>
+            )}
 
             {/* 목표 매출 */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: Colors.textSub,
-                marginBottom: 8,
-              }}
-            >
-              월 목표 매출 (원)
-            </Text>
-            <TextInput
-              value={goalRevenueInput}
-              onChangeText={(text) => {
-                const digits = text.replace(/[^0-9]/g, "");
-                setGoalRevenueInput(
-                  digits ? Number(digits).toLocaleString() : "",
-                );
-              }}
-              keyboardType="number-pad"
-              placeholder="예: 3,000,000"
-              placeholderTextColor={Colors.textMuted}
-              style={{
-                backgroundColor: Colors.bgSub,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                padding: 14,
-                fontSize: 16,
-                color: Colors.text,
-                marginBottom: 24,
-              }}
-            />
+            {(goalModalMode === "revenue" || goalModalMode === "both") && (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>
+                  월 목표 매출 (원)
+                </Text>
+                <TextInput
+                  value={goalRevenueInput}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/[^0-9]/g, "");
+                    setGoalRevenueInput(digits ? Number(digits).toLocaleString() : "");
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="예: 3,000,000"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 14,
+                    fontSize: 16,
+                    color: Colors.text,
+                    marginBottom: 24,
+                  }}
+                />
+              </>
+            )}
 
             <TouchableOpacity
               onPress={saveGoals}
