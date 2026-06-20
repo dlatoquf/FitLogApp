@@ -949,7 +949,7 @@ export default function TrainerScheduleScreen() {
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
-    const SLOT_H = 30;
+    const SLOT_H = 36;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
