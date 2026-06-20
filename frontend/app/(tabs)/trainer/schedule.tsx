@@ -973,8 +973,12 @@ export default function TrainerScheduleScreen() {
             const dk = toDateKey(d);
             const isToday = dk === todayKey;
             return (
-              <View
+              <TouchableOpacity
                 key={dk}
+                onPress={() => {
+                  setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+                  setViewMode("month");
+                }}
                 style={{
                   width: COL_W,
                   alignItems: "center",
@@ -1023,7 +1027,7 @@ export default function TrainerScheduleScreen() {
                     {d.getDate()}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
