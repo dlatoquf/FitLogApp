@@ -41,6 +41,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import {
   API_URL,
+  APP_STORE_URL,
   CLOUDINARY_UPLOAD_PRESET,
   CLOUDINARY_UPLOAD_URL,
   ENDPOINTS,
@@ -1364,6 +1365,7 @@ export default function MemberDetailScreen() {
   const [savingFitLog, setSavingFitLog] = useState(false);
   const [trainerPlan, setTrainerPlan] = useState<"FREE" | "PRO">("FREE");
   const [trainerInviteCode, setTrainerInviteCode] = useState("");
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [smsPromptData, setSmsPromptData] = useState<{
@@ -2723,6 +2725,30 @@ export default function MemberDetailScreen() {
     }
   };
 
+  const handleInviteCopy = () => {
+    const code = trainerInviteCode ?? "";
+    Clipboard.setStringAsync(code);
+    Alert.alert("복사됐어요!", `트레이너 코드 ${code} 가 복사됐어요.`);
+  };
+
+  const handleInviteKakao = async () => {
+    const code = trainerInviteCode ?? "";
+    const trainerName = member?.user?.name ?? "트레이너";
+    const safeText = String(`안녕하세요! FitLog 앱에서 아래 트레이너 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
+    const safeUrl = String(APP_STORE_URL ?? "https://fitlog.app");
+    try {
+      await KakaoShare.shareTextTemplate({
+        template: {
+          text: safeText,
+          link: { mobileWebUrl: safeUrl, webUrl: safeUrl },
+          buttonTitle: "FitLog 앱 설치하기",
+        },
+      });
+    } catch (e: any) {
+      Alert.alert("카카오 공유 실패", e?.message ?? String(e));
+    }
+  };
+
   const getWorkoutConditionText = (score?: number | null) =>
     score === 4
       ? "최상"
@@ -3973,7 +3999,9 @@ export default function MemberDetailScreen() {
             </Text>
             {/* 미연동 / OT 뱃지 */}
             {isManual && (
-              <View
+              <TouchableOpacity
+                onPress={isOt ? undefined : () => setInviteModalVisible(true)}
+                activeOpacity={isOt ? 1 : 0.7}
                 style={{
                   backgroundColor: isOt ? "#FFF7ED" : "#F3F4F6",
                   borderWidth: 1,
@@ -3992,7 +4020,7 @@ export default function MemberDetailScreen() {
                 >
                   {isOt ? "OT" : "미연동"}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
           {/* 오른쪽: 공지사항 + ⋮ 메뉴 */}
@@ -7556,6 +7584,83 @@ export default function MemberDetailScreen() {
             </TouchableOpacity>
           </View>
         </Animated.View>
+      </Modal>
+
+      {/* 회원 초대 모달 */}
+      <Modal
+        visible={inviteModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInviteModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setInviteModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: Math.max(insets.bottom, 28),
+              }}
+            >
+              <View style={{ alignItems: "center", paddingBottom: 12, marginTop: -8 }}>
+                <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99 }} />
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>
+                회원 초대하기 🔗
+              </Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
+                아래 코드를 회원에게 공유하면 자동으로 연결돼요
+              </Text>
+              <View
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 14,
+                  padding: 20,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  marginBottom: 20,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 6 }}>🔑 내 트레이너 코드</Text>
+                <Text style={{ fontSize: 32, fontWeight: "900", color: Colors.green, letterSpacing: 4 }}>
+                  {trainerInviteCode || "-"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleInviteKakao}
+                style={{
+                  backgroundColor: "#FEE500",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#3C1E1E" }}>카카오톡으로 공유하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleInviteCopy}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.text }}>코드 복사하기</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

@@ -209,7 +209,6 @@ export default function TrainerMembersScreen() {
         const newMemo: Memo = await res.json();
         setMemos((prev) => [newMemo, ...prev]);
         setMemoInput("");
-        fetchMembers();
       }
     } catch {
     } finally {
@@ -231,7 +230,6 @@ export default function TrainerMembersScreen() {
             headers: { Authorization: `Bearer ${jwt}` },
           });
           setMemos((prev) => prev.filter((m) => m.id !== memoId));
-          fetchMembers();
         },
       },
     ]);
@@ -241,13 +239,6 @@ export default function TrainerMembersScreen() {
   const addManualMember = async () => {
     if (!addName.trim()) {
       Alert.alert("알림", "이름을 입력해주세요.");
-      return;
-    }
-    if (!addPhone.trim()) {
-      Alert.alert(
-        "알림",
-        "전화번호를 입력해주세요.\n운동 기록 문자(SMS) 발송에 사용됩니다.",
-      );
       return;
     }
     if (!addPt.trim()) {
@@ -1247,7 +1238,7 @@ export default function TrainerMembersScreen() {
         visible={memoModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setMemoModal(false)}
+        onRequestClose={() => { setMemoModal(false); fetchMembers(); }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1263,7 +1254,7 @@ export default function TrainerMembersScreen() {
               backgroundColor: "rgba(0,0,0,0.4)",
             }}
             activeOpacity={1}
-            onPress={() => setMemoModal(false)}
+            onPress={() => { setMemoModal(false); fetchMembers(); }}
           />
           <View
             style={{
@@ -1771,18 +1762,7 @@ export default function TrainerMembersScreen() {
                 style={inputStyle}
               />
 
-              <Text style={labelStyle}>
-                전화번호 *{" "}
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: Colors.textMuted,
-                    fontWeight: "400",
-                  }}
-                >
-                  (운동 기록 문자(SMS) 발송용)
-                </Text>
-              </Text>
+              <Text style={labelStyle}>전화번호</Text>
               <TextInput
                 value={addPhone}
                 onChangeText={(text) => {
