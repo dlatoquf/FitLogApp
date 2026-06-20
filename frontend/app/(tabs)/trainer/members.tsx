@@ -685,144 +685,82 @@ export default function TrainerMembersScreen() {
 
             return (
             <React.Fragment key={m.key}>
-              <TouchableOpacity
-                onPress={() => {
-                  if (m.isLinked) {
-                    router.push(
-                      `/(tabs)/trainer/member-detail?id=${m.id}` as any,
-                    );
-                  } else {
-                    router.push(
-                      `/(tabs)/trainer/member-detail?id=${m.id}&type=manual`,
-                    );
-                  }
-                }}
+              <View
                 style={{
                   flexDirection: "row",
-                  alignItems: "center",
                   backgroundColor: "#fff",
                   borderRadius: 10,
-                  paddingVertical: 9,
-                  paddingHorizontal: 12,
                   marginBottom: 6,
                   borderWidth: 1,
                   borderColor: Colors.border,
+                  overflow: "hidden",
                 }}
               >
-                {/* 아바타 */}
-                <View
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    backgroundColor: Colors.green,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginRight: 10,
+                {/* 왼쪽: 회원상세로 이동 */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (m.isLinked) {
+                      router.push(`/(tabs)/trainer/member-detail?id=${m.id}` as any);
+                    } else {
+                      router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual`);
+                    }
                   }}
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 12 }}
                 >
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
-                    {m.name[0]}
-                  </Text>
-                </View>
+                  {/* 아바타 */}
+                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>{m.name[0]}</Text>
+                  </View>
 
-                {/* 이름 + 뱃지 */}
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>
-                      {m.name}
-                    </Text>
-                    {!m.isLinked && (
-                      <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "33" }}>
-                        <Text style={{ fontSize: 9, fontWeight: "700", color: Colors.green + "AA" }}>미연동</Text>
+                  {/* 이름 + 뱃지 + 메모 미리보기 */}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>{m.name}</Text>
+                      {!m.isLinked && (
+                        <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "33" }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: Colors.green + "AA" }}>미연동</Text>
+                        </View>
+                      )}
+                    </View>
+                    {m.latestMemo ? (
+                      <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
+                        {m.latestMemo.length > 18 ? m.latestMemo.slice(0, 18) + "..." : m.latestMemo}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* PT 잔여 */}
+                  <View style={{ alignItems: "center", minWidth: 44 }}>
+                    {m.ptTotal > 0 ? (
+                      <>
+                        <Text style={{ fontSize: 20, fontWeight: "900", color }}>{m.ptRemaining}</Text>
+                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>/ {m.ptTotal}회</Text>
+                      </>
+                    ) : (
+                      <View style={{ backgroundColor: Colors.goldBg, borderWidth: 1, borderColor: Colors.gold + "44", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10, color: Colors.gold, fontWeight: "700" }}>미등록</Text>
                       </View>
                     )}
                   </View>
-                  {m.latestMemo ? (
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
-                      {m.latestMemo.length > 18 ? m.latestMemo.slice(0, 18) + "..." : m.latestMemo}
-                    </Text>
-                  ) : null}
-                </View>
+                </TouchableOpacity>
 
-                {/* PT 잔여 칸 */}
-                <View style={{ alignItems: "center", minWidth: 50, borderRightWidth: 1, borderRightColor: Colors.border, paddingRight: 10, marginRight: 2 }}>
-                  {m.ptTotal > 0 ? (
-                    <>
-                      <Text style={{ fontSize: 20, fontWeight: "900", color }}>
-                        {m.ptRemaining}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                        / {m.ptTotal}회
-                      </Text>
-                    </>
-                  ) : m.isLinked ? (
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push(
-                          `/(tabs)/trainer/member-detail?id=${m.id}&openPtAdd=true`,
-                        );
-                      }}
-                      style={{
-                        backgroundColor: Colors.goldBg,
-                        borderWidth: 1,
-                        borderColor: Colors.gold + "44",
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: Colors.gold,
-                          fontWeight: "700",
-                        }}
-                      >
-                        PT 미등록
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View
-                      style={{
-                        backgroundColor: Colors.goldBg,
-                        borderWidth: 1,
-                        borderColor: Colors.gold + "44",
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: Colors.gold,
-                          fontWeight: "700",
-                        }}
-                      >
-                        PT 미등록
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* 메모 칸 */}
+                {/* 오른쪽: 메모 칸 (완전히 분리) */}
                 <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); openMemos(m); }}
+                  onPress={() => openMemos(m)}
                   style={{
+                    width: 46,
+                    borderLeftWidth: 1,
+                    borderLeftColor: Colors.border,
                     alignItems: "center",
                     justifyContent: "center",
-                    minWidth: 44,
-                    paddingLeft: 10,
                   }}
                 >
                   {m.latestMemo ? (
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 2 }} />
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 3 }} />
                   ) : null}
                   <Text style={{ fontSize: 10, fontWeight: "700", color: m.latestMemo ? Colors.green : Colors.textMuted }}>메모</Text>
                 </TouchableOpacity>
-              </TouchableOpacity>
+              </View>
             </React.Fragment>
             );
           })
