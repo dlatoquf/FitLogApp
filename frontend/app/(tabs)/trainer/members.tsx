@@ -726,9 +726,9 @@ export default function TrainerMembersScreen() {
                   </Text>
                 </View>
 
-                {/* 이름 + 뱃지 + 메모 미리보기 */}
+                {/* 이름 + 뱃지 */}
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>
                       {m.name}
                     </Text>
@@ -739,36 +739,14 @@ export default function TrainerMembersScreen() {
                     )}
                   </View>
                   {m.latestMemo ? (
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted }}>
-                      {m.latestMemo.length > 20 ? m.latestMemo.slice(0, 20) + "..." : m.latestMemo}
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
+                      {m.latestMemo.length > 18 ? m.latestMemo.slice(0, 18) + "..." : m.latestMemo}
                     </Text>
                   ) : null}
                 </View>
 
-                {/* 메모 버튼 | PT 잔여 */}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  {/* 메모 칸 */}
-                  <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation(); openMemos(m); }}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: m.latestMemo ? Colors.green + "66" : Colors.border,
-                      borderRadius: 6,
-                      paddingHorizontal: 7,
-                      paddingVertical: 4,
-                      backgroundColor: m.latestMemo ? Colors.greenLight : "#fff",
-                      alignItems: "center",
-                      minWidth: 38,
-                    }}
-                  >
-                    {m.latestMemo ? (
-                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 2 }} />
-                    ) : null}
-                    <Text style={{ fontSize: 10, color: m.latestMemo ? Colors.green : Colors.textSub, fontWeight: "700" }}>메모</Text>
-                  </TouchableOpacity>
-
-                  {/* PT 잔여 칸 */}
-                  <View style={{ alignItems: "flex-end", minWidth: 44 }}>
+                {/* PT 잔여 칸 */}
+                <View style={{ alignItems: "center", minWidth: 50, borderRightWidth: 1, borderRightColor: Colors.border, paddingRight: 10, marginRight: 2 }}>
                   {m.ptTotal > 0 ? (
                     <>
                       <Text style={{ fontSize: 20, fontWeight: "900", color }}>
@@ -827,8 +805,23 @@ export default function TrainerMembersScreen() {
                       </Text>
                     </View>
                   )}
-                  </View>
                 </View>
+
+                {/* 메모 칸 */}
+                <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation(); openMemos(m); }}
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 44,
+                    paddingLeft: 10,
+                  }}
+                >
+                  {m.latestMemo ? (
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 2 }} />
+                  ) : null}
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: m.latestMemo ? Colors.green : Colors.textMuted }}>메모</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             </React.Fragment>
             );
