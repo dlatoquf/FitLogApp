@@ -2937,15 +2937,6 @@ export default function TrainerScheduleScreen() {
                 >
                   회원 선택
                 </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.textMuted,
-                    marginBottom: 10,
-                  }}
-                >
-                  일정 확정 시 PT 잔여 횟수가 {selectedDays.length > 1 ? `${selectedDays.length}회` : "1회"} 차감돼요
-                </Text>
                 <TextInput
                   value={ptNote}
                   onChangeText={setPtNote}
