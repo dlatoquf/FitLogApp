@@ -46,10 +46,10 @@ function formatPhoneNumber(value: string): string {
 }
 
 // 1시간 단위 시간 옵션 (offset에 따라 :00 or :30)
-function makeTimeOptions(offset: 0 | 30, startHour = 5): string[] {
+function makeTimeOptions(offset: 0 | 30, startHour = 5, endHour = 23): string[] {
   const times: string[] = [];
   const mm = offset === 30 ? "30" : "00";
-  for (let h = startHour; h <= 23; h++) {
+  for (let h = startHour; h <= endHour; h++) {
     times.push(`${String(h).padStart(2, "0")}:${mm}`);
   }
   return times;
@@ -181,8 +181,9 @@ export default function TrainerScheduleScreen() {
   // 주간 뷰 열 너비 스케일: 1=좁게(기본), 2=보통, 3=넓게
   const [colScale, setColScale] = useState<1 | 2 | 3>(1);
 
-  // 주간 뷰 시작 시간 (스크롤 초기 위치)
+  // 주간 뷰 시작/마지막 시간
   const [weekStartHour, setWeekStartHour] = useState(9);
+  const [weekEndHour, setWeekEndHour] = useState(23);
   const SLOT_H_REF = useRef(30);
 
   // 주간 long press 상태 모달
@@ -311,12 +312,12 @@ export default function TrainerScheduleScreen() {
           const data = await slotSettingsRes.json();
           const off = data.slotOffset;
           setSlotOffset(off === 30 ? 30 : 0);
+          if (data.weekStartHour != null) setWeekStartHour(data.weekStartHour);
+          if (data.weekEndHour != null) setWeekEndHour(data.weekEndHour);
         }
         const savedScale = await AsyncStorage.getItem("weekColScale");
         if (savedScale === "2" || savedScale === "3") setColScale(Number(savedScale) as 2 | 3);
         else setColScale(1);
-        const savedHour = await AsyncStorage.getItem("weekStartHour");
-        if (savedHour) setWeekStartHour(Number(savedHour));
       } catch (e) {
         console.error("fetchAll error:", e);
       } finally {
@@ -954,7 +955,7 @@ export default function TrainerScheduleScreen() {
 
     // 1시간 단위 시간대 (offset에 따라 :00 or :30)
     const effectiveOffset = slotOffset === 30 ? 30 : 0;
-    const times = makeTimeOptions(effectiveOffset as 0 | 30, weekStartHour);
+    const times = makeTimeOptions(effectiveOffset as 0 | 30, weekStartHour, weekEndHour);
 
     // "date_HH:mm" → slot 맵
     const slotMap: Record<string, any> = {};
@@ -1891,29 +1892,77 @@ export default function TrainerScheduleScreen() {
               ))}
             </View>
 
-            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 시작 시간</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                <TouchableOpacity
-                  key={h}
-                  onPress={async () => {
-                    setWeekStartHour(h);
-                    await AsyncStorage.setItem("weekStartHour", String(h));
-                  }}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 14,
-                    borderRadius: 10,
-                    borderWidth: 1.5,
-                    borderColor: weekStartHour === h ? Colors.green : Colors.border,
-                    backgroundColor: weekStartHour === h ? Colors.greenLight : Colors.bgSub,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartHour === h ? Colors.green : Colors.textSub }}>
-                    {h}시
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+              {/* 시작 시간 피커 */}
+              {(() => {
+                const ITEM_H = 44;
+                const VISIBLE = 5;
+                const saveStart = async (h: number) => {
+                  setWeekStartHour(h);
+                  try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekStartHour: h }) }); } catch {}
+                };
+                return (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>시작 시간</Text>
+                    <View style={{ height: ITEM_H * VISIBLE, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
+                      {/* 선택줄 — scrollview 뒤에 깔림 */}
+                      <View pointerEvents="none" style={{ position: "absolute", top: ITEM_H * 2, left: 0, right: 0, height: ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
+                      <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        snapToInterval={ITEM_H}
+                        decelerationRate="fast"
+                        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+                        onMomentumScrollEnd={(e) => saveStart(Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H))))}
+                        onScrollEndDrag={(e) => saveStart(Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H))))}
+                        ref={(ref) => { if (ref) setTimeout(() => ref.scrollTo({ y: weekStartHour * ITEM_H, animated: false }), 80); }}
+                      >
+                        {Array.from({ length: 24 }, (_, h) => (
+                          <View key={h} style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 17, fontWeight: h === weekStartHour ? "800" : "500", color: h === weekStartHour ? Colors.green : Colors.textMuted }}>
+                              {String(h).padStart(2, "0")}:00
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                );
+              })()}
+              {/* 마지막 시간 피커 */}
+              {(() => {
+                const ITEM_H = 44;
+                const VISIBLE = 5;
+                const hours = Array.from({ length: 12 }, (_, i) => i + 12);
+                const saveEnd = async (h: number) => {
+                  setWeekEndHour(h);
+                  try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekEndHour: h }) }); } catch {}
+                };
+                return (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>마지막 시간</Text>
+                    <View style={{ height: ITEM_H * VISIBLE, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
+                      <View pointerEvents="none" style={{ position: "absolute", top: ITEM_H * 2, left: 0, right: 0, height: ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
+                      <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        snapToInterval={ITEM_H}
+                        decelerationRate="fast"
+                        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+                        onMomentumScrollEnd={(e) => saveEnd(Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H) + 12)))}
+                        onScrollEndDrag={(e) => saveEnd(Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H) + 12)))}
+                        ref={(ref) => { if (ref) setTimeout(() => ref.scrollTo({ y: (weekEndHour - 12) * ITEM_H, animated: false }), 80); }}
+                      >
+                        {hours.map((h) => (
+                          <View key={h} style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ fontSize: 17, fontWeight: h === weekEndHour ? "800" : "500", color: h === weekEndHour ? Colors.green : Colors.textMuted }}>
+                              {String(h).padStart(2, "0")}:00
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                );
+              })()}
             </View>
 
             <TouchableOpacity
