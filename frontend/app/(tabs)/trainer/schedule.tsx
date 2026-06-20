@@ -154,7 +154,7 @@ export default function TrainerScheduleScreen() {
   const [manualTime, setManualTime] = useState("09:00");
   const [manualTimeFixed, setManualTimeFixed] = useState(false); // 주간 셀 탭 시 시간 고정
   const [addingManual, setAddingManual] = useState(false);
-  const [trainerStartTime, setTrainerStartTime] = useState("09:00"); // 출근 시간
+  const [trainerStartTime, setTrainerStartTime] = useState<string | null>(null); // 출근 시간 (null = 아직 로드 안됨)
   const trainerStartTimeRef = useRef("09:00");
   const weekScrollRef = useRef<ScrollView>(null);
   const hasScrolledRef = useRef(false); // 주간 뷰 초기 스크롤 1회만
@@ -436,22 +436,12 @@ export default function TrainerScheduleScreen() {
   useEffect(() => {
     if (viewMode !== "week") { hasScrolledRef.current = false; return; }
     if (loading) return;
+    if (trainerStartTime === null) return; // 서버에서 출근시간 오기 전엔 대기
     if (hasScrolledRef.current) return;
     hasScrolledRef.current = true;
     const effectiveOffset = slotOffset === 30 ? 30 : 0;
     const times = makeTimeOptions(effectiveOffset as 0 | 30);
-    // 이번 주 슬롯 중 가장 빠른 시작 시간
-    const weekDateKeys = currentWeekDates.map((d) => toDateKey(d));
-    const weekSlotTimes = slots
-      .filter((s) => weekDateKeys.includes(s.date))
-      .map((s) => s.startTime.slice(0, 5));
-    const earliestSlot =
-      weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
-    const scrollTarget =
-      earliestSlot && earliestSlot < trainerStartTime
-        ? earliestSlot
-        : trainerStartTime;
-    const startIdx = times.indexOf(scrollTarget);
+    const startIdx = times.indexOf(trainerStartTime);
     if (startIdx <= 0) return;
     const timer = setTimeout(() => {
       weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
