@@ -6,8 +6,10 @@ import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.member.dto.MemberResponse;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
 import com.fitlog.fitlog.diet.repository.DietDayFeedbackRepository;
 import com.fitlog.fitlog.diet.repository.DietPhotoFeedbackRepository;
+import com.fitlog.fitlog.diet.repository.DietPhotoRepository;
 import com.fitlog.fitlog.member.repository.MemberGoalRepository;
 import com.fitlog.fitlog.mission.repository.MissionRepository;
 import com.fitlog.fitlog.notice.repository.TrainerNoticeRepository;
@@ -43,8 +45,11 @@ public class TrainerController {
     private final NotificationRepository notificationRepository;
     private final DietDayFeedbackRepository dietDayFeedbackRepository;
     private final DietPhotoFeedbackRepository dietPhotoFeedbackRepository;
+    private final DietPhotoRepository dietPhotoRepository;
     private final MissionRepository missionRepository;
     private final TrainerNoticeRepository trainerNoticeRepository;
+    private final BodyLogRepository bodyLogRepository;
+    private final MemberGoalRepository memberGoalRepository;
 
     public TrainerController(TrainerRepository trainerRepository,
                              MemberRepository memberRepository,
@@ -58,8 +63,11 @@ public class TrainerController {
                              NotificationRepository notificationRepository,
                              DietDayFeedbackRepository dietDayFeedbackRepository,
                              DietPhotoFeedbackRepository dietPhotoFeedbackRepository,
+                             DietPhotoRepository dietPhotoRepository,
                              MissionRepository missionRepository,
-                             TrainerNoticeRepository trainerNoticeRepository) {
+                             TrainerNoticeRepository trainerNoticeRepository,
+                             BodyLogRepository bodyLogRepository,
+                             MemberGoalRepository memberGoalRepository) {
         this.trainerRepository = trainerRepository;
         this.memberMemoRepository = memberMemoRepository;
         this.memberRepository = memberRepository;
@@ -72,8 +80,11 @@ public class TrainerController {
         this.notificationRepository = notificationRepository;
         this.dietDayFeedbackRepository = dietDayFeedbackRepository;
         this.dietPhotoFeedbackRepository = dietPhotoFeedbackRepository;
+        this.dietPhotoRepository = dietPhotoRepository;
         this.missionRepository = missionRepository;
         this.trainerNoticeRepository = trainerNoticeRepository;
+        this.bodyLogRepository = bodyLogRepository;
+        this.memberGoalRepository = memberGoalRepository;
     }
 
     /*// 트레이너 프로필 조회
@@ -358,15 +369,18 @@ public class TrainerController {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
         Long mId = member.getId();
-        // 트레이너가 생성한 데이터 삭제
+        // PT 결제(PtContract)·회원 계정(User)·Member 행만 유지, 나머지 전부 삭제
         scheduleRepository.deleteByMember(member);
         missionRepository.deleteByMemberId(mId);
         memberMemoRepository.deleteByMember(member);
-        dietDayFeedbackRepository.deleteByMember(member);
+        workoutLogRepository.deleteByMember(member);
         dietPhotoFeedbackRepository.deleteByMemberId(mId);
+        dietDayFeedbackRepository.deleteByMember(member);
+        dietPhotoRepository.deleteByMember(member);
+        bodyLogRepository.deleteByMember(member);
+        memberGoalRepository.deleteByMember(member);
         trainerNoticeRepository.deleteByMemberId(mId);
         notificationRepository.deleteByMemberId(mId);
-        // 트레이너 참조 제거 — 회원 계정·운동일지·식단사진·체성분·PT결제는 유지
         member.setTrainer(null);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);
