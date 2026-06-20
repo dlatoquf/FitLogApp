@@ -679,7 +679,7 @@ export default function TrainerHomeScreen() {
 
       // 연결해제 + PT 만료 회원 제외, ㄱㄴㄷ순
       combined.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-      const filtered = combined.filter((m) => !m.isDisconnected && m.ptRemaining > 0);
+      const filtered = combined.filter((m) => !m.isDisconnected);
 
       setPayCombinedMembers(filtered);
     } catch {
