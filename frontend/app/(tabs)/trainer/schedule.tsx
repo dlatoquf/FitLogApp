@@ -46,10 +46,10 @@ function formatPhoneNumber(value: string): string {
 }
 
 // 1시간 단위 시간 옵션 (offset에 따라 :00 or :30)
-function makeTimeOptions(offset: 0 | 30): string[] {
+function makeTimeOptions(offset: 0 | 30, startHour = 5): string[] {
   const times: string[] = [];
   const mm = offset === 30 ? "30" : "00";
-  for (let h = 5; h <= 23; h++) {
+  for (let h = startHour; h <= 23; h++) {
     times.push(`${String(h).padStart(2, "0")}:${mm}`);
   }
   return times;
@@ -182,7 +182,7 @@ export default function TrainerScheduleScreen() {
   const [colScale, setColScale] = useState<1 | 2 | 3>(1);
 
   // 주간 뷰 시작 시간 (스크롤 초기 위치)
-  const [weekStartHour, setWeekStartHour] = useState(5);
+  const [weekStartHour, setWeekStartHour] = useState(9);
   const SLOT_H_REF = useRef(30);
 
   // 주간 long press 상태 모달
@@ -465,18 +465,6 @@ export default function TrainerScheduleScreen() {
       fetchAll();
     }
   }, [yearMonthStr, fetchAll]);
-
-  // 주간 뷰 진입 or 시작 시간 변경 시 해당 시간으로 스크롤
-  useEffect(() => {
-    if (viewMode !== "week") return;
-    const effectiveOffset = slotOffset === 30 ? 30 : 0;
-    const times = makeTimeOptions(effectiveOffset as 0 | 30);
-    const idx = times.findIndex(t => t.startsWith(String(weekStartHour).padStart(2, "0") + ":"));
-    if (idx <= 0) return;
-    setTimeout(() => {
-      weekScrollRef.current?.scrollTo({ y: idx * SLOT_H_REF.current, animated: false });
-    }, 100);
-  }, [viewMode, weekStartHour, slotOffset]);
 
   // ─── 메모 저장 ───────────────────────────────────────────────────────────
 
@@ -966,7 +954,7 @@ export default function TrainerScheduleScreen() {
 
     // 1시간 단위 시간대 (offset에 따라 :00 or :30)
     const effectiveOffset = slotOffset === 30 ? 30 : 0;
-    const times = makeTimeOptions(effectiveOffset as 0 | 30);
+    const times = makeTimeOptions(effectiveOffset as 0 | 30, weekStartHour);
 
     // "date_HH:mm" → slot 맵
     const slotMap: Record<string, any> = {};
@@ -1579,17 +1567,7 @@ export default function TrainerScheduleScreen() {
             {(["month", "week"] as const).map((mode) => (
               <TouchableOpacity
                 key={mode}
-                onPress={() => {
-                  setViewMode(mode);
-                  if (mode === "week") {
-                    setTimeout(() => {
-                      const effectiveOffset = slotOffset === 30 ? 30 : 0;
-                      const times = makeTimeOptions(effectiveOffset as 0 | 30);
-                      const idx = times.findIndex(t => t.startsWith(String(weekStartHour).padStart(2, "0") + ":"));
-                      if (idx > 0) weekScrollRef.current?.scrollTo({ y: idx * SLOT_H_REF.current, animated: false });
-                    }, 100);
-                  }
-                }}
+                onPress={() => setViewMode(mode)}
                 style={{
                   paddingHorizontal: 4,
                   paddingVertical: 6,
@@ -1915,7 +1893,7 @@ export default function TrainerScheduleScreen() {
 
             <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 시작 시간</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-              {[5, 6, 7, 8, 9, 10].map((h) => (
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
                 <TouchableOpacity
                   key={h}
                   onPress={async () => {
