@@ -21,6 +21,7 @@ export default function NotificationSettingsScreen() {
     const [notifBirthday, setNotifBirthday] = useState(true);
     const [notifMissionDone, setNotifMissionDone] = useState(true);
     const [notifPersonalWorkout, setNotifPersonalWorkout] = useState(true);
+    const [notifIncompleteSession, setNotifIncompleteSession] = useState(true);
 
     useEffect(() => {
         const fetch_ = async () => {
@@ -41,6 +42,7 @@ export default function NotificationSettingsScreen() {
                     const data = await res.json();
                     setNotifBirthday(data.notifBirthday !== false);
                     setNotifMissionDone(data.notifMissionDone !== false);
+                    if (typeof data.notifIncompleteSession === "boolean") setNotifIncompleteSession(data.notifIncompleteSession);
                     if (typeof data.notifWorkout === "boolean") { setNotifWorkout(data.notifWorkout); await AsyncStorage.setItem("notif_workout", String(data.notifWorkout)); }
                     if (typeof data.notifPersonalWorkout === "boolean") setNotifPersonalWorkout(data.notifPersonalWorkout);
                     if (typeof data.notifDiet === "boolean") { setNotifDiet(data.notifDiet); await AsyncStorage.setItem("notif_diet", String(data.notifDiet)); }
@@ -67,14 +69,14 @@ export default function NotificationSettingsScreen() {
         setNotifPush(v);
         AsyncStorage.setItem("notif_push", String(v));
         if (!v) {
-            setNotifWorkout(false); setNotifDiet(false); setNotifNewMember(false); setNotifPersonalWorkout(false);
+            setNotifWorkout(false); setNotifDiet(false); setNotifNewMember(false); setNotifPersonalWorkout(false); setNotifIncompleteSession(false);
             AsyncStorage.multiSet([["notif_workout","false"],["notif_diet","false"],["notif_new_member","false"]]);
-            await patch({ notifWorkout: false, notifDiet: false, notifNewMember: false, notifPersonalWorkout: false });
+            await patch({ notifWorkout: false, notifDiet: false, notifNewMember: false, notifPersonalWorkout: false, notifIncompleteSession: false });
             handleNotifBirthday(false, false); handleNotifMissionDone(false, false);
         } else {
-            setNotifWorkout(true); setNotifDiet(true); setNotifNewMember(true); setNotifPersonalWorkout(true);
+            setNotifWorkout(true); setNotifDiet(true); setNotifNewMember(true); setNotifPersonalWorkout(true); setNotifIncompleteSession(true);
             AsyncStorage.multiSet([["notif_workout","true"],["notif_diet","true"],["notif_new_member","true"]]);
-            await patch({ notifWorkout: true, notifDiet: true, notifNewMember: true, notifPersonalWorkout: true });
+            await patch({ notifWorkout: true, notifDiet: true, notifNewMember: true, notifPersonalWorkout: true, notifIncompleteSession: true });
             handleNotifBirthday(true, false); handleNotifMissionDone(true, false);
         }
     };
@@ -84,6 +86,7 @@ export default function NotificationSettingsScreen() {
     const handleNotifBirthday = async (v: boolean, turnOnPush = true) => { setNotifBirthday(v); if (v && turnOnPush && !notifPush) handleNotifPush(true); await patch({ notifBirthday: v }); };
     const handleNotifMissionDone = async (v: boolean, turnOnPush = true) => { setNotifMissionDone(v); if (v && turnOnPush && !notifPush) handleNotifPush(true); await patch({ notifMissionDone: v }); };
     const handleNotifPersonalWorkout = async (v: boolean) => { setNotifPersonalWorkout(v); await patch({ notifPersonalWorkout: v }); if (v && !notifPush) handleNotifPush(true); };
+    const handleNotifIncompleteSession = async (v: boolean) => { setNotifIncompleteSession(v); await patch({ notifIncompleteSession: v }); if (v && !notifPush) handleNotifPush(true); };
 
     return (
         <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -152,6 +155,13 @@ export default function NotificationSettingsScreen() {
                         desc="회원이 챌린지를 완료하면 알림"
                         value={notifMissionDone}
                         onValueChange={handleNotifMissionDone}
+                        disabled={!notifPush}
+                    />
+                    <Row
+                        label="수업 미완료 알림"
+                        desc="전날 확정된 수업이 완료/노쇼 처리되지 않으면 오전 9시에 알림"
+                        value={notifIncompleteSession}
+                        onValueChange={handleNotifIncompleteSession}
                         disabled={!notifPush}
                         isLast
                     />

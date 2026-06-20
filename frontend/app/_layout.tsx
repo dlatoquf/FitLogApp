@@ -79,6 +79,11 @@ function navigateByType(type: string, date?: string, targetId?: string) {
         } else {
           router.push("/(tabs)/trainer/members" as any);
         }
+      } else if (type === "INCOMPLETE_SESSION") {
+        router.push(date
+          ? ({ pathname: "/(tabs)/trainer/schedule", params: { date, mode: "week" } } as any)
+          : "/(tabs)/trainer/schedule"
+        );
       }
     });
   } catch {}

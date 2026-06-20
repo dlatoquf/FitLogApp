@@ -82,6 +82,35 @@ public class NotificationScheduler {
     }
 
     // ─────────────────────────────────────────────────────────
+    // 2. 매일 오전 9시(KST) – 전날 미완료 수업 알림
+    //    어제 날짜에 CONFIRMED 상태로 남은 수업이 있는 트레이너에게 알림
+    // ─────────────────────────────────────────────────────────
+    @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
+    public void sendIncompleteSessionNotification() {
+        java.time.LocalDate yesterday = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(1);
+
+        List<Trainer> trainers = scheduleRepository.findTrainersWithConfirmedScheduleOn(yesterday);
+        for (Trainer trainer : trainers) {
+            try {
+                if (!trainer.getNotifIncompleteSession()) continue;
+                if (trainer.getUser() == null) continue;
+
+                long count = scheduleRepository.countConfirmedByTrainerAndDate(trainer, yesterday);
+                notificationService.sendNotification(
+                    trainer.getUser(),
+                    "INCOMPLETE_SESSION",
+                    "어제 수업 중 상태가 변경되지 않은 일정이 " + count + "건 있어요.",
+                    "SCHEDULE_DATE",
+                    null,
+                    yesterday.toString()
+                );
+            } catch (Exception e) {
+                System.err.println("[미완료수업알림] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
     // 3. 매주 월요일 오전 9시(KST) – 트레이너 다음 주 슬롯 자동 생성
     //    (슬롯 생성만, 회원 알림 없음 — 트레이너 전용 운영)
     // ─────────────────────────────────────────────────────────

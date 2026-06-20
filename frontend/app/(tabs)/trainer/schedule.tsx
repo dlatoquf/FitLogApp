@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -102,7 +103,20 @@ function getActiveRange(startDay: 0 | 1 = 1): { from: Date; to: Date } {
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
 export default function TrainerScheduleScreen() {
+  const { date: paramDate, mode: paramMode } = useLocalSearchParams<{ date?: string; mode?: string }>();
   const today = new Date();
+
+  // 알림 딥링크: date 파라미터로 해당 날짜 주간으로 이동
+  useEffect(() => {
+    if (!paramDate) return;
+    const parts = paramDate.split("-");
+    if (parts.length !== 3) return;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    setSelectedDate(d);
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth() + 1);
+    if (paramMode === "week") setViewMode("week");
+  }, [paramDate, paramMode]);
 
   // 현재 보고 있는 연/월
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -120,7 +134,7 @@ export default function TrainerScheduleScreen() {
   const [members, setMembers] = useState<any[]>([]);
 
   // 뷰 모드 (월간 / 주간)
-  const [viewMode, setViewMode] = useState<"month" | "week">("week");
+  const [viewMode, setViewMode] = useState<"month" | "week">(paramMode === "month" ? "month" : "week");
   const [weekOffset, setWeekOffset] = useState(0);
 
   // 월별 메모
@@ -158,6 +172,10 @@ export default function TrainerScheduleScreen() {
     "loading",
   );
   const [showOffsetModal, setShowOffsetModal] = useState(false);
+
+  // 주간 long press 상태 모달
+  const [slotActionModal, setSlotActionModal] = useState(false);
+  const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
   // 주 시작 요일: 0=일요일, 1=월요일
   const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
 
@@ -675,6 +693,40 @@ export default function TrainerScheduleScreen() {
     }
   };
 
+  const completeSlot = async (slot: any) => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/schedule/${slot.id}/complete`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (!res.ok) throw new Error("완료 처리 실패");
+      setSlots((prev) =>
+        prev.map((s) => (s.id === slot.id ? { ...s, status: "COMPLETED" } : s)),
+      );
+      setSlotActionModal(false);
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    }
+  };
+
+  const noShowSlot = async (slot: any) => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/schedule/${slot.id}/no-show`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (!res.ok) throw new Error("노쇼 처리 실패");
+      setSlots((prev) =>
+        prev.map((s) => (s.id === slot.id ? { ...s, status: "NO_SHOW" } : s)),
+      );
+      setSlotActionModal(false);
+    } catch (e: any) {
+      Alert.alert("오류", e.message);
+    }
+  };
+
   const cancelSlot = (slot: any) => {
     Alert.alert(
       "수업 취소",
@@ -1040,9 +1092,14 @@ export default function TrainerScheduleScreen() {
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
                         onPress={() => {
-                          setSelectedDate(d);
+                          setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
                           setViewMode("month");
                         }}
+                        onLongPress={() => {
+                          setSlotActionTarget({ ...slot, _date: d });
+                          setSlotActionModal(true);
+                        }}
+                        delayLongPress={400}
                         style={{
                           backgroundColor: isNoShowSlot
                             ? "#9CA3AF"
@@ -1340,29 +1397,53 @@ export default function TrainerScheduleScreen() {
                 )}
               </View>
 
-              {/* 취소 버튼 (확정 + 노쇼 모두) */}
+              {/* 상태 버튼 (확정/노쇼/취소) */}
               {(slot.status === "CONFIRMED" || isNoShowSlot) && slot.id && (
-                <TouchableOpacity
-                  onPress={() => cancelSlot(slot)}
-                  style={{
-                    backgroundColor: Colors.redBg,
-                    borderWidth: 1,
-                    borderColor: Colors.red + "44",
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {slot.status === "CONFIRMED" && (
+                    <TouchableOpacity
+                      onPress={() => completeSlot(slot)}
+                      style={{
+                        backgroundColor: Colors.greenLight,
+                        borderWidth: 1,
+                        borderColor: Colors.green + "55",
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>확정</Text>
+                    </TouchableOpacity>
+                  )}
+                  {slot.status === "CONFIRMED" && (
+                    <TouchableOpacity
+                      onPress={() => noShowSlot(slot)}
+                      style={{
+                        backgroundColor: "#F3F4F6",
+                        borderWidth: 1,
+                        borderColor: "#D1D5DB",
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "700" }}>노쇼</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => cancelSlot(slot)}
                     style={{
-                      fontSize: 12,
-                      color: Colors.red,
-                      fontWeight: "700",
+                      backgroundColor: Colors.redBg,
+                      borderWidth: 1,
+                      borderColor: Colors.red + "44",
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 8,
                     }}
                   >
-                    취소
-                  </Text>
-                </TouchableOpacity>
+                    <Text style={{ fontSize: 12, color: Colors.red, fontWeight: "700" }}>취소</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* 추가 버튼 (비어있음) */}
@@ -2788,6 +2869,77 @@ export default function TrainerScheduleScreen() {
             </TouchableOpacity>
           </Animated.View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* 주간 슬롯 long press 액션 모달 */}
+      <Modal
+        visible={slotActionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSlotActionModal(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 }}
+          activeOpacity={1}
+          onPress={() => setSlotActionModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+              {slotActionTarget?.memberName ?? "수업"}
+            </Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>
+              {slotActionTarget?._date
+                ? `${slotActionTarget._date.getMonth() + 1}/${slotActionTarget._date.getDate()} ${slotActionTarget.startTime ?? ""}`
+                : ""}
+            </Text>
+
+            {slotActionTarget?.status === "CONFIRMED" && (
+              <TouchableOpacity
+                onPress={() => completeSlot(slotActionTarget)}
+                style={{
+                  backgroundColor: Colors.greenLight,
+                  borderWidth: 1,
+                  borderColor: Colors.green + "55",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.green }}>확정</Text>
+              </TouchableOpacity>
+            )}
+            {slotActionTarget?.status === "CONFIRMED" && (
+              <TouchableOpacity
+                onPress={() => noShowSlot(slotActionTarget)}
+                style={{
+                  backgroundColor: "#F3F4F6",
+                  borderWidth: 1,
+                  borderColor: "#D1D5DB",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => { setSlotActionModal(false); cancelSlot(slotActionTarget); }}
+              style={{
+                backgroundColor: Colors.redBg,
+                borderWidth: 1,
+                borderColor: Colors.red + "44",
+                borderRadius: 12,
+                paddingVertical: 14,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
