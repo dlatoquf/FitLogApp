@@ -209,6 +209,7 @@ export default function TrainerMembersScreen() {
         const newMemo: Memo = await res.json();
         setMemos((prev) => [newMemo, ...prev]);
         setMemoInput("");
+        fetchMembers();
       }
     } catch {
     } finally {
@@ -230,6 +231,7 @@ export default function TrainerMembersScreen() {
             headers: { Authorization: `Bearer ${jwt}` },
           });
           setMemos((prev) => prev.filter((m) => m.id !== memoId));
+          fetchMembers();
         },
       },
     ]);
