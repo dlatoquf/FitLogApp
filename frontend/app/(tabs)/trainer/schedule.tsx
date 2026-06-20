@@ -2851,7 +2851,13 @@ export default function TrainerScheduleScreen() {
                 >
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .filter((m: any) => !memberSearchQuery || m.name.includes(memberSearchQuery))
+                    .filter((m: any) => {
+                      if (!memberSearchQuery) return true;
+                      // 자음/모음 단독 입력(미완성 음절)이면 필터링 건너뜀
+                      const isIncomplete = /^[ㄱ-ㅎㅏ-ㅣ]+$/.test(memberSearchQuery);
+                      if (isIncomplete) return true;
+                      return m.name.includes(memberSearchQuery);
+                    })
                     .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
