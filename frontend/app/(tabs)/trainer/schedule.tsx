@@ -322,6 +322,7 @@ export default function TrainerScheduleScreen() {
         setViewMonth(now.getMonth() + 1);
       }
       dateNavRef.current = false;
+      prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
       fetchAll();
       fetchMembers();
       // 탭 복귀 시에도 이번 주 가장 빠른 슬롯 vs 출근 시간 기준 스크롤
@@ -949,7 +950,7 @@ export default function TrainerScheduleScreen() {
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
-    const SLOT_H = 28;
+    const SLOT_H = 34;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
@@ -1124,7 +1125,7 @@ export default function TrainerScheduleScreen() {
                 const isActive = isDateActive(d);
 
                 return (
-                  <View key={dk} style={{ width: COL_W, paddingHorizontal: 1 }}>
+                  <View key={dk} style={{ width: COL_W }}>
                     {isConfirmed ? (
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
