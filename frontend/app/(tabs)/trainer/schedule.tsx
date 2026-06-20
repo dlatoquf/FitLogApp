@@ -180,7 +180,7 @@ export default function TrainerScheduleScreen() {
   const [showOffsetModal, setShowOffsetModal] = useState(false);
 
   // 주간 뷰 열 너비 스케일: 1=좁게(기본), 2=보통, 3=넓게
-  const [colScale, setColScale] = useState<1 | 2 | 3>(1);
+  const [colScale, setColScale] = useState<1 | 2 | 3>(2);
 
   // 주간 뷰 시작/마지막 시간
   const [weekStartHour, setWeekStartHour] = useState(9);
