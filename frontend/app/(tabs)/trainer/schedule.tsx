@@ -2438,16 +2438,6 @@ export default function TrainerScheduleScreen() {
                 >
                   이 시간에 추가할 회원을 선택하세요
                 </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.textMuted,
-                    marginBottom: 12,
-                    marginTop: -10,
-                  }}
-                >
-                  일정 확정 시 PT 잔여 횟수가 1회 차감돼요
-                </Text>
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)

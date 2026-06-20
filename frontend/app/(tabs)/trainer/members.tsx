@@ -47,7 +47,7 @@ interface Memo {
   createdAt: string;
 }
 
-type SortKey = "ptAsc" | "ptDesc";
+type SortKey = "ptAsc" | "ptDesc" | "nameAsc";
 type FilterKey = "all" | "linked" | "unlinked";
 
 function ptColor(ptRemaining: number, ptTotal: number): string {
@@ -385,8 +385,8 @@ export default function TrainerMembersScreen() {
     })
     .filter((m) => m.name.includes(search))
     .sort((a, b) => {
-      // 잔여 적은순/많은순: 연동·미연동 구분 없이 순수 ptRemaining 기준
-      // PT 미등록 회원(ptTotal=0)은 맨 뒤
+      if (sortBy === "nameAsc") return a.name.localeCompare(b.name, "ko");
+      // 잔여 적은순/많은순: PT 미등록 회원(ptTotal=0)은 맨 뒤
       const aHasPt = a.ptTotal > 0;
       const bHasPt = b.ptTotal > 0;
       if (aHasPt !== bHasPt) return aHasPt ? -1 : 1;
@@ -616,24 +616,34 @@ export default function TrainerMembersScreen() {
               </TouchableOpacity>
             );
           })}
-          <TouchableOpacity
-            onPress={() =>
-              setSortBy((s) => (s === "ptAsc" ? "ptDesc" : "ptAsc"))
-            }
-            style={{
-              marginLeft: "auto",
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              backgroundColor: Colors.bgSub,
-            }}
-          >
-            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-              {sortBy === "ptAsc" ? "잔여 적은순 ↑" : "잔여 많은순 ↓"}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 6, marginLeft: "auto" }}>
+            <TouchableOpacity
+              onPress={() => setSortBy("ptAsc")}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: sortBy === "ptAsc" ? Colors.green : Colors.border,
+                backgroundColor: sortBy === "ptAsc" ? Colors.greenLight : Colors.bgSub,
+              }}
+            >
+              <Text style={{ fontSize: 11, color: sortBy === "ptAsc" ? Colors.green : Colors.textMuted }}>잔여 적은순</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSortBy("nameAsc")}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: sortBy === "nameAsc" ? Colors.green : Colors.border,
+                backgroundColor: sortBy === "nameAsc" ? Colors.greenLight : Colors.bgSub,
+              }}
+            >
+              <Text style={{ fontSize: 11, color: sortBy === "nameAsc" ? Colors.green : Colors.textMuted }}>ㄱㄴㄷ순</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 색상 범례 */}
