@@ -1196,7 +1196,7 @@ export default function TrainerScheduleScreen() {
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
-                            ? sessionLabel(slot.sessionType ?? "")
+                            ? (slot.note ?? sessionLabel(slot.sessionType ?? ""))
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
                         <Text
@@ -1204,7 +1204,7 @@ export default function TrainerScheduleScreen() {
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
-                            ? (slot.note ?? "")
+                            ? ""
                             : slot.note
                               ? slot.note
                               : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
