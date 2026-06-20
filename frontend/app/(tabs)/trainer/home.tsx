@@ -26,6 +26,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases from "react-native-purchases";
 import { shareTextTemplate } from "@react-native-kakao/share";
+import * as Application from "expo-application";
 import { Colors } from "../../../constants/Colors";
 import { API_URL, APP_STORE_URL, PLAY_STORE_URL } from "../../../constants/api";
 
@@ -845,13 +846,19 @@ export default function TrainerHomeScreen() {
       updateChecked.current = true;
       (async () => {
         try {
-          const CURRENT_VERSION = "1.0.3";
+          const CURRENT_VERSION = Application.nativeApplicationVersion ?? "0.0.0";
           console.log("[업데이트 체크] 시작 - 현재 버전:", CURRENT_VERSION);
           const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
           const json = await res.json();
           const latest = json.results?.[0]?.version;
           console.log("[업데이트 체크] App Store 최신 버전:", latest);
-          if (latest && latest > CURRENT_VERSION) {
+          const parseVer = (v: string) => v.split(".").map(Number);
+          const isNewer = (a: string, b: string) => {
+            const [a1,a2,a3] = parseVer(a);
+            const [b1,b2,b3] = parseVer(b);
+            return a1 > b1 || (a1===b1 && a2 > b2) || (a1===b1 && a2===b2 && a3 > b3);
+          };
+          if (latest && isNewer(latest, CURRENT_VERSION)) {
             console.log("[업데이트 체크] 업데이트 Alert 표시");
             Alert.alert(
               "업데이트 안내",
