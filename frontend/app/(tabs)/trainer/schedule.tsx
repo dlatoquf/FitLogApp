@@ -327,31 +327,6 @@ export default function TrainerScheduleScreen() {
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
       fetchAll(false, hasLoadedRef.current); // 이미 데이터 있으면 스피너 없이 백그라운드 갱신
       fetchMembers();
-      // 탭 복귀 시에도 이번 주 가장 빠른 슬롯 vs 출근 시간 기준 스크롤
-      if (viewMode === "week") {
-        setTimeout(() => {
-          const effectiveOffset = slotOffset === 30 ? 30 : 0;
-          const times = makeTimeOptions(effectiveOffset as 0 | 30);
-          const weekDateKeys = getWeekDatesForOffset(weekOffset).map((d) =>
-            toDateKey(d),
-          );
-          const weekSlotTimes = slots
-            .filter((s: any) => weekDateKeys.includes(s.date))
-            .map((s: any) => s.startTime.slice(0, 5));
-          const earliestSlot =
-            weekSlotTimes.length > 0 ? weekSlotTimes.sort()[0] : null;
-          const scrollTarget =
-            earliestSlot && earliestSlot < trainerStartTimeRef.current
-              ? earliestSlot
-              : trainerStartTimeRef.current;
-          const startIdx = times.indexOf(scrollTarget);
-          if (startIdx > 0)
-            weekScrollRef.current?.scrollTo({
-              y: startIdx * 47,
-              animated: false,
-            });
-        }, 150);
-      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, slotOffset]),
   );
