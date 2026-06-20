@@ -788,10 +788,15 @@ export default function TrainerScheduleScreen() {
   };
 
   const cancelSlot = (slot: any) => {
-    Alert.alert(
-      "수업 취소",
-      `${slot.memberName ?? sessionLabel(slot.sessionType ?? "")}님 수업을 취소할까요?`,
-      [
+    const type = slot.sessionType ?? "";
+    const isPersonal = type === "PERSONAL_WORKOUT" || type === "PERSONAL_SCHEDULE";
+    const title = isPersonal
+      ? type === "PERSONAL_WORKOUT" ? "개인운동 취소" : "개인일정 취소"
+      : "수업 취소";
+    const message = isPersonal
+      ? type === "PERSONAL_WORKOUT" ? "개인운동을 취소하시겠어요?" : "개인일정을 취소하시겠어요?"
+      : `${slot.memberName ?? sessionLabel(type)}님 수업을 취소할까요?`;
+    Alert.alert(title, message, [
         { text: "아니요", style: "cancel" },
         {
           text: "취소",
