@@ -330,6 +330,7 @@ public class ManualMemberController {
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<Void> delete(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
@@ -339,6 +340,7 @@ public class ManualMemberController {
                 c.setManualMember(null);
                 ptContractRepository.save(c);
             });
+            workoutLogRepository.deleteByManualMember(m);
         });
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();
