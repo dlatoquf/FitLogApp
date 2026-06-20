@@ -143,15 +143,6 @@ public class ScheduleController {
                 if (newRemaining == 0) member.setPtEndedAt(java.time.LocalDate.now());
                 memberRepository.save(member);
             }
-            if (member.getNotifSchedule()) {
-                notificationService.sendNotification(
-                        member.getUser(),
-                        "SCHEDULE_CANCEL",
-                        "오늘 " + schedule.getStartTime() + " 수업이 노쇼 처리됐어요.",
-                        "SCHEDULE",
-                        schedule.getId()
-                );
-            }
         } else if (schedule.getManualMember() != null) {
             ManualMember mm = schedule.getManualMember();
             if (mm.getPtRemaining() != null && mm.getPtRemaining() > 0) {
@@ -171,6 +162,15 @@ public class ScheduleController {
             @RequestHeader("Authorization") String auth,
             @PathVariable Long scheduleId) {
         scheduleService.cancelConfirmed(auth, scheduleId);
+        return ResponseEntity.ok().build();
+    }
+
+    // ─── 트레이너: 수업 취소 + 슬롯 삭제 ────────────────────────────────────
+    @DeleteMapping("/{scheduleId}")
+    public ResponseEntity<Void> cancelAndDelete(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId) {
+        scheduleService.cancelAndDeleteSlot(auth, scheduleId);
         return ResponseEntity.ok().build();
     }
 
@@ -204,11 +204,10 @@ public class ScheduleController {
                 memberRepository.save(member);
             }
             if (member.getNotifSchedule()) {
-                String ptMsg = member.getPtRemaining() != null ? " · PT 잔여 " + member.getPtRemaining() + "회" : "";
                 notificationService.sendNotification(
                         member.getUser(),
-                        "WORKOUT_LOG",
-                        "오늘 " + schedule.getStartTime() + " 수업이 완료 처리됐어요." + ptMsg,
+                        "SCHEDULE_COMPLETE",
+                        "오늘 " + schedule.getStartTime().toString().substring(0, 5) + " 수업이 완료 처리됐어요.",
                         "SCHEDULE",
                         schedule.getId()
                 );

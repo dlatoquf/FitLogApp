@@ -90,7 +90,7 @@ public class PtContractService {
             notificationService.sendNotification(
                     member.getUser(),
                     "PT_ADD",
-                    "트레이너가 PT " + request.getSessions() + "회를 추가했어요. 현재 잔여 " + member.getPtRemaining() + "회.",
+                    "트레이너가 PT " + request.getSessions() + "회를 추가했어요.",
                     "PT",
                     member.getId()
             );

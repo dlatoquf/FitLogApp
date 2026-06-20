@@ -154,8 +154,7 @@ public class WorkoutLogController {
             }
         }
 
-        String ptStr = member.getPtRemaining() != null ? " 잔여 PT " + member.getPtRemaining() + "회" : "";
-        String notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요." + ptStr;
+        String notiContent = trainerUser.getName() + " 트레이너가 " + log.getLogDate() + " PT 운동 로그를 등록했어요.";
 
 
         // FCM 푸시 + 인앱 알림

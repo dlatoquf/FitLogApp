@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     ScrollView,
     Switch,
     Text,

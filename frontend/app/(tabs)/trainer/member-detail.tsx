@@ -1326,7 +1326,7 @@ export default function MemberDetailScreen() {
   const [exercises, setExercises] = useState<
     {
       name: string;
-      sets: { setId?: number; weight: string; reps: string }[];
+      sets: { setId?: number; _key: number; weight: string; reps: string }[];
       memo: string;
       mediaFiles: { uri: string; type: "image" | "video" }[];
       existingMediaList: {
@@ -1339,7 +1339,7 @@ export default function MemberDetailScreen() {
   >([
     {
       name: "",
-      sets: [{ setId: undefined, weight: "", reps: "" }],
+      sets: [{ setId: undefined, _key: 0, weight: "", reps: "" }],
       memo: "",
       mediaFiles: [],
       existingMediaList: [],
@@ -2260,7 +2260,7 @@ export default function MemberDetailScreen() {
     setExercises([
       {
         name: "",
-        sets: [{ setId: undefined, weight: "", reps: "" }],
+        sets: [{ setId: undefined, _key: Date.now(), weight: "", reps: "" }],
         memo: "",
         mediaFiles: [],
         existingMediaList: [],
@@ -2289,8 +2289,9 @@ export default function MemberDetailScreen() {
             mediaType: m.mediaType ?? "IMAGE",
           }),
         ),
-        sets: (ex.sets ?? []).map((s: any) => ({
+        sets: (ex.sets ?? []).map((s: any, si: number) => ({
           setId: s.setId ?? s.id ?? undefined,
+          _key: s.setId ?? s.id ?? Date.now() + si,
           weight: s.weight != null ? String(s.weight) : "",
           reps: s.reps != null ? String(s.reps) : "",
         })),
@@ -4554,13 +4555,7 @@ export default function MemberDetailScreen() {
                     borderColor: Colors.green + "55",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "700",
-                      color: Colors.green,
-                    }}
-                  >
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green }}>
                     + 운동일지 등록
                   </Text>
                 </TouchableOpacity>
@@ -5587,170 +5582,109 @@ export default function MemberDetailScreen() {
                   <View style={{ gap: 4 }}>
                     {ex.sets.map((s, si) => (
                       <View
-                        key={si}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 4,
-                        }}
+                        key={s._key}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                       >
-                        <View
-                          style={{
-                            width: 22,
-                            height: 28,
-                            borderRadius: 7,
-                            backgroundColor: Colors.green,
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "900",
-                              color: "#fff",
-                            }}
-                          >
-                            {si + 1}
-                          </Text>
+                        {/* 세트 번호 */}
+                        <View style={{ width: 22, height: 30, borderRadius: 7, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "900", color: "#fff" }}>{si + 1}</Text>
                         </View>
-                        <View
-                          style={{
-                            flex: 1,
-                            height: 30,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: Colors.bgSub,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: Colors.border,
-                            paddingHorizontal: 8,
-                          }}
-                        >
+                        {/* kg 입력 */}
+                        <View style={{ flex: 1, height: 30, flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 8 }}>
                           <TextInput
                             value={s.weight}
-                            onChangeText={(v) => {
-                              const u = [...exercises];
-                              u[ei].sets[si].weight = v;
-                              setExercises(u);
-                            }}
+                            onChangeText={(v) => { const u = [...exercises]; u[ei].sets[si].weight = v; setExercises(u); }}
                             placeholder="0"
                             placeholderTextColor={Colors.textPlaceholder}
                             keyboardType="decimal-pad"
-                            style={{
-                              flex: 1,
-                              height: 30,
-                              fontSize: 12,
-                              color: Colors.text,
-                              paddingVertical: 0,
-                            }}
+                            style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
                           />
-                          <Text
-                            style={{ fontSize: 10, color: Colors.textMuted }}
-                          >
-                            kg
-                          </Text>
+                          <Text style={{ fontSize: 10, color: Colors.textMuted }}>kg</Text>
                         </View>
-                        <View
-                          style={{
-                            flex: 1,
-                            height: 30,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: Colors.bgSub,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: Colors.border,
-                            paddingHorizontal: 8,
-                          }}
-                        >
+                        {/* 회 입력 */}
+                        <View style={{ flex: 1, height: 30, flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 8 }}>
                           <TextInput
                             value={s.reps}
-                            onChangeText={(v) => {
-                              const u = [...exercises];
-                              u[ei].sets[si].reps = v;
-                              setExercises(u);
-                            }}
+                            onChangeText={(v) => { const u = [...exercises]; u[ei].sets[si].reps = v; setExercises(u); }}
                             placeholder="0"
                             placeholderTextColor={Colors.textPlaceholder}
                             keyboardType="number-pad"
-                            style={{
-                              flex: 1,
-                              height: 30,
-                              fontSize: 12,
-                              color: Colors.text,
-                              paddingVertical: 0,
-                            }}
+                            style={{ flex: 1, height: 30, fontSize: 12, color: Colors.text, paddingVertical: 0 }}
                           />
-                          <Text
-                            style={{ fontSize: 10, color: Colors.textMuted }}
-                          >
-                            회
-                          </Text>
+                          <Text style={{ fontSize: 10, color: Colors.textMuted }}>회</Text>
                         </View>
-                        {ex.sets.length > 1 ? (
-                          <TouchableOpacity
-                            onPress={() => {
-                              const u = [...exercises];
-                              u[ei].sets = u[ei].sets.filter(
-                                (_, i) => i !== si,
-                              );
-                              setExercises(u);
-                            }}
-                            style={{
-                              width: 24,
-                              height: 28,
-                              borderRadius: 8,
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Text
-                              style={{ fontSize: 14, color: Colors.textMuted }}
-                            >
-                              ✕
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={{ width: 24 }} />
-                        )}
-                        {si === ex.sets.length - 1 ? (
-                          <TouchableOpacity
-                            onPress={() => {
-                              const u = [...exercises];
-                              u[ei].sets.push({
-                                setId: undefined,
-                                weight: "",
-                                reps: "",
-                              });
-                              setExercises(u);
-                            }}
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              backgroundColor: Colors.green,
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 16,
-                                color: "#fff",
-                                fontWeight: "900",
-                                marginTop: -1,
-                              }}
-                            >
-                              +
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={{ width: 28 }} />
-                        )}
+                        {/* ✕ 버튼 */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (ex.sets.length <= 1) return;
+                            const u = [...exercises];
+                            u[ei].sets = u[ei].sets.filter((_, i) => i !== si);
+                            setExercises(u);
+                          }}
+                          style={{ height: 30, paddingHorizontal: 8, borderRadius: 8, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#D1D5DB", justifyContent: "center", alignItems: "center", opacity: ex.sets.length <= 1 ? 0.3 : 1 }}
+                        >
+                          <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "700" }}>✕</Text>
+                        </TouchableOpacity>
+                        {/* + 버튼 */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            const u = [...exercises];
+                            u[ei].sets.splice(si + 1, 0, { setId: undefined, _key: Date.now(), weight: "", reps: "" });
+                            setExercises(u);
+                          }}
+                          style={{ height: 30, paddingHorizontal: 8, borderRadius: 8, backgroundColor: Colors.green + "22", borderWidth: 1, borderColor: Colors.green + "55", justifyContent: "center", alignItems: "center" }}
+                        >
+                          <Text style={{ fontSize: 13, color: Colors.green, fontWeight: "900" }}>+</Text>
+                        </TouchableOpacity>
+                        {/* 복사 버튼: 현재 세트와 같은 값으로 바로 아래에 새 세트 추가 */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            const u = [...exercises];
+                            u[ei].sets.splice(si + 1, 0, { setId: undefined, _key: Date.now(), weight: s.weight, reps: s.reps });
+                            setExercises(u);
+                          }}
+                          style={{ height: 30, paddingHorizontal: 8, borderRadius: 8, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#D1D5DB", justifyContent: "center", alignItems: "center" }}
+                        >
+                          <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "700" }}>복사</Text>
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>
+
+                  {/* 이전 기록 힌트 — 마지막 세트 아래 */}
+                  {(() => {
+                    const latest = getLatestSameExercise(ex.name);
+                    if (!latest) return null;
+                    return (
+                      <View style={{ marginTop: 6, backgroundColor: Colors.greenLight, borderRadius: 8, padding: 6, borderWidth: 1, borderColor: Colors.green + "33" }}>
+                        <Text style={{ fontSize: 10, color: Colors.green, fontWeight: "800", marginBottom: 5 }}>
+                          이전 기록 {latest.date} · 누르면 입력
+                        </Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                          {latest.exercise.sets?.map((prevSet: any, prevIdx: number) => (
+                            <TouchableOpacity
+                              key={prevIdx}
+                              onPress={() => {
+                                const u = [...exercises];
+                                while (u[ei].sets.length <= prevIdx) {
+                                  u[ei].sets.push({ setId: undefined, _key: Date.now(), weight: "", reps: "" });
+                                }
+                                u[ei].sets[prevIdx].weight = prevSet.weight ? String(prevSet.weight) : "";
+                                u[ei].sets[prevIdx].reps = prevSet.reps ? String(prevSet.reps) : "";
+                                setExercises(u);
+                              }}
+                              style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: Colors.green + "33" }}
+                            >
+                              <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "900" }}>{prevIdx + 1}</Text>
+                              <Text style={{ fontSize: 11, color: Colors.text, fontWeight: "700" }}>
+                                {"  "}{prevSet.weight ? `${prevSet.weight}kg × ` : ""}{prevSet.reps}회
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    );
+                  })()}
 
                   {/* 운동별 메모 */}
                   <TextInput
@@ -5940,99 +5874,6 @@ export default function MemberDetailScreen() {
                     </View>
                   </View>
 
-                  {/* 이전 기록 힌트 */}
-                  {(() => {
-                    const latest = getLatestSameExercise(ex.name);
-                    if (!latest) return null;
-                    return (
-                      <View
-                        style={{
-                          marginTop: 6,
-                          backgroundColor: Colors.greenLight,
-                          borderRadius: 8,
-                          padding: 6,
-                          borderWidth: 1,
-                          borderColor: Colors.green + "33",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: Colors.green,
-                            fontWeight: "800",
-                            marginBottom: 5,
-                          }}
-                        >
-                          이전 기록 {latest.date} · 누르면 입력
-                        </Text>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                            gap: 6,
-                          }}
-                        >
-                          {latest.exercise.sets?.map(
-                            (prevSet: any, prevIdx: number) => (
-                              <TouchableOpacity
-                                key={prevIdx}
-                                onPress={() => {
-                                  const u = [...exercises];
-                                  while (u[ei].sets.length <= prevIdx) {
-                                    u[ei].sets.push({
-                                      setId: undefined,
-                                      weight: "",
-                                      reps: "",
-                                    });
-                                  }
-                                  u[ei].sets[prevIdx].weight = prevSet.weight
-                                    ? String(prevSet.weight)
-                                    : "";
-                                  u[ei].sets[prevIdx].reps = prevSet.reps
-                                    ? String(prevSet.reps)
-                                    : "";
-                                  setExercises(u);
-                                }}
-                                style={{
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  backgroundColor: "#fff",
-                                  borderRadius: 999,
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                  borderWidth: 1,
-                                  borderColor: Colors.green + "33",
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    color: Colors.green,
-                                    fontWeight: "900",
-                                  }}
-                                >
-                                  {prevIdx + 1}
-                                </Text>
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    color: Colors.text,
-                                    fontWeight: "700",
-                                  }}
-                                >
-                                  {"  "}
-                                  {prevSet.weight
-                                    ? `${prevSet.weight}kg × `
-                                    : ""}
-                                  {prevSet.reps}회
-                                </Text>
-                              </TouchableOpacity>
-                            ),
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })()}
                 </View>
               ))}
 
@@ -6043,7 +5884,7 @@ export default function MemberDetailScreen() {
                     ...exercises,
                     {
                       name: "",
-                      sets: [{ setId: undefined, weight: "", reps: "" }],
+                      sets: [{ setId: undefined, _key: Date.now(), weight: "", reps: "" }],
                       memo: "",
                       mediaFiles: [],
                       existingMediaList: [],

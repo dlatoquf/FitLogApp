@@ -2,6 +2,7 @@ package com.fitlog.fitlog.notification.scheduler;
 
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import com.fitlog.fitlog.notification.service.NotificationService;
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
@@ -23,17 +24,20 @@ import java.util.HashSet;
 public class NotificationScheduler {
 
     private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
     private final ScheduleRepository scheduleRepository;
     private final ScheduleService scheduleService;
     private final TrainerRepository trainerRepository;
     private final MemberRepository memberRepository;
 
     public NotificationScheduler(NotificationService notificationService,
+                                 NotificationRepository notificationRepository,
                                  ScheduleRepository scheduleRepository,
                                  ScheduleService scheduleService,
                                  TrainerRepository trainerRepository,
                                  MemberRepository memberRepository) {
         this.notificationService = notificationService;
+        this.notificationRepository = notificationRepository;
         this.scheduleRepository = scheduleRepository;
         this.scheduleService = scheduleService;
         this.trainerRepository = trainerRepository;
@@ -270,6 +274,16 @@ public class NotificationScheduler {
                 System.err.println("[제휴갱신경고] 트레이너 " + trainer.getId() + " 실패: " + e.getMessage());
             }
         }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 7. 매일 오전 3시(KST) – 7일 지난 알림 자동 삭제
+    // ─────────────────────────────────────────────────────────
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteOldNotifications() {
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusDays(7);
+        notificationRepository.deleteByCreatedAtBefore(cutoff);
     }
 
     // ─────────────────────────────────────────────────────────

@@ -1769,11 +1769,12 @@ export default function TrainerHomeScreen() {
             })
             .map((item) => {
               const isOt = item.sessionType === "OT";
-              const isActualNoShow = item.isNoShow; // 명시적 노쇼 처리만
+              const isActualNoShow = item.isNoShow;
+              const isCompleted = item.completed;
 
-              const avatarColor = isActualNoShow ? "#9CA3AF" : isOt ? "#F97316" : Colors.green;
-              const bgColor = isActualNoShow ? "#F3F4F6" : isOt ? "#FFF7ED" : Colors.bgSub;
-              const borderColor = isActualNoShow ? "#D1D5DB" : isOt ? "#F9731644" : Colors.border;
+              const avatarColor = isCompleted ? Colors.blue : isActualNoShow ? "#9CA3AF" : isOt ? "#F97316" : Colors.green;
+              const bgColor = isCompleted ? Colors.blueBg : isActualNoShow ? "#F3F4F6" : isOt ? "#FFF7ED" : Colors.bgSub;
+              const borderColor = isCompleted ? Colors.blue + "55" : isActualNoShow ? "#D1D5DB" : isOt ? "#F9731644" : Colors.border;
 
               return (
                 <TouchableOpacity
@@ -1889,9 +1890,8 @@ export default function TrainerHomeScreen() {
                       {item.time}
                     </Text>
                     {item.completed ? (
-                      // 운동 로그 등록됨 → 완료
-                      <View style={{ backgroundColor: Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.green }}>완료 ✓</Text>
+                      <View style={{ backgroundColor: Colors.blueBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: Colors.blue + "44" }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.blue }}>완료</Text>
                       </View>
                     ) : item.isNoShow ? (
                       // 노쇼 — 명시적 노쇼만 취소 가능
@@ -1931,9 +1931,9 @@ export default function TrainerHomeScreen() {
                           if (!item.scheduleId) return;
                           setActionModal({ visible: true, item });
                         }}
-                        style={{ backgroundColor: isOt ? "#F9731618" : Colors.blue + "18", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
+                        style={{ backgroundColor: isOt ? "#F9731618" : Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
                       >
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: isOt ? "#F97316" : Colors.blue }}>확정 ›</Text>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: isOt ? "#F97316" : Colors.green }}>확정 ›</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -3137,53 +3137,97 @@ export default function TrainerHomeScreen() {
                 {actionModal.item?.memberName}님 수업
               </Text>
               <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
-                {actionModal.item?.time} · PT 잔여 {actionModal.item?.ptRemaining ?? 0}회
+                {actionModal.item?.time}
               </Text>
 
               {/* 완료 처리 */}
               <TouchableOpacity
-                onPress={async () => {
-                  const jwt = await AsyncStorage.getItem("jwt");
-                  await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/complete`, {
-                    method: "PATCH",
-                    headers: { Authorization: `Bearer ${jwt}` },
-                  });
-                  setActionModal({ visible: false, item: null });
-                  fetchHome();
+                onPress={() => {
+                  Alert.alert("수업 완료", `${actionModal.item?.memberName}님 수업을 완료 처리할까요?`, [
+                    { text: "아니요", style: "cancel" },
+                    { text: "완료", onPress: async () => {
+                      const jwt = await AsyncStorage.getItem("jwt");
+                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/complete`, {
+                        method: "PATCH",
+                        headers: { Authorization: `Bearer ${jwt}` },
+                      });
+                      setActionModal({ visible: false, item: null });
+                      fetchHome();
+                      Alert.alert("완료", "수업이 완료 처리됐어요.");
+                    }},
+                  ]);
                 }}
                 style={{
-                  backgroundColor: Colors.green,
+                  backgroundColor: Colors.blueBg,
                   borderRadius: 12,
                   paddingVertical: 14,
                   alignItems: "center",
                   marginBottom: 10,
+                  borderWidth: 1,
+                  borderColor: Colors.blue + "55",
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>완료 처리</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료 처리</Text>
               </TouchableOpacity>
 
               {/* 노쇼 처리 */}
               <TouchableOpacity
-                onPress={async () => {
-                  const jwt = await AsyncStorage.getItem("jwt");
-                  await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/no-show`, {
-                    method: "PATCH",
-                    headers: { Authorization: `Bearer ${jwt}` },
-                  });
-                  setActionModal({ visible: false, item: null });
-                  fetchHome();
+                onPress={() => {
+                  Alert.alert("노쇼 처리", `${actionModal.item?.memberName}님을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`, [
+                    { text: "아니요", style: "cancel" },
+                    { text: "노쇼", style: "destructive", onPress: async () => {
+                      const jwt = await AsyncStorage.getItem("jwt");
+                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/no-show`, {
+                        method: "PATCH",
+                        headers: { Authorization: `Bearer ${jwt}` },
+                      });
+                      setActionModal({ visible: false, item: null });
+                      fetchHome();
+                      Alert.alert("완료", "노쇼 처리됐어요.");
+                    }},
+                  ]);
                 }}
                 style={{
-                  backgroundColor: Colors.bgSub,
+                  backgroundColor: "#F3F4F6",
                   borderRadius: 12,
                   paddingVertical: 14,
                   alignItems: "center",
                   borderWidth: 1,
-                  borderColor: "#FECACA",
+                  borderColor: "#D1D5DB",
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#EF4444" }}>노쇼 처리</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼 처리</Text>
+              </TouchableOpacity>
+
+              {/* 취소 처리 */}
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert("수업 취소", `${actionModal.item?.memberName}님 수업을 취소할까요?`, [
+                    { text: "아니요", style: "cancel" },
+                    { text: "취소", style: "destructive", onPress: async () => {
+                      const jwt = await AsyncStorage.getItem("jwt");
+                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${jwt}` },
+                      });
+                      setActionModal({ visible: false, item: null });
+                      fetchHome();
+                      Alert.alert("완료", "수업이 취소됐어요.");
+                    }},
+                  ]);
+                }}
+                style={{
+                  backgroundColor: Colors.redBg,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.red + "44",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소 처리</Text>
               </TouchableOpacity>
 
               {/* 닫기 */}

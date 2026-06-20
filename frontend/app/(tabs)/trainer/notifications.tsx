@@ -26,16 +26,18 @@ interface Noti {
 }
 
 const NOTI_ICON: Record<string, string> = {
-    NEW_MEMBER:        "👋",
-    MEMBER_DELETED:    "👋",
-    MEMBER_DISCONNECT: "🔗",
-    DIET_PHOTO:        "🍽️",
-    WORKOUT_LOG:       "💪",
-    MISSION_DONE:      "🏆",
-    SCHEDULE_REQUEST:  "📅",
-    BIRTHDAY_TODAY:    "🎂",
-    BIRTHDAY_WEEK:     "🎁",
-    GENERAL:           "🔔",
+    NEW_MEMBER:          "👋",
+    MEMBER_DELETED:      "👋",
+    MEMBER_DISCONNECT:   "🔗",
+    DIET_PHOTO:          "🍽️",
+    WORKOUT_LOG:         "💪",
+    MISSION_DONE:        "🏆",
+    SCHEDULE_REQUEST:    "📅",
+    INCOMPLETE_SESSION:  "⚠️",
+    SCHEDULE_COMPLETE:   "✅",
+    BIRTHDAY_TODAY:      "🎂",
+    BIRTHDAY_WEEK:       "🎁",
+    GENERAL:             "🔔",
 };
 
 type TabKey = "전체" | "수업" | "기록/피드백" | "회원/공지";
@@ -49,10 +51,11 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const TAB_TYPES: Record<TabKey, string[]> = {
     전체:        [],
-    수업:        ["SCHEDULE_REQUEST"],
+    수업:        ["SCHEDULE_REQUEST", "INCOMPLETE_SESSION", "SCHEDULE_COMPLETE"],
     "기록/피드백": ["WORKOUT_LOG", "MISSION_DONE", "DIET_PHOTO"],
     "회원/공지":  ["NEW_MEMBER", "MEMBER_DELETED", "MEMBER_DISCONNECT", "BIRTHDAY_TODAY", "BIRTHDAY_WEEK", "GENERAL"],
 };
+
 
 function formatTime(createdAt: string) {
     const date = new Date(createdAt);
@@ -138,6 +141,10 @@ export default function TrainerNotificationsScreen() {
         if (n.type === "BIRTHDAY_TODAY" || n.type === "BIRTHDAY_WEEK") {
             const id = n.memberId ?? n.targetId;
             if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}` as any); return;
+        }
+        if (n.type === "INCOMPLETE_SESSION") {
+            const date = n.targetDate ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            router.push(`/(tabs)/trainer/schedule?date=${date}&mode=week` as any); return;
         }
         if (n.type === "GENERAL") {
             router.push("/(tabs)/trainer/more"); return;

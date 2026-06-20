@@ -340,6 +340,43 @@ public class ScheduleService {
         }
     }
 
+    // 수업 취소 후 슬롯 자체 삭제 (PT 복구 + FCM 포함)
+    @Transactional
+    public void cancelAndDeleteSlot(String auth, Long scheduleId) {
+        getUserFromAuth(auth);
+
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
+
+        Member member = schedule.getMember();
+        ManualMember manualMember = schedule.getManualMember();
+        boolean wasNoShow = "NO_SHOW".equals(schedule.getStatusStr());
+
+        if (member != null) {
+            if (wasNoShow && member.getPtRemaining() != null) {
+                member.setPtRemaining(member.getPtRemaining() + 1);
+                member.setPtEndedAt(null);
+                memberRepository.save(member);
+            }
+            if (member.getNotifSchedule()) {
+                notificationService.sendNotification(
+                        member.getUser(),
+                        "SCHEDULE_CANCEL",
+                        schedule.getDate() + " " + schedule.getStartTime().toString().substring(0, 5) + " 수업이 취소됐어요.",
+                        "SCHEDULE",
+                        scheduleId
+                );
+            }
+        }
+        if (manualMember != null && wasNoShow && manualMember.getPtRemaining() != null) {
+            manualMember.setPtRemaining(manualMember.getPtRemaining() + 1);
+            manualMember.setPtEndedAt(null);
+            manualMemberRepository.save(manualMember);
+        }
+
+        scheduleRepository.delete(schedule);
+    }
+
     // 오늘 수업 목록 (트레이너 홈용)
     public List<Map<String, Object>> getTodaySchedules(String auth) {
         User user = getUserFromAuth(auth);

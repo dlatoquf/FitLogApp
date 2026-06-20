@@ -230,10 +230,10 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
                               @Param("startTime") java.time.LocalTime startTime);
 
     // 특정 날짜에 CONFIRMED 상태인 수업이 있는 트레이너 목록
-    @Query("SELECT DISTINCT s.trainer FROM Schedule s WHERE s.date = :date AND s.statusStr = 'CONFIRMED'")
+    @Query("SELECT DISTINCT s.trainer FROM Schedule s WHERE s.date = :date AND s.status = 'CONFIRMED'")
     List<Trainer> findTrainersWithConfirmedScheduleOn(@Param("date") java.time.LocalDate date);
 
     // 특정 트레이너의 특정 날짜 CONFIRMED 수업 수
-    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.statusStr = 'CONFIRMED'")
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.status = 'CONFIRMED'")
     long countConfirmedByTrainerAndDate(@Param("trainer") Trainer trainer, @Param("date") java.time.LocalDate date);
 }

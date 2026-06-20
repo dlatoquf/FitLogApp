@@ -176,6 +176,22 @@ export default function TrainerScheduleScreen() {
   // 주간 long press 상태 모달
   const [slotActionModal, setSlotActionModal] = useState(false);
   const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
+
+  // long press 힌트 모달 (최초 1회)
+  const [hintModal, setHintModal] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("schedule_longpress_hint_shown").then((val) => {
+      if (!val) setHintModal(true);
+    });
+  }, []);
+
+  // 주간→월간 날짜 이동 시 useFocusEffect 리셋 방지용 플래그
+  const dateNavRef = useRef(false);
+
+  // 취소된 슬롯 ID 로컬 캐시 (배포 전 임시: 백엔드가 OPEN으로 바꾸기 때문에 필터 유지)
+  const cancelledIdsRef = useRef<Set<number>>(new Set());
+
   // 주 시작 요일: 0=일요일, 1=월요일
   const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
 
@@ -279,7 +295,10 @@ export default function TrainerScheduleScreen() {
           }
         }
 
-        if (calRes.ok) setSlots(await calRes.json());
+        if (calRes.ok) {
+          const fetched = await calRes.json();
+          setSlots(fetched.filter((s: any) => !cancelledIdsRef.current.has(s.id)));
+        }
         if (memoRes?.ok) {
           const data = await memoRes.json();
           setMonthMemo(data.memo ?? "");
@@ -301,10 +320,13 @@ export default function TrainerScheduleScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const now = new Date();
-      setSelectedDate(now);
-      setViewYear(now.getFullYear());
-      setViewMonth(now.getMonth() + 1);
+      if (!dateNavRef.current) {
+        const now = new Date();
+        setSelectedDate(now);
+        setViewYear(now.getFullYear());
+        setViewMonth(now.getMonth() + 1);
+      }
+      dateNavRef.current = false;
       fetchAll();
       fetchMembers();
       // 탭 복귀 시에도 이번 주 가장 빠른 슬롯 vs 출근 시간 기준 스크롤
@@ -381,7 +403,7 @@ export default function TrainerScheduleScreen() {
   // 세션 타입별 색상
   const sessionColor = (type: string) => {
     if (type === "OT") return "#F97316";
-    if (type === "PERSONAL_WORKOUT") return "#3B82F6";
+    if (type === "PERSONAL_WORKOUT") return "#F59E0B";
     if (type === "PERSONAL_SCHEDULE") return "#8B5CF6";
     return Colors.green;
   };
@@ -393,13 +415,13 @@ export default function TrainerScheduleScreen() {
   };
   const sessionBg = (type: string) => {
     if (type === "OT") return "#FFF7ED";
-    if (type === "PERSONAL_WORKOUT") return "#EFF6FF";
+    if (type === "PERSONAL_WORKOUT") return "#FFFBEB";
     if (type === "PERSONAL_SCHEDULE") return "#F5F3FF";
     return Colors.greenLight;
   };
   const sessionBorder = (type: string) => {
     if (type === "OT") return "#F9731644";
-    if (type === "PERSONAL_WORKOUT") return "#3B82F644";
+    if (type === "PERSONAL_WORKOUT") return "#F59E0B44";
     if (type === "PERSONAL_SCHEDULE") return "#8B5CF644";
     return Colors.green + "44";
   };
@@ -546,6 +568,7 @@ export default function TrainerScheduleScreen() {
       });
       if (!res.ok) throw new Error((await res.text()) || "추가 실패");
       setAddModal(false);
+      cancelledIdsRef.current.clear();
       fetchAll();
       Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
     } catch (e: any) {
@@ -584,6 +607,7 @@ export default function TrainerScheduleScreen() {
       });
       if (!res.ok) throw new Error((await res.text()) || "추가 실패");
       setManualModal(false);
+      cancelledIdsRef.current.clear();
       fetchAll();
       Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
     } catch (e: any) {
@@ -649,6 +673,7 @@ export default function TrainerScheduleScreen() {
       setOtName("");
       setOtPhone("");
       setSessionType("PT");
+      cancelledIdsRef.current.clear();
       fetchAll();
       Alert.alert("완료 ✓", `${name}님 OT 수업이 추가됐어요!`);
     } catch (e: any) {
@@ -684,6 +709,7 @@ export default function TrainerScheduleScreen() {
       setManualModal(false);
       setPersonalNote("");
       setSessionType("PT");
+      cancelledIdsRef.current.clear();
       fetchAll();
       Alert.alert("완료 ✓", `${label}이 추가됐어요!\n${time} ~ ${endT}`);
     } catch (e: any) {
@@ -693,38 +719,65 @@ export default function TrainerScheduleScreen() {
     }
   };
 
-  const completeSlot = async (slot: any) => {
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/schedule/${slot.id}/complete`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      if (!res.ok) throw new Error("완료 처리 실패");
-      setSlots((prev) =>
-        prev.map((s) => (s.id === slot.id ? { ...s, status: "COMPLETED" } : s)),
-      );
-      setSlotActionModal(false);
-    } catch (e: any) {
-      Alert.alert("오류", e.message);
-    }
+  const completeSlot = (slot: any) => {
+    Alert.alert(
+      "수업 완료",
+      `${slot.memberName ?? "수업"}을 완료 처리할까요?`,
+      [
+        { text: "아니요", style: "cancel" },
+        {
+          text: "완료",
+          onPress: async () => {
+            try {
+              const jwt = await AsyncStorage.getItem("jwt");
+              const res = await fetch(`${API_URL}/api/schedule/${slot.id}/complete`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${jwt}` },
+              });
+              if (!res.ok) throw new Error("완료 처리 실패");
+              setSlots((prev) =>
+                prev.map((s) => (s.id === slot.id ? { ...s, status: "COMPLETED" } : s)),
+              );
+              setSlotActionModal(false);
+              Alert.alert("완료", "수업이 완료 처리됐어요.");
+            } catch (e: any) {
+              Alert.alert("오류", e.message);
+            }
+          },
+        },
+      ],
+    );
   };
 
-  const noShowSlot = async (slot: any) => {
-    try {
-      const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/schedule/${slot.id}/no-show`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      if (!res.ok) throw new Error("노쇼 처리 실패");
-      setSlots((prev) =>
-        prev.map((s) => (s.id === slot.id ? { ...s, status: "NO_SHOW" } : s)),
-      );
-      setSlotActionModal(false);
-    } catch (e: any) {
-      Alert.alert("오류", e.message);
-    }
+  const noShowSlot = (slot: any) => {
+    Alert.alert(
+      "노쇼 처리",
+      `${slot.memberName ?? "수업"}을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`,
+      [
+        { text: "아니요", style: "cancel" },
+        {
+          text: "노쇼",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const jwt = await AsyncStorage.getItem("jwt");
+              const res = await fetch(`${API_URL}/api/schedule/${slot.id}/no-show`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${jwt}` },
+              });
+              if (!res.ok) throw new Error("노쇼 처리 실패");
+              setSlots((prev) =>
+                prev.map((s) => (s.id === slot.id ? { ...s, status: "NO_SHOW" } : s)),
+              );
+              setSlotActionModal(false);
+              Alert.alert("완료", "노쇼 처리됐어요.");
+            } catch (e: any) {
+              Alert.alert("오류", e.message);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const cancelSlot = (slot: any) => {
@@ -747,13 +800,8 @@ export default function TrainerScheduleScreen() {
                 },
               );
               if (!res.ok) throw new Error("취소 실패");
-              setSlots((prev) =>
-                prev.map((s) =>
-                  s.id === slot.id
-                    ? { ...s, status: "OPEN", memberName: null }
-                    : s,
-                ),
-              );
+              cancelledIdsRef.current.add(slot.id);
+              setSlots((prev) => prev.filter((s) => s.id !== slot.id));
               Alert.alert("완료", "수업이 취소됐어요.");
             } catch (e: any) {
               Alert.alert("오류", e.message);
@@ -977,6 +1025,7 @@ export default function TrainerScheduleScreen() {
                 key={dk}
                 onPress={() => {
                   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                  dateNavRef.current = true;
                   setSelectedDate(target);
                   setViewYear(target.getFullYear());
                   setViewMonth(target.getMonth() + 1);
@@ -1100,20 +1149,27 @@ export default function TrainerScheduleScreen() {
                       <TouchableOpacity
                         onPress={() => {
                           const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                          dateNavRef.current = true;
                           setSelectedDate(target);
                           setViewYear(target.getFullYear());
                           setViewMonth(target.getMonth() + 1);
                           setViewMode("month");
                         }}
                         onLongPress={() => {
+                          if (slot.status === "COMPLETED" || slot.status === "NO_SHOW") return;
                           setSlotActionTarget({ ...slot, _date: d });
                           setSlotActionModal(true);
                         }}
                         delayLongPress={400}
                         style={{
-                          backgroundColor: isNoShowSlot
-                            ? "#9CA3AF"
-                            : sessionColor(slot.sessionType ?? "PT"),
+                          backgroundColor:
+                            slot.status === "COMPLETED"
+                              ? Colors.blue
+                              : slot.status === "NO_SHOW"
+                                ? "#9CA3AF"
+                                : slot.status === "CANCELLED"
+                                  ? Colors.red
+                                  : sessionColor(slot.sessionType ?? "PT"),
                           borderRadius: 0,
                           paddingVertical: 4,
                           paddingHorizontal: 3,
@@ -1229,7 +1285,7 @@ export default function TrainerScheduleScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                backgroundColor: Colors.greenLight,
+                backgroundColor: "#fff",
                 paddingHorizontal: 16,
                 paddingVertical: 10,
                 borderRadius: 12,
@@ -1265,17 +1321,23 @@ export default function TrainerScheduleScreen() {
                 paddingVertical: 12,
                 paddingHorizontal: 14,
                 marginBottom: 6,
-                backgroundColor: isNoShowSlot
-                  ? "#F3F4F6"
-                  : !isConfirmed
-                    ? "#fff"
-                    : sessionBg(slot.sessionType ?? "PT"),
+                backgroundColor:
+                  slot.status === "COMPLETED"
+                    ? Colors.blueBg
+                    : slot.status === "NO_SHOW"
+                      ? "#F3F4F6"
+                      : !isConfirmed
+                        ? "#fff"
+                        : sessionBg(slot.sessionType ?? "PT"),
                 borderWidth: 1,
-                borderColor: isNoShowSlot
-                  ? "#D1D5DB"
-                  : !isConfirmed
-                    ? Colors.border
-                    : sessionBorder(slot.sessionType ?? "PT"),
+                borderColor:
+                  slot.status === "COMPLETED"
+                    ? Colors.blue + "55"
+                    : slot.status === "NO_SHOW"
+                      ? "#D1D5DB"
+                      : !isConfirmed
+                        ? Colors.border
+                        : sessionBorder(slot.sessionType ?? "PT"),
               }}
             >
               {/* 시간 */}
@@ -1323,6 +1385,20 @@ export default function TrainerScheduleScreen() {
                           ? slot.note || sessionLabel(slot.sessionType ?? "")
                           : slot.memberName}
                       </Text>
+                      {slot.status === "COMPLETED" && (
+                        <View
+                          style={{
+                            backgroundColor: Colors.blueBg,
+                            borderRadius: 4,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 9, fontWeight: "800", color: Colors.blue }}>
+                            완료
+                          </Text>
+                        </View>
+                      )}
                       {isNoShowSlot && (
                         <View
                           style={{
@@ -1410,7 +1486,7 @@ export default function TrainerScheduleScreen() {
               {/* 상태 버튼 (확정/노쇼/취소) */}
               {(slot.status === "CONFIRMED" || isNoShowSlot) && slot.id && (
                 <View style={{ flexDirection: "row", gap: 6 }}>
-                  {slot.status === "CONFIRMED" && (
+                  {slot.status === "CONFIRMED" && !isPersonalType(slot.sessionType ?? "") && (
                     <TouchableOpacity
                       onPress={() => completeSlot(slot)}
                       style={{
@@ -1425,7 +1501,7 @@ export default function TrainerScheduleScreen() {
                       <Text style={{ fontSize: 12, color: Colors.blue, fontWeight: "700" }}>완료</Text>
                     </TouchableOpacity>
                   )}
-                  {slot.status === "CONFIRMED" && (
+                  {slot.status === "CONFIRMED" && !isPersonalType(slot.sessionType ?? "") && (
                     <TouchableOpacity
                       onPress={() => noShowSlot(slot)}
                       style={{
@@ -1501,7 +1577,7 @@ export default function TrainerScheduleScreen() {
               marginTop: 8,
               paddingVertical: 12,
               borderRadius: 12,
-              backgroundColor: Colors.greenLight,
+              backgroundColor: "#fff",
               borderWidth: 1,
               borderColor: Colors.green + "44",
             }}
@@ -1601,6 +1677,23 @@ export default function TrainerScheduleScreen() {
           >
             <Text style={{ fontSize: 11, color: Colors.textMuted }}>설정</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* 색상 범례 */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 2, paddingBottom: 10 }}>
+          {[
+            { color: Colors.green, label: "수업 확정" },
+            { color: Colors.blue, label: "수업 완료" },
+            { color: "#9CA3AF", label: "노쇼" },
+            { color: "#F97316", label: "OT" },
+            { color: "#F59E0B", label: "개인운동" },
+            { color: "#8B5CF6", label: "개인일정" },
+          ].map(({ color, label }) => (
+            <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
+              <Text style={{ fontSize: 11, color: Colors.textMuted }}>{label}</Text>
+            </View>
+          ))}
         </View>
 
         {viewMode === "month" ? (
@@ -2198,6 +2291,7 @@ export default function TrainerScheduleScreen() {
                               setOtName("");
                               setOtPhone("");
                               setSessionType("PT");
+                              cancelledIdsRef.current.clear();
                               fetchAll();
                               Alert.alert(
                                 "완료 ✓",
@@ -2894,16 +2988,21 @@ export default function TrainerScheduleScreen() {
           onPress={() => setSlotActionModal(false)}
         >
           <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
-            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
-              {slotActionTarget?.memberName ?? "수업"}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, flex: 1 }}>
+                {slotActionTarget?.memberName ?? "수업"}
+              </Text>
+              <TouchableOpacity onPress={() => setSlotActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={{ fontSize: 18, color: Colors.textMuted, lineHeight: 22 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>
               {slotActionTarget?._date
-                ? `${slotActionTarget._date.getMonth() + 1}/${slotActionTarget._date.getDate()} ${slotActionTarget.startTime ?? ""}`
+                ? `${slotActionTarget._date.getMonth() + 1}월${slotActionTarget._date.getDate()}일 ${(slotActionTarget.startTime ?? "").slice(0, 5)}`
                 : ""}
             </Text>
 
-            {slotActionTarget?.status === "CONFIRMED" && (
+            {slotActionTarget?.status === "CONFIRMED" && !isPersonalType(slotActionTarget?.sessionType ?? "") && (
               <TouchableOpacity
                 onPress={() => completeSlot(slotActionTarget)}
                 style={{
@@ -2919,7 +3018,7 @@ export default function TrainerScheduleScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료</Text>
               </TouchableOpacity>
             )}
-            {slotActionTarget?.status === "CONFIRMED" && (
+            {slotActionTarget?.status === "CONFIRMED" && !isPersonalType(slotActionTarget?.sessionType ?? "") && (
               <TouchableOpacity
                 onPress={() => noShowSlot(slotActionTarget)}
                 style={{
@@ -2947,6 +3046,34 @@ export default function TrainerScheduleScreen() {
               }}
             >
               <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+      {/* 주간 long press 힌트 모달 (최초 1회) */}
+      <Modal
+        visible={hintModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 }}
+          activeOpacity={1}
+          onPress={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
+        >
+          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "85%" }}>
+            <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text, marginBottom: 8 }}>💡 수업 상태 변경</Text>
+            <Text style={{ fontSize: 14, color: Colors.textMuted, lineHeight: 22, marginBottom: 20 }}>
+              주간 일정에서 수업을{"\n"}
+              <Text style={{ fontWeight: "700", color: Colors.text }}>길게 누르면</Text> 완료·노쇼·취소를{"\n"}
+              바로 처리할 수 있어요.
+            </Text>
+            <TouchableOpacity
+              onPress={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
+              style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 13, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>확인</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
