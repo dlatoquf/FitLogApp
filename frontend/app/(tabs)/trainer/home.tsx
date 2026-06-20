@@ -296,6 +296,7 @@ export default function TrainerHomeScreen() {
   );
   const [payCombinedMembers, setPayCombinedMembers] = useState<CombinedPayMember[]>([]);
   const [payMembersLoading, setPayMembersLoading] = useState(false);
+  const [payMemberSearch, setPayMemberSearch] = useState("");
   const [paySelectedMember, setPaySelectedMember] = useState<Member | null>(
     null,
   );
@@ -625,6 +626,7 @@ export default function TrainerHomeScreen() {
     setPayMemberType("existing");
     setPayNewName("");
     setPayNewPhone("");
+    setPayMemberSearch("");
     setPayMembers([]);
     setPayManualMembers([]);
     setPayCombinedMembers([]);
@@ -674,10 +676,10 @@ export default function TrainerHomeScreen() {
         });
       }
 
-      // 연결해제 회원은 맨 끝, 나머지는 ptRemaining 오름차순 (0→1→3→5...)
+      // 연결해제 회원은 맨 끝, 나머지는 ㄱㄴㄷ순
       combined.sort((a, b) => {
         if (a.isDisconnected !== b.isDisconnected) return a.isDisconnected ? 1 : -1;
-        return a.ptRemaining - b.ptRemaining;
+        return a.name.localeCompare(b.name, "ko");
       });
 
       setPayCombinedMembers(combined);
@@ -2675,6 +2677,24 @@ export default function TrainerHomeScreen() {
                   >
                     회원 선택
                   </Text>
+                  {/* 검색 */}
+                  <TextInput
+                    value={payMemberSearch}
+                    onChangeText={setPayMemberSearch}
+                    placeholder="회원 이름 검색..."
+                    placeholderTextColor={Colors.textMuted}
+                    style={{
+                      backgroundColor: Colors.bgSub,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      fontSize: 13,
+                      color: Colors.text,
+                      marginBottom: 10,
+                    }}
+                  />
                   {payMembersLoading ? (
                     <View
                       style={{
@@ -2698,7 +2718,9 @@ export default function TrainerHomeScreen() {
                         alignItems: "center",
                       }}
                     >
-                      {payCombinedMembers.map((m) => {
+                      {payCombinedMembers.filter((m) =>
+                        payMemberSearch.trim() === "" || m.name.includes(payMemberSearch.trim())
+                      ).map((m) => {
                         const selected = m.isManual
                           ? paySelectedManualMember?.id === m.id
                           : paySelectedMember?.id === m.id;

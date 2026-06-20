@@ -736,9 +736,10 @@ export default function TrainerScheduleScreen() {
   };
 
   const completeSlot = (slot: any) => {
+    const displayLabel = slot.note ? slot.note : (slot.memberName ?? "수업");
     Alert.alert(
       "수업 완료",
-      `${slot.memberName ?? "수업"}을 완료 처리할까요?`,
+      `${displayLabel}을 완료 처리할까요?`,
       [
         { text: "아니요", style: "cancel" },
         {
@@ -766,9 +767,10 @@ export default function TrainerScheduleScreen() {
   };
 
   const noShowSlot = (slot: any) => {
+    const displayLabel = slot.note ? slot.note : (slot.memberName ?? "수업");
     Alert.alert(
       "노쇼 처리",
-      `${slot.memberName ?? "수업"}을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`,
+      `${displayLabel}을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`,
       [
         { text: "아니요", style: "cancel" },
         {
@@ -1189,6 +1191,8 @@ export default function TrainerScheduleScreen() {
                           alignItems: "center",
                           justifyContent: "center",
                           height: SLOT_H,
+                          borderRightWidth: 1,
+                          borderRightColor: "rgba(255,255,255,0.35)",
                         }}
                       >
                         <Text
@@ -3098,7 +3102,9 @@ export default function TrainerScheduleScreen() {
           <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
             <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
               <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, flex: 1 }}>
-                {slotActionTarget?.memberName ?? "수업"}
+                {isPersonalType(slotActionTarget?.sessionType ?? "")
+                  ? sessionLabel(slotActionTarget?.sessionType ?? "")
+                  : (slotActionTarget?.memberName ?? "수업")}
               </Text>
               <TouchableOpacity onPress={() => setSlotActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={{ fontSize: 18, color: Colors.textMuted, lineHeight: 22 }}>✕</Text>
