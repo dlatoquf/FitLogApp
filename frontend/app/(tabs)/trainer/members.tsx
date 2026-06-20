@@ -976,36 +976,37 @@ export default function TrainerMembersScreen() {
                           </Text>
                         </View>
                         <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                          {m.isLinked && (
-                            <TouchableOpacity
-                              onPress={async () => {
-                                try {
-                                  const jwt = await AsyncStorage.getItem("jwt");
-                                  const res = await fetch(`${API_URL}/api/trainer/members/${m.id}/reactivate`, {
-                                    method: "POST",
-                                    headers: { Authorization: `Bearer ${jwt}` },
-                                  });
-                                  if (!res.ok) throw new Error("실패");
-                                  setInactiveModal(false);
-                                  await fetchMembers();
-                                } catch {
-                                  Alert.alert("오류", "재활성화에 실패했어요.");
-                                }
-                              }}
-                              style={{
-                                backgroundColor: Colors.greenLight,
-                                borderRadius: 6,
-                                paddingHorizontal: 7,
-                                paddingVertical: 3,
-                                borderWidth: 1,
-                                borderColor: Colors.green + "66",
-                              }}
-                            >
-                              <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>
-                                비활성해제
-                              </Text>
-                            </TouchableOpacity>
-                          )}
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                const jwt = await AsyncStorage.getItem("jwt");
+                                const url = m.isLinked
+                                  ? `${API_URL}/api/trainer/members/${m.id}/reactivate`
+                                  : `${API_URL}/api/trainer/manual-members/${m.id}/reactivate`;
+                                const res = await fetch(url, {
+                                  method: "POST",
+                                  headers: { Authorization: `Bearer ${jwt}` },
+                                });
+                                if (!res.ok) throw new Error("실패");
+                                setInactiveModal(false);
+                                await fetchMembers();
+                              } catch {
+                                Alert.alert("오류", "재활성화에 실패했어요.");
+                              }
+                            }}
+                            style={{
+                              backgroundColor: Colors.greenLight,
+                              borderRadius: 6,
+                              paddingHorizontal: 7,
+                              paddingVertical: 3,
+                              borderWidth: 1,
+                              borderColor: Colors.green + "66",
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>
+                              비활성해제
+                            </Text>
+                          </TouchableOpacity>
                           <View
                             style={{
                               backgroundColor: "#F3F4F6",
