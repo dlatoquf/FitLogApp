@@ -24,7 +24,8 @@ import { toDateKey } from "../../../hooks/useApi";
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 
-const DAYS_KR = ["월", "화", "수", "목", "금", "토", "일"];
+const DAYS_KR_MON = ["월", "화", "수", "목", "금", "토", "일"];
+const DAYS_KR_SUN = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 전화번호 자동 하이픈 포맷 (010-1234-5678 / 02-123-4567 등)
 function formatPhoneNumber(value: string): string {
@@ -58,11 +59,12 @@ const TIME_OPTIONS_DEFAULT = makeTimeOptions(0);
 
 // ─── 유틸 ─────────────────────────────────────────────────────────────────────
 
-/** 해당 월의 1일이 무슨 요일(월=0, ..., 일=6)인지 반환 */
-function getMonthFirstDayOfWeek(year: number, month: number): number {
+/** 해당 월의 1일이 무슨 요일인지 반환 (startDay: 0=일요일시작, 1=월요일시작) */
+function getMonthFirstDayOfWeek(year: number, month: number, startDay: 0 | 1 = 1): number {
   const d = new Date(year, month - 1, 1);
   const jsDay = d.getDay(); // 0=일, 1=월 ... 6=토
-  return jsDay === 0 ? 6 : jsDay - 1; // 월=0
+  if (startDay === 1) return jsDay === 0 ? 6 : jsDay - 1; // 월=0
+  return jsDay; // 일=0
 }
 
 /** 해당 월의 마지막 날짜 */
@@ -75,24 +77,26 @@ function makeDateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** 오늘 기준 "이번 주 월요일" */
-function getThisWeekMonday(): Date {
+/** 오늘 기준 이번 주 시작일 (startDay: 0=일, 1=월) */
+function getThisWeekStart(startDay: 0 | 1 = 1): Date {
   const today = new Date();
   const jsDay = today.getDay(); // 0=일
-  const diff = jsDay === 0 ? -6 : 1 - jsDay;
-  const mon = new Date(today);
-  mon.setDate(today.getDate() + diff);
-  mon.setHours(0, 0, 0, 0);
-  return mon;
+  const diff = startDay === 1
+    ? (jsDay === 0 ? -6 : 1 - jsDay)
+    : -jsDay;
+  const start = new Date(today);
+  start.setDate(today.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
 }
 
-/** 활성 날짜 범위: 이번 주 월요일 ~ 다음 주 일요일 */
-function getActiveRange(): { from: Date; to: Date } {
-  const mon = getThisWeekMonday();
-  const to = new Date(mon);
-  to.setDate(mon.getDate() + 13); // +13 = 2주 범위 (일요일까지)
+/** 활성 날짜 범위: 이번 주 시작 ~ +13일 */
+function getActiveRange(startDay: 0 | 1 = 1): { from: Date; to: Date } {
+  const start = getThisWeekStart(startDay);
+  const to = new Date(start);
+  to.setDate(start.getDate() + 13);
   to.setHours(23, 59, 59, 999);
-  return { from: mon, to };
+  return { from: start, to };
 }
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
@@ -149,11 +153,13 @@ export default function TrainerScheduleScreen() {
   const [personalNote, setPersonalNote] = useState("");
   const [addingPersonal, setAddingPersonal] = useState(false);
 
-  // 슬롯 오프셋: null=미설정(모달 표시), 0=정각, 30=30분
+  // 슬롯 오프셋: 0=정각, 30=30분
   const [slotOffset, setSlotOffset] = useState<0 | 30 | null | "loading">(
     "loading",
   );
   const [showOffsetModal, setShowOffsetModal] = useState(false);
+  // 주 시작 요일: 0=일요일, 1=월요일
+  const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
 
   // ── 모달 스와이프 다운 닫기 ──────────────────────────────────────────────
   const addModalPanY = useRef(new Animated.Value(0)).current;
@@ -193,17 +199,18 @@ export default function TrainerScheduleScreen() {
   ).current;
 
   // ── 계산값 ────────────────────────────────────────────────────────────────
+  const DAYS_KR = weekStartDay === 0 ? DAYS_KR_SUN : DAYS_KR_MON;
 
   const yearMonthStr = `${viewYear}-${String(viewMonth).padStart(2, "0")}`;
   const dateKey = toDateKey(selectedDate);
-  const activeRange = getActiveRange();
+  const activeRange = getActiveRange(weekStartDay);
 
   /** 주간 뷰: weekOffset 기준 7일 배열 */
   function getWeekDatesForOffset(offset: number): Date[] {
-    const mon = getThisWeekMonday();
+    const start = getThisWeekStart(weekStartDay);
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mon);
-      d.setDate(mon.getDate() + offset * 7 + i);
+      const d = new Date(start);
+      d.setDate(start.getDate() + offset * 7 + i);
       return d;
     });
   }
@@ -262,13 +269,7 @@ export default function TrainerScheduleScreen() {
         if (slotSettingsRes?.ok) {
           const data = await slotSettingsRes.json();
           const off = data.slotOffset;
-          if (off === null || off === undefined) {
-            // 미설정 → 모달 표시
-            setSlotOffset(null);
-            setShowOffsetModal(true);
-          } else {
-            setSlotOffset(off === 30 ? 30 : 0);
-          }
+          setSlotOffset(off === 30 ? 30 : 0);
         }
       } catch (e) {
         console.error("fetchAll error:", e);
@@ -714,7 +715,7 @@ export default function TrainerScheduleScreen() {
   // ─── 캘린더 그리드 렌더 ──────────────────────────────────────────────────
 
   const renderCalendar = () => {
-    const firstDow = getMonthFirstDayOfWeek(viewYear, viewMonth); // 0=월
+    const firstDow = getMonthFirstDayOfWeek(viewYear, viewMonth, weekStartDay);
     const daysInMon = getDaysInMonth(viewYear, viewMonth);
     const todayKey = toDateKey(today);
 
@@ -801,7 +802,6 @@ export default function TrainerScheduleScreen() {
                 <TouchableOpacity
                   key={ci}
                   onPress={() => setSelectedDate(cellDate)}
-                  disabled={!active && !isPast}
                   style={{ flex: 1, alignItems: "center", paddingVertical: 8 }}
                 >
                   <View
@@ -816,7 +816,6 @@ export default function TrainerScheduleScreen() {
                       borderColor: Colors.green,
                       justifyContent: "center",
                       alignItems: "center",
-                      opacity: !active && !isPast ? 0.2 : 1,
                     }}
                   >
                     <Text
@@ -1152,8 +1151,7 @@ export default function TrainerScheduleScreen() {
           <Text style={{ fontSize: 13, color: Colors.textMuted }}>
             이날 스케줄이 없어요
           </Text>
-          {(selectedActive || selectedPast) && (
-            <TouchableOpacity
+          <TouchableOpacity
               onPress={async () => {
                 if (members.length === 0) await fetchMembers();
                 setManualTime("09:00");
@@ -1176,7 +1174,6 @@ export default function TrainerScheduleScreen() {
                 + 스케줄 추가
               </Text>
             </TouchableOpacity>
-          )}
         </View>
       );
     }
@@ -1432,7 +1429,9 @@ export default function TrainerScheduleScreen() {
   // ─── JSX ─────────────────────────────────────────────────────────────────
 
   const selDate = selectedDate;
-  const dayOfWeekKr = DAYS_KR[(selDate.getDay() + 6) % 7];
+  const dayOfWeekKr = weekStartDay === 0
+    ? DAYS_KR[selDate.getDay()]
+    : DAYS_KR[(selDate.getDay() + 6) % 7];
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -1509,9 +1508,7 @@ export default function TrainerScheduleScreen() {
               gap: 4,
             }}
           >
-            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-              {slotOffset === 30 ? "30분" : "정각"}
-            </Text>
+            <Text style={{ fontSize: 11, color: Colors.textMuted }}>설정</Text>
           </TouchableOpacity>
         </View>
 
@@ -1679,79 +1676,26 @@ export default function TrainerScheduleScreen() {
         )}
       </ScrollView>
 
-      {/* ── 슬롯 시작 시간 설정 모달 (최초 1회) ─────────────────────────── */}
+
+      {/* ── 메모 수정 모달 ─────────────────────────────────────────────────── */}
+      {/* ── 설정 모달 ────────────────────────────────────────────────────── */}
       <Modal
         visible={showOffsetModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowOffsetModal(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 24,
-          }}
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 }}
+          activeOpacity={1}
+          onPress={() => setShowOffsetModal(false)}
         >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 16,
-              padding: 20,
-              width: "85%",
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => setShowOffsetModal(false)}
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                padding: 4,
-                zIndex: 1,
-              }}
-            >
-              <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
-            </TouchableOpacity>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "800",
-                color: Colors.text,
-                textAlign: "center",
-                marginBottom: 4,
-              }}
-            >
-              수업 시작 시간을 알려주세요
-            </Text>
-            <Text
-              style={{
-                fontSize: 12,
-                color: Colors.textMuted,
-                textAlign: "center",
-                marginBottom: 20,
-              }}
-            >
-              슬롯이 정각 또는 30분 단위로 생성돼요.{"\n"}변경 시 다음 주부터
-              적용돼요.
-            </Text>
-            <View style={{ gap: 10 }}>
-              {(
-                [
-                  {
-                    label: "정각 시작",
-                    sub: "10:00, 11:00, 12:00 …",
-                    value: 0,
-                  },
-                  {
-                    label: "30분 시작",
-                    sub: "10:30, 11:30, 12:30 …",
-                    value: 30,
-                  },
-                ] as const
-              ).map((opt) => (
+          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 16 }}>일정 설정</Text>
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>수업 시작 시간</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+              {([{ label: "정각", value: 0 }, { label: "30분", value: 30 }] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
                   onPress={async () => {
@@ -1759,62 +1703,64 @@ export default function TrainerScheduleScreen() {
                       const jwt = await AsyncStorage.getItem("jwt");
                       await fetch(`${API_URL}/api/trainer/slot-settings`, {
                         method: "PATCH",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${jwt}`,
-                        },
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
                         body: JSON.stringify({ slotOffset: opt.value }),
                       });
                       setSlotOffset(opt.value);
-                      setShowOffsetModal(false);
-                      // 이번 주 + 다음 주 슬롯 자동 생성
-                      await fetch(`${API_URL}/api/schedule/generate`, {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${jwt}`,
-                        },
-                      });
-                      fetchAll();
                     } catch (e) {
                       Alert.alert("오류", "설정 저장에 실패했어요.");
                     }
                   }}
                   style={{
-                    borderWidth: 1.5,
-                    borderColor: Colors.green,
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
                     alignItems: "center",
+                    borderWidth: 1.5,
+                    borderColor: slotOffset === opt.value ? Colors.green : Colors.border,
+                    backgroundColor: slotOffset === opt.value ? Colors.greenLight : Colors.bgSub,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "800",
-                      color: Colors.text,
-                    }}
-                  >
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: slotOffset === opt.value ? Colors.green : Colors.textSub }}>
                     {opt.label}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: Colors.textMuted,
-                      marginTop: 2,
-                    }}
-                  >
-                    {opt.sub}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>주 시작 요일</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              {([{ label: "월요일", value: 1 }, { label: "일요일", value: 0 }] as const).map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => setWeekStartDay(opt.value)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: "center",
+                    borderWidth: 1.5,
+                    borderColor: weekStartDay === opt.value ? Colors.green : Colors.border,
+                    backgroundColor: weekStartDay === opt.value ? Colors.greenLight : Colors.bgSub,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartDay === opt.value ? Colors.green : Colors.textSub }}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowOffsetModal(false)}
+              style={{ marginTop: 16, paddingVertical: 12, borderRadius: 10, backgroundColor: Colors.green, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>확인</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
-      {/* ── 메모 수정 모달 ─────────────────────────────────────────────────── */}
       <Modal
         visible={editingMemo}
         transparent
