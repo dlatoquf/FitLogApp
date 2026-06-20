@@ -439,6 +439,7 @@ export default function TrainerScheduleScreen() {
   // 주간 뷰 진입 시 — 이번 주 가장 빠른 슬롯 vs 출근 시간 중 더 이른 시간으로 스크롤
   useEffect(() => {
     if (viewMode !== "week") return;
+    if (loading) return;
     const effectiveOffset = slotOffset === 30 ? 30 : 0;
     const times = makeTimeOptions(effectiveOffset as 0 | 30);
     // 이번 주 슬롯 중 가장 빠른 시작 시간
@@ -458,7 +459,7 @@ export default function TrainerScheduleScreen() {
       weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
     }, 50);
     return () => clearTimeout(timer);
-  }, [viewMode, trainerStartTime, slotOffset, slots, currentWeekDates]);
+  }, [viewMode, trainerStartTime, slotOffset, slots, currentWeekDates, loading]);
 
   // ─── 주간 이동 ───────────────────────────────────────────────────────────
 
@@ -497,10 +498,12 @@ export default function TrainerScheduleScreen() {
 
   // 월이 바뀌면 데이터 새로 가져오기
   const prevFetchKey = useRef(yearMonthStr);
-  if (prevFetchKey.current !== yearMonthStr) {
-    prevFetchKey.current = yearMonthStr;
-    fetchAll();
-  }
+  useEffect(() => {
+    if (prevFetchKey.current !== yearMonthStr) {
+      prevFetchKey.current = yearMonthStr;
+      fetchAll();
+    }
+  }, [yearMonthStr, fetchAll]);
 
   // ─── 메모 저장 ───────────────────────────────────────────────────────────
 
