@@ -3963,7 +3963,7 @@ export default function MemberDetailScreen() {
               flex: 1,
             }}
           >
-            <TouchableOpacity onPress={() => router.back()}>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/trainer/members" as any)}>
               <Text style={{ fontSize: 22, color: Colors.textMuted }}>←</Text>
             </TouchableOpacity>
             <Text
