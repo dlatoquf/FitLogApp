@@ -627,7 +627,18 @@ export default function TrainerMoreScreen() {
         </View> */}
 
         {/* 연동 */}
-        <FlatSectionHeader title="연동" />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 20, marginBottom: 4, paddingHorizontal: 4 }}>
+          <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted }}>연동</Text>
+          <TouchableOpacity
+            onPress={() => Alert.alert(
+              "Google Sheets 연동 안내",
+              "연동 시 Google 인증 화면에서\n① '고급'을 누르세요\n② 'FitLog(으)로 이동'을 눌러 실행하세요\n\nGoogle 앱 검증 진행 중으로 일시적으로 표시되는 안내입니다.\n\n연동 후 '기존 데이터 동기화'를 눌러 지금까지의 데이터를 업로드하세요."
+            )}
+            style={{ width: 15, height: 15, borderRadius: 3, borderWidth: 1.5, borderColor: Colors.textMuted, alignItems: "center", justifyContent: "center" }}
+          >
+            <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.textMuted, lineHeight: 13 }}>?</Text>
+          </TouchableOpacity>
+        </View>
         <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
           <FlatRow
             label="Google Sheets"
@@ -650,16 +661,6 @@ export default function TrainerMoreScreen() {
               )
             }
           />
-          {!sheetsConnected && (
-            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 18, textAlign: "left" }}>
-                💡 연동 시 Google 인증 화면에서{"\n"}
-                {'    '}① '고급'을 누르세요{"\n"}
-                {'    '}② 'FitLog(으)로 이동'을 눌러 실행하세요{"\n"}
-                Google 앱 검증 진행 중으로 일시적으로 표시되는 안내입니다.
-              </Text>
-            </View>
-          )}
           {sheetsConnected && (
             <>
               <FlatRow label="FitLog 데이터 시트 열기" onPress={openSpreadsheet} showArrow />
@@ -667,14 +668,18 @@ export default function TrainerMoreScreen() {
                 label={syncingSheets ? "동기화 중..." : "기존 데이터 동기화"}
                 onPress={handleSyncAllData}
                 showArrow
+                right={
+                  <TouchableOpacity
+                    onPress={() => Alert.alert(
+                      "기존 데이터 동기화",
+                      "처음 연동했다면 이 버튼을 눌러 지금까지의 데이터를 시트에 업로드하세요.\n\n이후 신규 데이터는 자동으로 업로드됩니다."
+                    )}
+                    style={{ width: 18, height: 18, borderRadius: 3, borderWidth: 1.5, borderColor: Colors.textMuted, alignItems: "center", justifyContent: "center", marginRight: 4 }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted, lineHeight: 14 }}>?</Text>
+                  </TouchableOpacity>
+                }
               />
-              <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 18 }}>
-                  💡 처음 연동했다면 <Text style={{ fontWeight: "700", color: Colors.text }}>기존 데이터 동기화</Text>를 눌러{"\n"}
-                  {'    '}지금까지의 데이터를 시트에 업로드하세요.{"\n"}
-                  {'    '}이후 신규 데이터는 자동으로 업로드됩니다.
-                </Text>
-              </View>
             </>
           )}
         </View>

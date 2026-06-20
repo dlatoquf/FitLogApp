@@ -109,7 +109,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     );
 
     // 다음 주 전체 슬롯 삭제 (OPEN/CONFIRMED/REQUESTED 모두)
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to")
     int deleteAllSlotsByTrainerAndDateBetween(
             @Param("trainer") Trainer trainer,
@@ -202,8 +202,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("UPDATE Schedule s SET s.member = null, s.status = 'OPEN' WHERE s.member = :member AND s.date < :today")
     void detachMemberFromPastSchedules(@Param("member") Member member, @Param("today") java.time.LocalDate today);
 
-    // 계정 삭제용 - 미래 스케줄 조회 (요청 삭제 후 슬롯 삭제용)
-    @Query("SELECT s FROM Schedule s WHERE s.member = :member AND s.date >= :today")
+    // 계정 삭제용 - 미래 스케줄 조회 (완료·노쇼 제외, 요청 삭제 후 슬롯 삭제용)
+    @Query("SELECT s FROM Schedule s WHERE s.member = :member AND s.date >= :today AND s.status NOT IN ('COMPLETED', 'NO_SHOW')")
     List<Schedule> findFutureSchedulesByMember(@Param("member") Member member, @Param("today") java.time.LocalDate today);
 
     // 연동 시 이전 - 미연동 회원 일정 → 연동 회원으로 일괄 이전

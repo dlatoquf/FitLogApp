@@ -97,7 +97,7 @@ public class MemberDeleteService {
             scheduleRequestRepository.deleteByScheduleIds(futureIds);
             scheduleRepository.deleteAll(futureSchedules);
         }
-        scheduleRequestRepository.deleteAll(scheduleRequestRepository.findByMember(member));
+        scheduleRequestRepository.deleteAll(scheduleRequestRepository.findNonCompletedByMember(member));
 
         // 2. 알림 삭제 (개인 식별 정보이므로 제거)
         notificationRepository.deleteAllByUser(user);

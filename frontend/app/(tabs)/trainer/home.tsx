@@ -554,7 +554,6 @@ export default function TrainerHomeScreen() {
         if (membersRes.ok) {
           const members = await membersRes.json();
 
-          console.log("[결제추가 fetchHome 회원목록 원본]", members);
 
           members.sort((a: any, b: any) => {
             const aDisconnected = a.connected === false ? 1 : 0;
@@ -567,7 +566,6 @@ export default function TrainerHomeScreen() {
             return (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0);
           });
 
-          console.log("[결제추가 fetchHome 회원목록 정렬후]", members);
           setPayMembers(members);
         }
       } catch {}

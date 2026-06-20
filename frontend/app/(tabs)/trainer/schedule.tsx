@@ -285,6 +285,7 @@ export default function TrainerScheduleScreen() {
 
   const fetchAll = useCallback(
     async (isRefresh = false, silent = false) => {
+      cancelledIdsRef.current.clear();
       if (isRefresh) setRefreshing(true);
       else if (!silent) setLoading(true);
       try {
@@ -325,12 +326,23 @@ export default function TrainerScheduleScreen() {
           const data = await slotSettingsRes.json();
           const off = data.slotOffset;
           setSlotOffset(off === 30 ? 30 : 0);
-          if (data.weekStartHour != null) setWeekStartHour(data.weekStartHour);
-          if (data.weekEndHour != null) setWeekEndHour(data.weekEndHour);
+          if (data.weekStartHour != null) {
+            setWeekStartHour(data.weekStartHour);
+            await AsyncStorage.setItem("weekStartHour", String(data.weekStartHour));
+          } else {
+            const saved = await AsyncStorage.getItem("weekStartHour");
+            if (saved != null) setWeekStartHour(Number(saved));
+          }
+          if (data.weekEndHour != null) {
+            setWeekEndHour(data.weekEndHour);
+            await AsyncStorage.setItem("weekEndHour", String(data.weekEndHour));
+          } else {
+            const saved = await AsyncStorage.getItem("weekEndHour");
+            if (saved != null) setWeekEndHour(Number(saved));
+          }
         }
         const savedScale = await AsyncStorage.getItem("weekColScale");
-        if (savedScale === "2" || savedScale === "3") setColScale(Number(savedScale) as 2 | 3);
-        else setColScale(1);
+        if (savedScale != null) setColScale(Number(savedScale) as 1 | 2 | 3);
       } catch (e) {
         console.error("fetchAll error:", e);
       } finally {
@@ -573,29 +585,40 @@ export default function TrainerScheduleScreen() {
   const doAddManualSchedule = async (m: any) => {
     setAddingManual(true);
     const dates = selectedDays.length > 0 ? selectedDays : [dateKey];
+    const jwt = await AsyncStorage.getItem("jwt");
+    const succeeded: string[] = [];
+    const failed: string[] = [];
     try {
-      const jwt = await AsyncStorage.getItem("jwt");
       for (const d of dates) {
         const body: any = { date: d, startTime: manualTime };
         if (m.isManual) body.manualMemberId = m.id;
         else body.memberId = m.id;
-        const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-          },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error((await res.text()) || "추가 실패");
+        try {
+          const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) failed.push(d);
+          else succeeded.push(d);
+        } catch {
+          failed.push(d);
+        }
       }
       setManualModal(false);
       cancelledIdsRef.current.clear();
       fetchAll();
-      const suffix = dates.length > 1 ? ` ${dates.length}일 일정이` : " 수업이";
-      Alert.alert("완료 ✓", `${m.name}님${suffix} 추가됐어요!`);
-    } catch (e: any) {
-      Alert.alert("오류", e.message);
+      if (failed.length === 0) {
+        const suffix = dates.length > 1 ? ` ${dates.length}일 일정이` : " 수업이";
+        Alert.alert("완료 ✓", `${m.name}님${suffix} 추가됐어요!`);
+      } else if (succeeded.length > 0) {
+        Alert.alert("일부 완료", `${succeeded.length}일 추가됐어요.\n${failed.length}일은 실패했어요: ${failed.join(", ")}`);
+      } else {
+        Alert.alert("오류", "일정 추가에 실패했어요.");
+      }
     } finally {
       setAddingManual(false);
     }
@@ -1889,50 +1912,57 @@ export default function TrainerScheduleScreen() {
               ))}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "center" }}>
               {/* 시작 시간 */}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>시작 시간</Text>
-                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bgSub, alignItems: "center", paddingVertical: 6 }}>
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>시작 시간</Text>
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bgSub, alignItems: "center", paddingVertical: 4, width: 90 }}>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.max(0, weekStartHour - 1);
                     setWeekStartHour(h);
+                    await AsyncStorage.setItem("weekStartHour", String(h));
                     try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekStartHour: h }) }); } catch {}
-                  }} style={{ padding: 8 }}>
-                    <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>▲</Text>
+                  }} style={{ paddingVertical: 6, paddingHorizontal: 20 }}>
+                    <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▲</Text>
                   </TouchableOpacity>
-                  <View style={{ paddingVertical: 6, paddingHorizontal: 16, backgroundColor: Colors.greenLight, borderRadius: 8, marginVertical: 4 }}>
+                  <View style={{ paddingVertical: 5, paddingHorizontal: 12, backgroundColor: Colors.greenLight, borderRadius: 6, marginVertical: 2 }}>
                     <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekStartHour).padStart(2, "0")}:00</Text>
                   </View>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.min(23, weekStartHour + 1);
                     setWeekStartHour(h);
+                    await AsyncStorage.setItem("weekStartHour", String(h));
                     try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekStartHour: h }) }); } catch {}
-                  }} style={{ padding: 8 }}>
-                    <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>▼</Text>
+                  }} style={{ paddingVertical: 6, paddingHorizontal: 20 }}>
+                    <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▼</Text>
                   </TouchableOpacity>
                 </View>
               </View>
+              <View style={{ justifyContent: "center", paddingTop: 20 }}>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, fontWeight: "600" }}>—</Text>
+              </View>
               {/* 마지막 시간 */}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>마지막 시간</Text>
-                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bgSub, alignItems: "center", paddingVertical: 6 }}>
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>마지막 시간</Text>
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bgSub, alignItems: "center", paddingVertical: 4, width: 90 }}>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.max(12, weekEndHour - 1);
                     setWeekEndHour(h);
+                    await AsyncStorage.setItem("weekEndHour", String(h));
                     try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekEndHour: h }) }); } catch {}
-                  }} style={{ padding: 8 }}>
-                    <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>▲</Text>
+                  }} style={{ paddingVertical: 6, paddingHorizontal: 20 }}>
+                    <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▲</Text>
                   </TouchableOpacity>
-                  <View style={{ paddingVertical: 6, paddingHorizontal: 16, backgroundColor: Colors.greenLight, borderRadius: 8, marginVertical: 4 }}>
+                  <View style={{ paddingVertical: 5, paddingHorizontal: 12, backgroundColor: Colors.greenLight, borderRadius: 6, marginVertical: 2 }}>
                     <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekEndHour).padStart(2, "0")}:00</Text>
                   </View>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.min(23, weekEndHour + 1);
                     setWeekEndHour(h);
+                    await AsyncStorage.setItem("weekEndHour", String(h));
                     try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekEndHour: h }) }); } catch {}
-                  }} style={{ padding: 8 }}>
-                    <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>▼</Text>
+                  }} style={{ paddingVertical: 6, paddingHorizontal: 20 }}>
+                    <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▼</Text>
                   </TouchableOpacity>
                 </View>
               </View>

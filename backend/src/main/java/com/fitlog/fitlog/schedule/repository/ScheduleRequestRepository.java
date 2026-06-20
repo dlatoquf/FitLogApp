@@ -27,6 +27,10 @@ public interface ScheduleRequestRepository extends JpaRepository<ScheduleRequest
     @Query("SELECT sr FROM ScheduleRequest sr LEFT JOIN FETCH sr.schedule s WHERE sr.member = :member")
     List<ScheduleRequest> findByMember(@Param("member") Member member);
 
+    // 계정 삭제용 - 완료·노쇼 제외한 수업 신청 조회
+    @Query("SELECT sr FROM ScheduleRequest sr JOIN sr.schedule s WHERE sr.member = :member AND s.status NOT IN ('COMPLETED', 'NO_SHOW')")
+    List<ScheduleRequest> findNonCompletedByMember(@Param("member") Member member);
+
     //오늘 확정 PT 목록 한번에 조회 (member + user JOIN FETCH)
     @Query("SELECT sr FROM ScheduleRequest sr " +
             "JOIN FETCH sr.member m " +
