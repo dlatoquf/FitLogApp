@@ -237,9 +237,9 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.status = 'CONFIRMED'")
     long countConfirmedByTrainerAndDate(@Param("trainer") Trainer trainer, @Param("date") java.time.LocalDate date);
 
-    // 연동 회원 해제 시 해당 회원 스케줄 삭제
+    // 연동 회원 해제 시 미완료 스케줄만 삭제 (COMPLETED·NO_SHOW는 통계용으로 유지)
     @Transactional
     @Modifying
-    @Query("DELETE FROM Schedule s WHERE s.member = :member")
+    @Query("DELETE FROM Schedule s WHERE s.member = :member AND s.status NOT IN ('COMPLETED', 'NO_SHOW')")
     void deleteByMember(@Param("member") Member member);
 }
