@@ -3159,8 +3159,8 @@ export default function TrainerScheduleScreen() {
                           body: JSON.stringify({ note: editingNoteText }),
                         });
                         setSlots((prev) => prev.map((s) => s.id === slotActionTarget.id ? { ...s, note: editingNoteText || null } : s));
-                        setSlotActionTarget((prev: any) => prev ? { ...prev, note: editingNoteText || null } : prev);
                         setEditingNoteSlotId(null);
+                        setSlotActionModal(false);
                         Alert.alert("완료", "메모가 저장됐어요.");
                       } catch { Alert.alert("오류", "메모 저장에 실패했어요."); }
                     }}
