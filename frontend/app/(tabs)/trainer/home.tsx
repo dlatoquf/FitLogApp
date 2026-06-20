@@ -1232,7 +1232,7 @@ export default function TrainerHomeScreen() {
                     }}
                   >
                     <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                      이번달 목표 수정
+                      목표 수업 수정
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1374,6 +1374,24 @@ export default function TrainerHomeScreen() {
                         gap: 6,
                       }}
                     >
+                      {/* 목표 매출 수정 (이번 달만) */}
+                      {isCurrentMonth && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setGoalRevenueInput(
+                              data?.goalRevenue != null
+                                ? data.goalRevenue.toLocaleString()
+                                : "",
+                            );
+                            setGoalModalMode("revenue");
+                            setGoalModal(true);
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                            목표 매출 수정
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                       {/* PDF 버튼 */}
                       <TouchableOpacity
                         onPress={generatePdf}
@@ -1386,54 +1404,25 @@ export default function TrainerHomeScreen() {
                           borderColor: "#C7D2FE",
                         }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: "700",
-                            color: "#4338CA",
-                          }}
-                        >
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#4338CA" }}>
                           📄 PDF
                         </Text>
                       </TouchableOpacity>
-                      {/* 목표 수정 & 결제 추가 (이번 달만) */}
+                      {/* 결제 추가 (이번 달만) */}
                       {isCurrentMonth && (
-                        <>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setGoalRevenueInput(
-                                data?.goalRevenue != null
-                                  ? data.goalRevenue.toLocaleString()
-                                  : "",
-                              );
-                              setGoalModalMode("revenue");
-                              setGoalModal(true);
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                              이번달 매출 수정
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={handlePayButtonPress}
-                            style={{
-                              backgroundColor: Colors.green,
-                              paddingHorizontal: 12,
-                              paddingVertical: 6,
-                              borderRadius: 8,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontWeight: "700",
-                                color: "#fff",
-                              }}
-                            >
-                              + 결제 추가
-                            </Text>
-                          </TouchableOpacity>
-                        </>
+                        <TouchableOpacity
+                          onPress={handlePayButtonPress}
+                          style={{
+                            backgroundColor: Colors.green,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>
+                            + 결제 추가
+                          </Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                   </View>
