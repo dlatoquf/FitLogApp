@@ -1442,18 +1442,6 @@ export default function TrainerScheduleScreen() {
                       >
                         {slot.note}
                       </Text>
-                    ) : slot.sessionType !== "OT" &&
-                      slot.ptRemaining != null &&
-                      slot.ptTotal != null ? (
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: Colors.textMuted,
-                          marginTop: 2,
-                        }}
-                      >
-                        잔여 {slot.ptRemaining}/{slot.ptTotal}회
-                      </Text>
                     ) : slot.sessionType === "OT" ? (
                       <Text
                         style={{ fontSize: 11, color: "#F97316", marginTop: 2 }}
