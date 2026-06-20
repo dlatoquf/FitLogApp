@@ -1175,7 +1175,7 @@ export default function TrainerScheduleScreen() {
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
                         onPress={() => {
-                          if (slot.status === "COMPLETED" || slot.status === "NO_SHOW") return;
+                          if ((slot.status === "COMPLETED" || slot.status === "NO_SHOW") && !slot.note) return;
                           setSlotActionTarget({ ...slot, _date: d });
                           setSlotActionModal(true);
                         }}
@@ -1204,11 +1204,14 @@ export default function TrainerScheduleScreen() {
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
                         {!isPersonalType(slot.sessionType ?? "") && (() => {
+                          const isFinished = slot.status === "COMPLETED" || slot.status === "NO_SHOW";
                           const sub = slot.note
                             ? slot.note
-                            : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
-                              ? "OT"
-                              : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : "";
+                            : isFinished
+                              ? ""
+                              : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
+                                ? "OT"
+                                : "";
                           return sub ? (
                             <Text style={{ fontSize: CELL_SUB_FONT, color: "#ffffffcc", textAlign: "center" }} numberOfLines={1}>
                               {sub}
