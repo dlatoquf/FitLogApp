@@ -22,4 +22,5 @@ public interface DietPhotoRepository extends JpaRepository<DietPhoto, Long> {
 
     // 특정 날짜의 최근 N분 이내 사진 수 (업로드 세션 감지용)
     int countByMemberAndDateAndCreatedAtAfter(Member member, LocalDate date, LocalDateTime after);
+    void deleteByMember(Member member);
 }

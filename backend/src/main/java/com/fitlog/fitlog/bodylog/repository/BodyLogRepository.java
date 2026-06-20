@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface BodyLogRepository extends JpaRepository<BodyLog, Long> {
     List<BodyLog> findByMemberOrderByLogDateAsc(Member member);
+    void deleteByMember(Member member);
 }

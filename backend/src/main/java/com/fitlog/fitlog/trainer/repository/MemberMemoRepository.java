@@ -12,4 +12,5 @@ public interface MemberMemoRepository extends JpaRepository<MemberMemo, Long> {
     List<MemberMemo> findByManualMemberOrderByCreatedAtDesc(ManualMember manualMember);
     java.util.Optional<MemberMemo> findTop1ByMemberOrderByCreatedAtDesc(Member member);
     java.util.Optional<MemberMemo> findTop1ByManualMemberOrderByCreatedAtDesc(ManualMember manualMember);
+    void deleteByMember(Member member);
 }

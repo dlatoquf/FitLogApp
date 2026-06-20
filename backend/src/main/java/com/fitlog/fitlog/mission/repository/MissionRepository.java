@@ -68,4 +68,8 @@ public interface MissionRepository extends JpaRepository<Mission, Long> {
     // 회원의 PENDING 상태 미션 전체 (다음 수업 시 실패 처리 대상)
     @Query("SELECT m FROM Mission m WHERE m.member.id = :memberId AND m.status = 'PENDING'")
     List<Mission> findPendingByMemberId(@Param("memberId") Long memberId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Mission m WHERE m.member.id = :memberId")
+    void deleteByMemberId(@Param("memberId") Long memberId);
 }

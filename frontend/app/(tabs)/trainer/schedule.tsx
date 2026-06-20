@@ -1148,7 +1148,7 @@ export default function TrainerScheduleScreen() {
                         }}
                       >
                         <Text
-                          style={{ fontSize: 8, fontWeight: "800", color: "#fff", textAlign: "center" }}
+                          style={{ fontSize: 10, fontWeight: "800", color: "#fff", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
@@ -1156,7 +1156,7 @@ export default function TrainerScheduleScreen() {
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
                         <Text
-                          style={{ fontSize: 7, color: "#ffffffcc", textAlign: "center" }}
+                          style={{ fontSize: 8, color: "#ffffffcc", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")

@@ -13,4 +13,5 @@ public interface MemberGoalRepository extends JpaRepository<MemberGoal, Long> {
     Optional<MemberGoal> findTopByMemberOrderByCreatedAtDesc(Member member);
     // 계정 삭제용 - 회원의 전체 목표
     List<MemberGoal> findByMember(Member member);
+    void deleteByMember(Member member);
 }

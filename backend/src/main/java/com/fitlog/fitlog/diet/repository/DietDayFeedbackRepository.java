@@ -23,4 +23,6 @@ public interface DietDayFeedbackRepository extends JpaRepository<DietDayFeedback
     @Modifying
     @Query("DELETE FROM DietDayFeedback f WHERE f.trainer.id = :trainerId")
     void deleteByTrainerId(@Param("trainerId") Long trainerId);
+
+    void deleteByMember(Member member);
 }

@@ -340,10 +340,7 @@ public class TrainerController {
         if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
-        // 운동일지, 일정, 알림 삭제 (PT 결제 정보는 유지)
-        workoutLogRepository.deleteByMember(member);
-        scheduleRepository.deleteByMember(member);
-        notificationRepository.deleteByMemberId(member.getId());
+        // 연동만 해제 — 회원 데이터는 회원 계정에 속하므로 삭제하지 않음
         member.setStatus(Member.Status.INACTIVE);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);
