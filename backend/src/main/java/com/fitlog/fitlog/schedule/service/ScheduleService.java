@@ -306,6 +306,13 @@ public class ScheduleService {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new RuntimeException("슬롯 없음"));
 
+        // 개인운동/개인일정은 슬롯 자체를 삭제
+        String sessionType = schedule.getSessionType();
+        if ("PERSONAL_WORKOUT".equals(sessionType) || "PERSONAL_SCHEDULE".equals(sessionType)) {
+            scheduleRepository.delete(schedule);
+            return;
+        }
+
         Member member = schedule.getMember();
         ManualMember manualMember = schedule.getManualMember();
         boolean wasNoShow = "NO_SHOW".equals(schedule.getStatusStr());
