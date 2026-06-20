@@ -241,6 +241,10 @@ export default function TrainerMembersScreen() {
       Alert.alert("알림", "이름을 입력해주세요.");
       return;
     }
+    if (!addPhone.trim()) {
+      Alert.alert("알림", "전화번호를 입력해주세요.\n연동 시 회원 매칭에 사용됩니다.");
+      return;
+    }
     if (!addPt.trim()) {
       Alert.alert("알림", "첫 PT 결제 수를 입력해주세요.");
       return;
@@ -1762,7 +1766,7 @@ export default function TrainerMembersScreen() {
                 style={inputStyle}
               />
 
-              <Text style={labelStyle}>전화번호</Text>
+              <Text style={labelStyle}>전화번호 *</Text>
               <TextInput
                 value={addPhone}
                 onChangeText={(text) => {

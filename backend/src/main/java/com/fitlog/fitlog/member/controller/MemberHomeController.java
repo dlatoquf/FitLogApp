@@ -258,13 +258,20 @@ public class MemberHomeController {
         boolean merged = false;
         if (mm != null) {
 
-            // 1. PT 데이터 이전 (미연동에만 있고 연동엔 없을 때)
+            // 1. PT 데이터 + 전화번호 이전 (미연동에만 있고 연동엔 없을 때)
+            boolean memberUpdated = false;
             if (mm.getPtTotal() != null && mm.getPtTotal() > 0
                     && (member.getPtTotal() == null || member.getPtTotal() == 0)) {
                 member.setPtTotal(mm.getPtTotal());
                 member.setPtRemaining(mm.getPtRemaining());
-                memberRepository.save(member);
+                memberUpdated = true;
             }
+            if (mm.getPhone() != null && !mm.getPhone().isBlank()
+                    && (member.getPhone() == null || member.getPhone().isBlank())) {
+                member.setPhone(mm.getPhone());
+                memberUpdated = true;
+            }
+            if (memberUpdated) memberRepository.save(member);
 
             // 2. 메모 이전: manual_member_id → member_id 로 교체 후 저장
             //    이렇게 해야 manualMember 삭제 시 CASCADE로 메모가 날아가지 않음
