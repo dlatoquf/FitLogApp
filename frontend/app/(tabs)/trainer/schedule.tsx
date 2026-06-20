@@ -1918,7 +1918,7 @@ export default function TrainerScheduleScreen() {
                       >
                         {Array.from({ length: 24 }, (_, h) => (
                           <View key={h} style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 17, fontWeight: h === weekStartHour ? "800" : "500", color: h === weekStartHour ? Colors.green : Colors.textMuted }}>
+                            <Text style={{ fontSize: 14, fontWeight: h === weekStartHour ? "800" : "500", color: h === weekStartHour ? Colors.green : Colors.textMuted }}>
                               {String(h).padStart(2, "0")}:00
                             </Text>
                           </View>

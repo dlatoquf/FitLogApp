@@ -338,7 +338,9 @@ public class TrainerController {
             @RequestHeader("Authorization") String authorization) {
         Trainer trainer = getTrainer(authorization);
         Map<String, Object> result = new HashMap<>();
-        result.put("slotOffset", trainer.getSlotOffset()); // null이면 미설정
+        result.put("slotOffset", trainer.getSlotOffset());
+        result.put("weekStartHour", trainer.getWeekStartHour() != null ? trainer.getWeekStartHour() : 9);
+        result.put("weekEndHour", trainer.getWeekEndHour() != null ? trainer.getWeekEndHour() : 23);
         return ResponseEntity.ok(result);
     }
 
@@ -352,8 +354,20 @@ public class TrainerController {
             Object val = body.get("slotOffset");
             trainer.setSlotOffset(val != null ? ((Number) val).intValue() : null);
         }
+        if (body.containsKey("weekStartHour")) {
+            Object val = body.get("weekStartHour");
+            trainer.setWeekStartHour(val != null ? ((Number) val).intValue() : 9);
+        }
+        if (body.containsKey("weekEndHour")) {
+            Object val = body.get("weekEndHour");
+            trainer.setWeekEndHour(val != null ? ((Number) val).intValue() : 23);
+        }
         trainerRepository.save(trainer);
-        return ResponseEntity.ok(Map.of("slotOffset", trainer.getSlotOffset()));
+        return ResponseEntity.ok(Map.of(
+            "slotOffset", trainer.getSlotOffset(),
+            "weekStartHour", trainer.getWeekStartHour() != null ? trainer.getWeekStartHour() : 9,
+            "weekEndHour", trainer.getWeekEndHour() != null ? trainer.getWeekEndHour() : 23
+        ));
     }
 
     // POST /api/trainer/members/{memberId}/disconnect — 연동 회원 연결 해제 (INACTIVE 전환, trainer 참조 유지)

@@ -72,6 +72,14 @@ public class Trainer {
     @Column(name = "slot_offset")
     private Integer slotOffset;
 
+    // 주간 뷰 시작 시간 (0~23, 기본 9)
+    @Column(name = "week_start_hour")
+    private Integer weekStartHour;
+
+    // 주간 뷰 마지막 시간 (12~23, 기본 23)
+    @Column(name = "week_end_hour")
+    private Integer weekEndHour;
+
     // 1개월 무료 체험 종료일 (이 날까지 PRO 기능 사용 가능)
     @Column(name = "trial_end_date")
     private java.time.LocalDate trialEndDate;
@@ -127,6 +135,10 @@ public class Trainer {
     public void setNotifIncompleteSession(Boolean v) { this.notifIncompleteSession = v; }
     public Integer getSlotOffset() { return slotOffset; }
     public void setSlotOffset(Integer slotOffset) { this.slotOffset = slotOffset; }
+    public Integer getWeekStartHour() { return weekStartHour; }
+    public void setWeekStartHour(Integer weekStartHour) { this.weekStartHour = weekStartHour; }
+    public Integer getWeekEndHour() { return weekEndHour; }
+    public void setWeekEndHour(Integer weekEndHour) { this.weekEndHour = weekEndHour; }
     public java.time.LocalDate getTrialEndDate() { return trialEndDate; }
     public void setTrialEndDate(java.time.LocalDate trialEndDate) { this.trialEndDate = trialEndDate; }
     public Gym getGym() { return gym; }
