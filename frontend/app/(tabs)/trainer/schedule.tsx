@@ -172,6 +172,7 @@ export default function TrainerScheduleScreen() {
   const [otPhone, setOtPhone] = useState("");
   const [addingOt, setAddingOt] = useState(false);
   const [personalNote, setPersonalNote] = useState("");
+  const [ptNote, setPtNote] = useState("");
   const [addingPersonal, setAddingPersonal] = useState(false);
 
   // 슬롯 오프셋: 0=정각, 30=30분
@@ -238,6 +239,7 @@ export default function TrainerScheduleScreen() {
       setAddModal(false);
       setSessionType("PT");
       setOtName("");
+      setPtNote("");
     }),
   ).current;
 
@@ -246,6 +248,7 @@ export default function TrainerScheduleScreen() {
       setManualModal(false);
       setSessionType("PT");
       setOtName("");
+      setPtNote("");
     }),
   ).current;
 
@@ -548,6 +551,7 @@ export default function TrainerScheduleScreen() {
       };
       if (m.isManual) body.manualMemberId = m.id;
       else body.memberId = m.id;
+      if (ptNote.trim()) body.note = ptNote.trim();
       const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
         method: "POST",
         headers: {
@@ -558,6 +562,7 @@ export default function TrainerScheduleScreen() {
       });
       if (!res.ok) throw new Error((await res.text()) || "추가 실패");
       setAddModal(false);
+      setPtNote("");
       cancelledIdsRef.current.clear();
       fetchAll();
       Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
@@ -593,6 +598,7 @@ export default function TrainerScheduleScreen() {
         const body: any = { date: d, startTime: manualTime };
         if (m.isManual) body.manualMemberId = m.id;
         else body.memberId = m.id;
+        if (ptNote.trim()) body.note = ptNote.trim();
         try {
           const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
             method: "POST",
@@ -609,6 +615,7 @@ export default function TrainerScheduleScreen() {
         }
       }
       setManualModal(false);
+      setPtNote("");
       cancelledIdsRef.current.clear();
       fetchAll();
       if (failed.length === 0) {
@@ -1196,11 +1203,13 @@ export default function TrainerScheduleScreen() {
                         >
                           {isPersonalType(slot.sessionType ?? "")
                             ? (slot.note ?? "")
-                            : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
-                              ? "OT"
-                              : slot.ptRemaining != null && slot.ptTotal != null && slot.ptTotal > 0
-                                ? `${slot.ptRemaining}/${slot.ptTotal}회`
-                                : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : ""}
+                            : slot.note
+                              ? slot.note
+                              : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
+                                ? "OT"
+                                : slot.ptRemaining != null && slot.ptTotal != null && slot.ptTotal > 0
+                                  ? `${slot.ptRemaining}/${slot.ptTotal}회`
+                                  : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : ""}
                         </Text>
                       </TouchableOpacity>
                     ) : (
@@ -1426,8 +1435,14 @@ export default function TrainerScheduleScreen() {
                           ? "개인 운동"
                           : "개인 일정"}
                       </Text>
-                    ) : slot.status ===
-                      "COMPLETED" ? null : slot.sessionType !== "OT" &&
+                    ) : slot.status === "COMPLETED" ? null : slot.note ? (
+                      <Text
+                        style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
+                        numberOfLines={1}
+                      >
+                        {slot.note}
+                      </Text>
+                    ) : slot.sessionType !== "OT" &&
                       slot.ptRemaining != null &&
                       slot.ptTotal != null ? (
                       <Text
@@ -1453,6 +1468,13 @@ export default function TrainerScheduleScreen() {
                   </Text>
                 )}
               </View>
+
+              {/* 메모 (note) */}
+              {slot.note && !isPersonalType(slot.sessionType ?? "") && (
+                <View style={{ backgroundColor: Colors.bgSub, borderRadius: 8, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.border }}>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{slot.note}</Text>
+                </View>
+              )}
 
               {/* 상태 버튼 (확정/노쇼/취소) */}
               {(slot.status === "CONFIRMED" || isNoShowSlot) && slot.id && (
@@ -2443,6 +2465,23 @@ export default function TrainerScheduleScreen() {
                 >
                   이 시간에 추가할 회원을 선택하세요
                 </Text>
+                <TextInput
+                  value={ptNote}
+                  onChangeText={setPtNote}
+                  placeholder="메모 (선택)"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: Colors.text,
+                    marginBottom: 12,
+                  }}
+                />
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
@@ -2925,6 +2964,23 @@ export default function TrainerScheduleScreen() {
                 >
                   일정 확정 시 PT 잔여 횟수가 {selectedDays.length > 1 ? `${selectedDays.length}회` : "1회"} 차감돼요
                 </Text>
+                <TextInput
+                  value={ptNote}
+                  onChangeText={setPtNote}
+                  placeholder="메모 (선택)"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: Colors.text,
+                    marginBottom: 10,
+                  }}
+                />
                 <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, marginBottom: 8, height: 36 }}>
                   <Text style={{ fontSize: 13, color: Colors.textMuted, marginRight: 6 }}>🔍</Text>
                   <TextInput
