@@ -261,10 +261,7 @@ export default function MemberHomeScreen() {
       setTrainerCode("");
       setShowTrainerConnect(false);
       await fetchHome();
-      Alert.alert(
-        "연결 완료! 🎉",
-        `${result.trainerName} 트레이너와 연결됐어요!`,
-      );
+      Alert.alert("연결 완료", `${result.trainerName} 트레이너와 연결됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
     } finally {
@@ -401,7 +398,14 @@ export default function MemberHomeScreen() {
             }}
           >
             {/* 종 아이콘 */}
-            <View style={{ width: 16, height: 16, justifyContent: "center", alignItems: "center" }}>
+            <View
+              style={{
+                width: 16,
+                height: 16,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <View
                 style={{
                   width: 10,
@@ -651,22 +655,43 @@ export default function MemberHomeScreen() {
         </View>
 
         {/* 이번 주 내 수업 */}
-        <View style={{
-          backgroundColor: Colors.bgSub,
-          borderRadius: 14,
-          padding: 14,
-          marginBottom: 12,
-          borderWidth: 1,
-          borderColor: Colors.border,
-        }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: activeThisWeek.length > 0 ? 10 : 0 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}>이번 주 내 수업</Text>
+        <View
+          style={{
+            backgroundColor: Colors.bgSub,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: activeThisWeek.length > 0 ? 10 : 0,
+            }}
+          >
+            <Text
+              style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}
+            >
+              이번 주 내 수업
+            </Text>
             {activeThisWeek.length > 0 && (
-              <Text style={{ fontSize: 11, color: Colors.blue, fontWeight: "600" }}>{activeThisWeek.length}개</Text>
+              <Text
+                style={{ fontSize: 11, color: Colors.blue, fontWeight: "600" }}
+              >
+                {activeThisWeek.length}개
+              </Text>
             )}
           </View>
           {activeThisWeek.length === 0 ? (
-            <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 4 }}>이번 주 확정된 수업이 없어요</Text>
+            <Text
+              style={{ fontSize: 13, color: Colors.textMuted, marginTop: 4 }}
+            >
+              이번 주 확정된 수업이 없어요
+            </Text>
           ) : (
             activeThisWeek.map((s) => (
               <View
@@ -684,11 +709,31 @@ export default function MemberHomeScreen() {
                   gap: 8,
                 }}
               >
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.blue }} />
-                <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.text, flex: 1 }}>
+                <View
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: 3,
+                    backgroundColor: Colors.blue,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: Colors.text,
+                    flex: 1,
+                  }}
+                >
                   {s.date.slice(5)}
                 </Text>
-                <Text style={{ fontSize: 13, color: Colors.blue, fontWeight: "700" }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.blue,
+                    fontWeight: "700",
+                  }}
+                >
                   {formatTime(s.startTime)}
                 </Text>
               </View>
@@ -697,12 +742,14 @@ export default function MemberHomeScreen() {
         </View>
 
         {/* 탭 바: 공지 | 식단 | 운동 */}
-        <View style={{
-          flexDirection: "row",
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
-          marginBottom: 14,
-        }}>
+        <View
+          style={{
+            flexDirection: "row",
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.border,
+            marginBottom: 14,
+          }}
+        >
           {(["공지", "식단", "운동"] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
@@ -712,14 +759,17 @@ export default function MemberHomeScreen() {
                 alignItems: "center",
                 paddingBottom: 10,
                 borderBottomWidth: 2,
-                borderBottomColor: activeTab === tab ? Colors.blue : "transparent",
+                borderBottomColor:
+                  activeTab === tab ? Colors.blue : "transparent",
               }}
             >
-              <Text style={{
-                fontSize: 14,
-                fontWeight: activeTab === tab ? "700" : "500",
-                color: activeTab === tab ? Colors.blue : Colors.textMuted,
-              }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: activeTab === tab ? "700" : "500",
+                  color: activeTab === tab ? Colors.blue : Colors.textMuted,
+                }}
+              >
                 {tab}
               </Text>
             </TouchableOpacity>
@@ -743,44 +793,87 @@ export default function MemberHomeScreen() {
               }}
               activeOpacity={0.8}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <Text style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}>트레이너 공지</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}
+                >
+                  트레이너 공지
+                </Text>
                 <Text style={{ fontSize: 11, color: "#B45309" }}>더보기 →</Text>
               </View>
               {latestNotice ? (
                 <>
-                  <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={2}>
+                  <Text
+                    style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
+                    numberOfLines={2}
+                  >
                     {latestNotice.content}
                   </Text>
-                  <Text style={{ fontSize: 10, color: Colors.textPlaceholder, marginTop: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: Colors.textPlaceholder,
+                      marginTop: 4,
+                    }}
+                  >
                     {latestNotice.createdAt}
                   </Text>
                 </>
               ) : (
-                <Text style={{ fontSize: 13, color: Colors.textMuted }}>아직 등록된 공지가 없어요</Text>
+                <Text style={{ fontSize: 13, color: Colors.textMuted }}>
+                  아직 등록된 공지가 없어요
+                </Text>
               )}
             </TouchableOpacity>
 
             {/* 챌린지 — 컴팩트 */}
-            <View style={{
-              backgroundColor: "#fff7ed",
-              borderRadius: 12,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderWidth: 1,
-              borderColor: "#f9731633",
-              marginBottom: 10,
-            }}>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: missions.length > 0 ? 8 : 0 }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#f97316" }}>챌린지</Text>
+            <View
+              style={{
+                backgroundColor: "#fff7ed",
+                borderRadius: 12,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderWidth: 1,
+                borderColor: "#f9731633",
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: missions.length > 0 ? 8 : 0,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 13, fontWeight: "700", color: "#f97316" }}
+                >
+                  챌린지
+                </Text>
                 {missions.length > 0 && (
-                  <Text style={{ fontSize: 11, color: "#f9731699", marginLeft: "auto" }}>
-                    {missions.filter((m) => m.isDone).length}/{missions.length} 완료
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#f9731699",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {missions.filter((m) => m.isDone).length}/{missions.length}{" "}
+                    완료
                   </Text>
                 )}
               </View>
               {missions.length === 0 ? (
-                <Text style={{ fontSize: 12, color: "#f9731688" }}>아직 챌린지가 없어요</Text>
+                <Text style={{ fontSize: 12, color: "#f9731688" }}>
+                  아직 챌린지가 없어요
+                </Text>
               ) : (
                 missions.map((m) => (
                   <View
@@ -794,35 +887,75 @@ export default function MemberHomeScreen() {
                       borderBottomColor: "#f9731618",
                     }}
                   >
-                    <View style={{
-                      width: 18, height: 18, borderRadius: 9,
-                      backgroundColor: m.isDone ? "#f97316" : "transparent",
-                      borderWidth: 1.5, borderColor: "#f97316",
-                      justifyContent: "center", alignItems: "center",
-                    }}>
-                      {m.isDone && <Text style={{ fontSize: 10, color: "#fff", fontWeight: "700" }}>✓</Text>}
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        backgroundColor: m.isDone ? "#f97316" : "transparent",
+                        borderWidth: 1.5,
+                        borderColor: "#f97316",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      {m.isDone && (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: "#fff",
+                            fontWeight: "700",
+                          }}
+                        >
+                          ✓
+                        </Text>
+                      )}
                     </View>
-                    <Text style={{
-                      flex: 1, fontSize: 13,
-                      color: m.isDone ? "#f9731688" : "#1c1c1e",
-                      textDecorationLine: m.isDone ? "line-through" : "none",
-                      fontWeight: "500",
-                    }}>
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 13,
+                        color: m.isDone ? "#f9731688" : "#1c1c1e",
+                        textDecorationLine: m.isDone ? "line-through" : "none",
+                        fontWeight: "500",
+                      }}
+                    >
                       {m.content}
                     </Text>
                     {!m.isDone && (
                       <TouchableOpacity
                         onPress={() => toggleMission(m.id)}
-                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: "#f97316", borderRadius: 6 }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          backgroundColor: "#f97316",
+                          borderRadius: 6,
+                        }}
                       >
-                        <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>완료</Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#fff",
+                            fontWeight: "700",
+                          }}
+                        >
+                          완료
+                        </Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 ))
               )}
               {missions.length > 0 && missions.every((m) => m.isDone) && (
-                <Text style={{ fontSize: 12, color: "#f97316", textAlign: "center", marginTop: 8, fontWeight: "700" }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#f97316",
+                    textAlign: "center",
+                    marginTop: 8,
+                    fontWeight: "700",
+                  }}
+                >
                   모두 완료! 🎉
                 </Text>
               )}
@@ -844,17 +977,49 @@ export default function MemberHomeScreen() {
                   marginBottom: 10,
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 식단 피드백</Text>
-                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestFeedback.date}</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: Colors.green,
+                    }}
+                  >
+                    트레이너 식단 피드백
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: Colors.textMuted,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {latestFeedback.date}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={3}>
+                <Text
+                  style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
+                  numberOfLines={3}
+                >
                   {latestFeedback.content}
                 </Text>
               </TouchableOpacity>
             ) : (
               <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: Colors.text,
+                    marginBottom: 4,
+                  }}
+                >
                   식단 피드백이 없어요
                 </Text>
                 <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -865,12 +1030,22 @@ export default function MemberHomeScreen() {
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/member/diet")}
               style={{
-                borderWidth: 1, borderColor: Colors.border,
-                borderRadius: 10, paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                borderRadius: 10,
+                paddingVertical: 10,
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: "600" }}>식단 전체 보기 →</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textSub,
+                  fontWeight: "600",
+                }}
+              >
+                식단 전체 보기 →
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -889,17 +1064,49 @@ export default function MemberHomeScreen() {
                   marginBottom: 10,
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green }}>트레이너 운동 피드백</Text>
-                  <Text style={{ fontSize: 10, color: Colors.textMuted, marginLeft: "auto" }}>{latestWorkoutFeedback.date}</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: Colors.green,
+                    }}
+                  >
+                    트레이너 운동 피드백
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: Colors.textMuted,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {latestWorkoutFeedback.date}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }} numberOfLines={3}>
+                <Text
+                  style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}
+                  numberOfLines={3}
+                >
                   {latestWorkoutFeedback.content}
                 </Text>
               </TouchableOpacity>
             ) : (
               <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: Colors.text,
+                    marginBottom: 4,
+                  }}
+                >
                   운동 피드백이 없어요
                 </Text>
                 <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -910,16 +1117,25 @@ export default function MemberHomeScreen() {
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/member/workout" as any)}
               style={{
-                borderWidth: 1, borderColor: Colors.border,
-                borderRadius: 10, paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                borderRadius: 10,
+                paddingVertical: 10,
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: "600" }}>운동일지 전체 보기 →</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: Colors.textSub,
+                  fontWeight: "600",
+                }}
+              >
+                운동일지 전체 보기 →
+              </Text>
             </TouchableOpacity>
           </View>
         )}
-
       </ScrollView>
 
       {/* 트레이너 코드 입력 모달 */}

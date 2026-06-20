@@ -178,6 +178,9 @@ export default function TrainerScheduleScreen() {
   );
   const [showOffsetModal, setShowOffsetModal] = useState(false);
 
+  // 주간 뷰 열 너비 스케일: 1=좁게(기본), 2=보통, 3=넓게
+  const [colScale, setColScale] = useState<1 | 2 | 3>(1);
+
   // 주간 long press 상태 모달
   const [slotActionModal, setSlotActionModal] = useState(false);
   const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
@@ -305,6 +308,9 @@ export default function TrainerScheduleScreen() {
           const off = data.slotOffset;
           setSlotOffset(off === 30 ? 30 : 0);
         }
+        const savedScale = await AsyncStorage.getItem("weekColScale");
+        if (savedScale === "2" || savedScale === "3") setColScale(Number(savedScale) as 2 | 3);
+        else setColScale(1);
       } catch (e) {
         console.error("fetchAll error:", e);
       } finally {
@@ -926,7 +932,11 @@ export default function TrainerScheduleScreen() {
     const SCREEN_W = Dimensions.get("window").width;
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 40; // 화면 padding 20*2
-    const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
+    // colScale: 1=좁게(7열), 2=보통(5열 너비), 3=넓게(3열 너비)
+    const COL_SCALE_FACTOR = colScale === 3 ? 7 / 3 : colScale === 2 ? 7 / 5 : 1;
+    const COL_W = ((SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7) * COL_SCALE_FACTOR;
+    const CELL_FONT = colScale === 3 ? 14 : colScale === 2 ? 12 : 11;
+    const CELL_SUB_FONT = colScale === 3 ? 12 : colScale === 2 ? 10 : 9;
     const SLOT_H = 30;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
@@ -971,8 +981,13 @@ export default function TrainerScheduleScreen() {
     };
 
     return (
-      // 월~일이 한 화면에 보이도록 가로 스크롤 제거
-      <View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={colScale > 1}
+        bounces={false}
+      >
+      <View style={{ width: colScale > 1 ? COL_W * 7 + TIME_W : undefined }}>
         {/* 헤더: 요일 + 날짜 */}
         <View style={{ flexDirection: "row" }}>
           <View style={{ width: TIME_W }} />
@@ -1126,7 +1141,7 @@ export default function TrainerScheduleScreen() {
                         }}
                       >
                         <Text
-                          style={{ fontSize: 11, fontWeight: "900", color: "#fff", textAlign: "center" }}
+                          style={{ fontSize: CELL_FONT, fontWeight: "900", color: "#fff", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
@@ -1134,7 +1149,7 @@ export default function TrainerScheduleScreen() {
                             : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
                         <Text
-                          style={{ fontSize: 9, color: "#ffffffcc", textAlign: "center" }}
+                          style={{ fontSize: CELL_SUB_FONT, color: "#ffffffcc", textAlign: "center" }}
                           numberOfLines={1}
                         >
                           {isPersonalType(slot.sessionType ?? "")
@@ -1165,6 +1180,7 @@ export default function TrainerScheduleScreen() {
           ))}
         </ScrollView>
       </View>
+      </ScrollView>
     );
   };
 
@@ -1844,6 +1860,32 @@ export default function TrainerScheduleScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartDay === opt.value ? Colors.green : Colors.textSub }}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 크기</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              {([{ label: "좁게", value: 1 }, { label: "보통", value: 2 }, { label: "넓게", value: 3 }] as const).map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={async () => {
+                    setColScale(opt.value);
+                    await AsyncStorage.setItem("weekColScale", String(opt.value));
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    alignItems: "center",
+                    borderWidth: 1.5,
+                    borderColor: colScale === opt.value ? Colors.green : Colors.border,
+                    backgroundColor: colScale === opt.value ? Colors.greenLight : Colors.bgSub,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: colScale === opt.value ? Colors.green : Colors.textSub }}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
