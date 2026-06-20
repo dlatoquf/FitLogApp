@@ -30,6 +30,7 @@ import { Colors } from "../../../constants/Colors";
 import { API_URL, APP_STORE_URL, PLAY_STORE_URL } from "../../../constants/api";
 
 interface TodayPt {
+  note?: string | null;
   scheduleId?: number;
   memberId: number;
   memberName: string;
@@ -1853,7 +1854,11 @@ export default function TrainerHomeScreen() {
                       )}
                     </View>
                     <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                      {isOt ? `체험 수업` : `잔여 ${item.ptRemaining}회`}
+                      {isOt
+                        ? `체험 수업`
+                        : item.note
+                          ? `잔여 ${item.ptRemaining}회 | ${item.note}`
+                          : `잔여 ${item.ptRemaining}회`}
                     </Text>
                   </View>
 

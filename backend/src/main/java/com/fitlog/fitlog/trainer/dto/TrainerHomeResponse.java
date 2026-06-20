@@ -77,6 +77,7 @@ public class TrainerHomeResponse {
         private String sessionType; // "PT" or "OT"
         private boolean isNoShow;   // 명시적 NO_SHOW 처리됨
         private int otSessionCount; // OT 회원의 누적 OT 수업 횟수 (OT가 아니면 0)
+        private String note;
 
         public TodayPt(Long scheduleId, Long memberId, String memberName, String time, int ptRemaining, boolean completed, boolean isManual, String sessionType, boolean isNoShow, int otSessionCount) {
             this.scheduleId = scheduleId;
@@ -103,6 +104,8 @@ public class TrainerHomeResponse {
         @JsonProperty("isNoShow")
         public boolean isNoShow() { return isNoShow; }
         public int getOtSessionCount() { return otSessionCount; }
+        public String getNote() { return note; }
+        public void setNote(String note) { this.note = note; }
     }
 
     public static class MonthRevenueDetail {

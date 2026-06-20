@@ -154,7 +154,7 @@ public class TrainerHomeService {
                     int otSessionCount = "OT".equals(sessionType) && isManual && s.getManualMember() != null
                             ? scheduleRepository.countOtSessionsBefore(s.getManualMember(), s.getDate(), s.getStartTime()) + 1
                             : 0;
-                    return new TrainerHomeResponse.TodayPt(
+                    TrainerHomeResponse.TodayPt tp = new TrainerHomeResponse.TodayPt(
                             s.getId(), id, name,
                             s.getStartTime() != null ? s.getStartTime().format(fmt) : "",
                             remaining,
@@ -164,6 +164,8 @@ public class TrainerHomeService {
                             "NO_SHOW".equals(s.getStatusStr()),
                             otSessionCount
                     );
+                    tp.setNote(s.getNote());
+                    return tp;
                 })
                 .collect(Collectors.toList());
 
