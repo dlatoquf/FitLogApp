@@ -1437,7 +1437,7 @@ export default function TrainerHomeScreen() {
                           style={{
                             backgroundColor: Colors.green,
                             paddingHorizontal: 12,
-                            paddingVertical: 6,
+                            paddingVertical: 5,
                             borderRadius: 8,
                           }}
                         >
