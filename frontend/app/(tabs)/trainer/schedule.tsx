@@ -17,6 +17,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   View,
 } from "react-native";
 import { Colors } from "../../../constants/Colors";
@@ -1816,7 +1817,7 @@ export default function TrainerScheduleScreen() {
           activeOpacity={1}
           onPress={() => setShowOffsetModal(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
+          <Pressable style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
             <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 14 }}>일정 설정</Text>
 
             {/* ── 공통 설정 (월간 + 주간) ── */}
@@ -1898,6 +1899,7 @@ export default function TrainerScheduleScreen() {
                     showsVerticalScrollIndicator={false}
                     snapToInterval={PICKER_ITEM_H}
                     decelerationRate="fast"
+                    nestedScrollEnabled
                     contentContainerStyle={{ paddingVertical: PICKER_ITEM_H * 2 }}
                     onMomentumScrollEnd={(e) => {
                       const h = Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / PICKER_ITEM_H)));
@@ -1925,6 +1927,7 @@ export default function TrainerScheduleScreen() {
                     showsVerticalScrollIndicator={false}
                     snapToInterval={PICKER_ITEM_H}
                     decelerationRate="fast"
+                    nestedScrollEnabled
                     contentContainerStyle={{ paddingVertical: PICKER_ITEM_H * 2 }}
                     onMomentumScrollEnd={(e) => {
                       const h = Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / PICKER_ITEM_H) + 12));
@@ -1950,7 +1953,7 @@ export default function TrainerScheduleScreen() {
             >
               <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>확인</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </Pressable>
         </TouchableOpacity>
       </Modal>
 
