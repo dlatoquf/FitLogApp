@@ -1408,15 +1408,15 @@ export default function TrainerScheduleScreen() {
                     <TouchableOpacity
                       onPress={() => completeSlot(slot)}
                       style={{
-                        backgroundColor: Colors.greenLight,
+                        backgroundColor: Colors.blueBg,
                         borderWidth: 1,
-                        borderColor: Colors.green + "55",
+                        borderColor: Colors.blue + "55",
                         paddingHorizontal: 10,
                         paddingVertical: 6,
                         borderRadius: 8,
                       }}
                     >
-                      <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>확정</Text>
+                      <Text style={{ fontSize: 12, color: Colors.blue, fontWeight: "700" }}>완료</Text>
                     </TouchableOpacity>
                   )}
                   {slot.status === "CONFIRMED" && (
@@ -2901,16 +2901,16 @@ export default function TrainerScheduleScreen() {
               <TouchableOpacity
                 onPress={() => completeSlot(slotActionTarget)}
                 style={{
-                  backgroundColor: Colors.greenLight,
+                  backgroundColor: Colors.blueBg,
                   borderWidth: 1,
-                  borderColor: Colors.green + "55",
+                  borderColor: Colors.blue + "55",
                   borderRadius: 12,
                   paddingVertical: 14,
                   alignItems: "center",
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.green }}>확정</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료</Text>
               </TouchableOpacity>
             )}
             {slotActionTarget?.status === "CONFIRMED" && (
