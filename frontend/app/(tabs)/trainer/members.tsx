@@ -768,6 +768,10 @@ export default function TrainerMembersScreen() {
                       </View>
                     )}
                   </View>
+                </View>
+
+                {/* PT 잔여 + 메모 버튼 */}
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
                   {/* 메모 버튼 */}
                   <TouchableOpacity
                     onPress={(e) => {
@@ -775,35 +779,24 @@ export default function TrainerMembersScreen() {
                       openMemos(m);
                     }}
                     style={{
-                      alignSelf: "flex-start",
                       borderWidth: 1,
-                      borderColor: m.memo ? Colors.green + "66" : Colors.border,
+                      borderColor: m.latestMemo ? Colors.green + "66" : Colors.border,
                       borderRadius: 6,
                       paddingHorizontal: 7,
                       paddingVertical: 2,
-                      backgroundColor: m.memo ? Colors.greenLight : "#fff",
+                      backgroundColor: m.latestMemo ? Colors.greenLight : "#fff",
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 3,
                     }}
                   >
-                    {m.memo ? (
+                    {m.latestMemo ? (
                       <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.green }} />
                     ) : null}
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: m.memo ? Colors.green : Colors.textSub,
-                        fontWeight: "700",
-                      }}
-                    >
+                    <Text style={{ fontSize: 10, color: m.latestMemo ? Colors.green : Colors.textSub, fontWeight: "700" }}>
                       메모
                     </Text>
                   </TouchableOpacity>
-                </View>
-
-                {/* PT 잔여 */}
-                <View style={{ alignItems: "flex-end" }}>
                   {m.ptTotal > 0 ? (
                     <>
                       <Text style={{ fontSize: 20, fontWeight: "900", color }}>
