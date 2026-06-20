@@ -298,6 +298,15 @@ public class ScheduleService {
         }
     }
 
+    // 메모 수정 (트레이너용)
+    @Transactional
+    public void updateNote(String auth, Long scheduleId, String note) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new RuntimeException("슬롯 없음"));
+        schedule.setNote(note == null || note.isBlank() ? null : note.trim());
+        scheduleRepository.save(schedule);
+    }
+
     // 확정 수업 취소 (트레이너용)
     @Transactional
     public void cancelConfirmed(String auth, Long scheduleId) {

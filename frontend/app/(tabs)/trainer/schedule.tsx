@@ -173,6 +173,8 @@ export default function TrainerScheduleScreen() {
   const [addingOt, setAddingOt] = useState(false);
   const [personalNote, setPersonalNote] = useState("");
   const [ptNote, setPtNote] = useState("");
+  const [editingNoteSlotId, setEditingNoteSlotId] = useState<number | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
   const [addingPersonal, setAddingPersonal] = useState(false);
 
   // 슬롯 오프셋: 0=정각, 30=30분
@@ -1470,10 +1472,66 @@ export default function TrainerScheduleScreen() {
               </View>
 
               {/* 메모 (note) */}
-              {slot.note && !isPersonalType(slot.sessionType ?? "") && (
-                <View style={{ backgroundColor: Colors.bgSub, borderRadius: 8, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.border }}>
-                  <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{slot.note}</Text>
-                </View>
+              {!isPersonalType(slot.sessionType ?? "") && (slot.note || true) && (
+                editingNoteSlotId === slot.id ? (
+                  <View style={{ marginBottom: 8 }}>
+                    <TextInput
+                      value={editingNoteText}
+                      onChangeText={setEditingNoteText}
+                      placeholder="메모 입력"
+                      placeholderTextColor={Colors.textMuted}
+                      autoFocus
+                      multiline
+                      style={{
+                        backgroundColor: Colors.bgSub,
+                        borderRadius: 8,
+                        borderWidth: 1.5,
+                        borderColor: Colors.green,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        fontSize: 12,
+                        color: Colors.text,
+                        lineHeight: 18,
+                        minHeight: 40,
+                      }}
+                    />
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+                      <TouchableOpacity
+                        onPress={() => setEditingNoteSlotId(null)}
+                        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, borderWidth: 1, borderColor: Colors.border }}
+                      >
+                        <Text style={{ fontSize: 12, color: Colors.textMuted }}>취소</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            const jwt = await AsyncStorage.getItem("jwt");
+                            await fetch(`${API_URL}/api/schedule/${slot.id}/note`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                              body: JSON.stringify({ note: editingNoteText }),
+                            });
+                            setSlots((prev) => prev.map((s) => s.id === slot.id ? { ...s, note: editingNoteText || null } : s));
+                            setEditingNoteSlotId(null);
+                          } catch { Alert.alert("오류", "메모 저장에 실패했어요."); }
+                        }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, backgroundColor: Colors.green }}
+                      >
+                        <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>저장</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => { setEditingNoteSlotId(slot.id); setEditingNoteText(slot.note ?? ""); }}
+                    style={{ backgroundColor: Colors.bgSub, borderRadius: 8, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: Colors.border }}
+                  >
+                    {slot.note
+                      ? <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{slot.note}</Text>
+                      : <Text style={{ fontSize: 12, color: Colors.textPlaceholder, lineHeight: 18 }}>메모 추가...</Text>
+                    }
+                  </TouchableOpacity>
+                )
               )}
 
               {/* 상태 버튼 (확정/노쇼/취소) */}

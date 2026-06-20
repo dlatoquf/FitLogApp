@@ -157,6 +157,17 @@ public class ScheduleController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    // ─── 트레이너: 메모 수정 ─────────────────────────────────────────────────
+    @PatchMapping("/{scheduleId}/note")
+    public ResponseEntity<Void> updateNote(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId,
+            @RequestBody Map<String, Object> body) {
+        String note = body.get("note") != null ? (String) body.get("note") : "";
+        scheduleService.updateNote(auth, scheduleId, note);
+        return ResponseEntity.ok().build();
+    }
+
     // ─── 트레이너: 수업 취소 ─────────────────────────────────────────────────
     @DeleteMapping("/confirm/{scheduleId}")
     public ResponseEntity<Void> cancelConfirmed(
