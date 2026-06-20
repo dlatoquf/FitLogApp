@@ -51,6 +51,9 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     // 미연동 회원 삭제 시 운동일지 함께 삭제
     void deleteByManualMember(ManualMember mm);
 
+    // 연동 회원 해제 시 운동일지 삭제
+    void deleteByMember(Member member);
+
     // 연동 시 이전: manualMember → member 로 일괄 업데이트
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkoutLog w SET w.member = :member, w.manualMember = null WHERE w.manualMember = :mm")

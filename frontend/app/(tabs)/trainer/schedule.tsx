@@ -145,6 +145,7 @@ export default function TrainerScheduleScreen() {
 
   // 회원 추가 모달 (슬롯 선택 후)
   const [addModal, setAddModal] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [addingSlot, setAddingSlot] = useState<any | null>(null);
   const [addingMember, setAddingMember] = useState(false);
 
@@ -156,6 +157,10 @@ export default function TrainerScheduleScreen() {
   const [trainerStartTime, setTrainerStartTime] = useState("09:00"); // 출근 시간
   const trainerStartTimeRef = useRef("09:00");
   const weekScrollRef = useRef<ScrollView>(null);
+  const hasScrolledRef = useRef(false); // 주간 뷰 초기 스크롤 1회만
+
+  // 요일 다중 선택 (수업 추가 시)
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
   // PT / OT / 개인운동 / 개인일정
   const [sessionType, setSessionType] = useState<
@@ -176,15 +181,6 @@ export default function TrainerScheduleScreen() {
   // 주간 long press 상태 모달
   const [slotActionModal, setSlotActionModal] = useState(false);
   const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
-
-  // long press 힌트 모달 (최초 1회)
-  const [hintModal, setHintModal] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem("schedule_longpress_hint_shown").then((val) => {
-      if (!val) setHintModal(true);
-    });
-  }, []);
 
   // 주간→월간 날짜 이동 시 useFocusEffect 리셋 방지용 플래그
   const dateNavRef = useRef(false);
@@ -436,10 +432,12 @@ export default function TrainerScheduleScreen() {
     return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
   };
 
-  // 주간 뷰 진입 시 — 이번 주 가장 빠른 슬롯 vs 출근 시간 중 더 이른 시간으로 스크롤
+  // 주간 뷰 진입 시 — 이번 주 가장 빠른 슬롯 vs 출근 시간 중 더 이른 시간으로 스크롤 (1회만)
   useEffect(() => {
-    if (viewMode !== "week") return;
+    if (viewMode !== "week") { hasScrolledRef.current = false; return; }
     if (loading) return;
+    if (hasScrolledRef.current) return;
+    hasScrolledRef.current = true;
     const effectiveOffset = slotOffset === 30 ? 30 : 0;
     const times = makeTimeOptions(effectiveOffset as 0 | 30);
     // 이번 주 슬롯 중 가장 빠른 시작 시간
@@ -465,6 +463,7 @@ export default function TrainerScheduleScreen() {
 
   const goWeek = (delta: number) => {
     const newOffset = weekOffset + delta;
+    hasScrolledRef.current = false;
     setWeekOffset(newOffset);
     // 주가 다른 달로 넘어가면 viewMonth도 업데이트
     const dates = getWeekDatesForOffset(newOffset);
@@ -583,9 +582,11 @@ export default function TrainerScheduleScreen() {
 
   const addManualSchedule = (m: any) => {
     const endT = getEndTime(manualTime);
+    const dayCount = selectedDays.length;
+    const dayLabel = dayCount > 1 ? ` (${dayCount}일)` : "";
     Alert.alert(
       "수업 확정",
-      `${m.name}님\n${manualTime} ~ ${endT}\n\n위 시간으로 수업을 확정할까요?`,
+      `${m.name}님\n${manualTime} ~ ${endT}${dayLabel}\n\n위 시간으로 수업을 확정할까요?`,
       [
         { text: "취소", style: "cancel" },
         { text: "확정", onPress: () => doAddManualSchedule(m) },
@@ -595,24 +596,28 @@ export default function TrainerScheduleScreen() {
 
   const doAddManualSchedule = async (m: any) => {
     setAddingManual(true);
+    const dates = selectedDays.length > 0 ? selectedDays : [dateKey];
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const body: any = { date: dateKey, startTime: manualTime };
-      if (m.isManual) body.manualMemberId = m.id;
-      else body.memberId = m.id;
-      const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error((await res.text()) || "추가 실패");
+      for (const d of dates) {
+        const body: any = { date: d, startTime: manualTime };
+        if (m.isManual) body.manualMemberId = m.id;
+        else body.memberId = m.id;
+        const res = await fetch(`${API_URL}/api/schedule/create-and-confirm`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.text()) || "추가 실패");
+      }
       setManualModal(false);
       cancelledIdsRef.current.clear();
       fetchAll();
-      Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
+      const suffix = dates.length > 1 ? ` ${dates.length}일 일정이` : " 수업이";
+      Alert.alert("완료 ✓", `${m.name}님${suffix} 추가됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
     } finally {
@@ -1010,6 +1015,7 @@ export default function TrainerScheduleScreen() {
       } else {
         setSessionType("PT");
         setOtName("");
+        setSelectedDays([toDateKey(selectedDate)]);
         setManualModal(true);
       }
     };
@@ -1151,14 +1157,6 @@ export default function TrainerScheduleScreen() {
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
                         onPress={() => {
-                          const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                          dateNavRef.current = true;
-                          setSelectedDate(target);
-                          setViewYear(target.getFullYear());
-                          setViewMonth(target.getMonth() + 1);
-                          setViewMode("month");
-                        }}
-                        onLongPress={() => {
                           if (slot.status === "COMPLETED" || slot.status === "NO_SHOW") return;
                           setSlotActionTarget({ ...slot, _date: d });
                           setSlotActionModal(true);
@@ -1282,6 +1280,7 @@ export default function TrainerScheduleScreen() {
                 if (members.length === 0) await fetchMembers();
                 setManualTime("09:00");
                 setManualTimeFixed(false);
+                setSelectedDays([toDateKey(selectedDate)]);
                 setManualModal(true);
               }}
               style={{
@@ -1570,6 +1569,7 @@ export default function TrainerScheduleScreen() {
               if (members.length === 0) await fetchMembers();
               setManualTime("09:00");
               setManualTimeFixed(false);
+              setSelectedDays([toDateKey(selectedDate)]);
               setManualModal(true);
             }}
             style={{
@@ -2848,6 +2848,39 @@ export default function TrainerScheduleScreen() {
               </View>
             ) : (
               <>
+                {/* 요일 다중 선택 */}
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginBottom: 8 }}>날짜 선택</Text>
+                <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
+                  {currentWeekDates.map((d) => {
+                    const dk = toDateKey(d);
+                    const isSelected = selectedDays.includes(dk);
+                    const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+                    const dayLabel = dayLabels[d.getDay()];
+                    const dateNum = d.getDate();
+                    return (
+                      <TouchableOpacity
+                        key={dk}
+                        onPress={() => {
+                          setSelectedDays(prev =>
+                            prev.includes(dk) ? prev.filter(x => x !== dk) : [...prev, dk]
+                          );
+                        }}
+                        style={{
+                          flex: 1,
+                          alignItems: "center",
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: isSelected ? Colors.green : Colors.bgSub,
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? Colors.green : Colors.border,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: isSelected ? "#fff" : Colors.textMuted }}>{dayLabel}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{dateNum}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
                 <Text
                   style={{
                     fontSize: 13,
@@ -2865,14 +2898,25 @@ export default function TrainerScheduleScreen() {
                     marginBottom: 10,
                   }}
                 >
-                  일정 확정 시 PT 잔여 횟수가 1회 차감돼요
+                  일정 확정 시 PT 잔여 횟수가 {selectedDays.length > 1 ? `${selectedDays.length}회` : "1회"} 차감돼요
                 </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, marginBottom: 8, height: 36 }}>
+                  <Text style={{ fontSize: 13, color: Colors.textMuted, marginRight: 6 }}>🔍</Text>
+                  <TextInput
+                    value={memberSearchQuery}
+                    onChangeText={setMemberSearchQuery}
+                    placeholder="회원 검색"
+                    placeholderTextColor={Colors.textPlaceholder}
+                    style={{ flex: 1, fontSize: 13, color: Colors.text, paddingVertical: 0 }}
+                  />
+                </View>
                 <ScrollView
                   showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: 280 }}
+                  style={{ maxHeight: 260 }}
                 >
                   {[...members]
                     .filter((m: any) => (m.ptRemaining ?? 0) > 0)
+                    .filter((m: any) => !memberSearchQuery || m.name.includes(memberSearchQuery))
                     .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
                     .map((m: any, idx: number, arr: any[]) => (
                       <TouchableOpacity
@@ -2967,6 +3011,7 @@ export default function TrainerScheduleScreen() {
                 setManualModal(false);
                 setSessionType("PT");
                 setOtName("");
+                setMemberSearchQuery("");
               }}
               style={{ marginTop: 16, alignItems: "center", padding: 14 }}
             >
@@ -3049,34 +3094,6 @@ export default function TrainerScheduleScreen() {
               }}
             >
               <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-      {/* 주간 long press 힌트 모달 (최초 1회) */}
-      <Modal
-        visible={hintModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
-      >
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 }}
-          activeOpacity={1}
-          onPress={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
-        >
-          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "85%" }}>
-            <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text, marginBottom: 8 }}>💡 수업 상태 변경</Text>
-            <Text style={{ fontSize: 14, color: Colors.textMuted, lineHeight: 22, marginBottom: 20 }}>
-              주간 일정에서 수업을{"\n"}
-              <Text style={{ fontWeight: "700", color: Colors.text }}>길게 누르면</Text> 완료·노쇼·취소를{"\n"}
-              바로 처리할 수 있어요.
-            </Text>
-            <TouchableOpacity
-              onPress={() => { setHintModal(false); AsyncStorage.setItem("schedule_longpress_hint_shown", "true"); }}
-              style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 13, alignItems: "center" }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>확인</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>

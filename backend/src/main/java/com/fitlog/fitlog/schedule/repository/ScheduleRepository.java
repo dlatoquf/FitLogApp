@@ -236,4 +236,10 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     // 특정 트레이너의 특정 날짜 CONFIRMED 수업 수
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.status = 'CONFIRMED'")
     long countConfirmedByTrainerAndDate(@Param("trainer") Trainer trainer, @Param("date") java.time.LocalDate date);
+
+    // 연동 회원 해제 시 해당 회원 스케줄 삭제
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.member = :member")
+    void deleteByMember(@Param("member") Member member);
 }

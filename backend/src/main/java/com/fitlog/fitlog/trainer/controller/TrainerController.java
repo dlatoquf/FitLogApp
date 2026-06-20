@@ -6,6 +6,7 @@ import com.fitlog.fitlog.auth.repository.UserRepository;
 import com.fitlog.fitlog.member.dto.MemberResponse;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.notification.repository.NotificationRepository;
 import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.schedule.service.ScheduleService;
@@ -14,6 +15,7 @@ import com.fitlog.fitlog.trainer.entity.MemberMemo;
 import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.trainer.service.TrainerDeleteService;
+import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +34,8 @@ public class TrainerController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final TrainerDeleteService trainerDeleteService;
+    private final WorkoutLogRepository workoutLogRepository;
+    private final NotificationRepository notificationRepository;
 
     public TrainerController(TrainerRepository trainerRepository,
                              MemberRepository memberRepository,
@@ -40,7 +44,9 @@ public class TrainerController {
                              ScheduleService scheduleService,
                              JwtService jwtService,
                              UserRepository userRepository,
-                             TrainerDeleteService trainerDeleteService) {
+                             TrainerDeleteService trainerDeleteService,
+                             WorkoutLogRepository workoutLogRepository,
+                             NotificationRepository notificationRepository) {
         this.trainerRepository = trainerRepository;
         this.memberMemoRepository = memberMemoRepository;
         this.memberRepository = memberRepository;
@@ -49,6 +55,8 @@ public class TrainerController {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.trainerDeleteService = trainerDeleteService;
+        this.workoutLogRepository = workoutLogRepository;
+        this.notificationRepository = notificationRepository;
     }
 
     /*// 트레이너 프로필 조회
@@ -332,6 +340,10 @@ public class TrainerController {
         if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
+        // 운동일지, 일정, 알림 삭제 (PT 결제 정보는 유지)
+        workoutLogRepository.deleteByMember(member);
+        scheduleRepository.deleteByMember(member);
+        notificationRepository.deleteByMemberId(member.getId());
         member.setStatus(Member.Status.INACTIVE);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);

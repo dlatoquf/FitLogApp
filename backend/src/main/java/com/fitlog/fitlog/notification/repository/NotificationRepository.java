@@ -44,4 +44,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.user = :user")
     void deleteAllByUser(@Param("user") User user);
+
+    // 연동 회원 해제 시 해당 회원 관련 알림 삭제 (targetType=MEMBER, targetId=memberId)
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.targetType = 'MEMBER' AND n.targetId = :memberId")
+    void deleteByMemberId(@Param("memberId") Long memberId);
 }
