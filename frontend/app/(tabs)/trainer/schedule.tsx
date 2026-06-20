@@ -181,6 +181,10 @@ export default function TrainerScheduleScreen() {
   // 주간 뷰 열 너비 스케일: 1=좁게(기본), 2=보통, 3=넓게
   const [colScale, setColScale] = useState<1 | 2 | 3>(1);
 
+  // 주간 뷰 시작 시간 (스크롤 초기 위치)
+  const [weekStartHour, setWeekStartHour] = useState(5);
+  const SLOT_H_REF = useRef(30);
+
   // 주간 long press 상태 모달
   const [slotActionModal, setSlotActionModal] = useState(false);
   const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
@@ -311,6 +315,8 @@ export default function TrainerScheduleScreen() {
         const savedScale = await AsyncStorage.getItem("weekColScale");
         if (savedScale === "2" || savedScale === "3") setColScale(Number(savedScale) as 2 | 3);
         else setColScale(1);
+        const savedHour = await AsyncStorage.getItem("weekStartHour");
+        if (savedHour) setWeekStartHour(Number(savedHour));
       } catch (e) {
         console.error("fetchAll error:", e);
       } finally {
@@ -935,6 +941,7 @@ export default function TrainerScheduleScreen() {
     // colScale: 1=좁게(7열), 2=보통(5열 너비), 3=넓게(3열 너비)
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
     const SLOT_H = colScale === 3 ? 52 : colScale === 2 ? 40 : 30;
+    SLOT_H_REF.current = SLOT_H;
     const CELL_FONT = colScale === 3 ? 13 : colScale === 2 ? 12 : 11;
     const CELL_SUB_FONT = colScale === 3 ? 11 : colScale === 2 ? 10 : 9;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
@@ -1560,7 +1567,17 @@ export default function TrainerScheduleScreen() {
             {(["month", "week"] as const).map((mode) => (
               <TouchableOpacity
                 key={mode}
-                onPress={() => setViewMode(mode)}
+                onPress={() => {
+                  setViewMode(mode);
+                  if (mode === "week") {
+                    setTimeout(() => {
+                      const effectiveOffset = slotOffset === 30 ? 30 : 0;
+                      const times = makeTimeOptions(effectiveOffset as 0 | 30);
+                      const idx = times.findIndex(t => t.startsWith(String(weekStartHour).padStart(2, "0") + ":"));
+                      if (idx > 0) weekScrollRef.current?.scrollTo({ y: idx * SLOT_H_REF.current, animated: false });
+                    }, 100);
+                  }
+                }}
                 style={{
                   paddingHorizontal: 4,
                   paddingVertical: 6,
@@ -1879,6 +1896,31 @@ export default function TrainerScheduleScreen() {
                 >
                   <Text style={{ fontSize: 14, fontWeight: "700", color: colScale === opt.value ? Colors.green : Colors.textSub }}>
                     {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 시작 시간</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+              {[5, 6, 7, 8, 9, 10].map((h) => (
+                <TouchableOpacity
+                  key={h}
+                  onPress={async () => {
+                    setWeekStartHour(h);
+                    await AsyncStorage.setItem("weekStartHour", String(h));
+                  }}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: weekStartHour === h ? Colors.green : Colors.border,
+                    backgroundColor: weekStartHour === h ? Colors.greenLight : Colors.bgSub,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartHour === h ? Colors.green : Colors.textSub }}>
+                    {h}시
                   </Text>
                 </TouchableOpacity>
               ))}
