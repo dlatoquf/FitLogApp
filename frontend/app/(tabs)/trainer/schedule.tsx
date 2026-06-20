@@ -933,11 +933,10 @@ export default function TrainerScheduleScreen() {
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 40; // 화면 padding 20*2
     // colScale: 1=좁게(7열), 2=보통(5열 너비), 3=넓게(3열 너비)
-    const COL_SCALE_FACTOR = colScale === 3 ? 7 / 3 : colScale === 2 ? 7 / 5 : 1;
-    const COL_W = ((SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7) * COL_SCALE_FACTOR;
-    const CELL_FONT = colScale === 3 ? 14 : colScale === 2 ? 12 : 11;
-    const CELL_SUB_FONT = colScale === 3 ? 12 : colScale === 2 ? 10 : 9;
-    const SLOT_H = 30;
+    const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
+    const SLOT_H = colScale === 3 ? 52 : colScale === 2 ? 40 : 30;
+    const CELL_FONT = colScale === 3 ? 13 : colScale === 2 ? 12 : 11;
+    const CELL_SUB_FONT = colScale === 3 ? 11 : colScale === 2 ? 10 : 9;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
@@ -981,13 +980,7 @@ export default function TrainerScheduleScreen() {
     };
 
     return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={colScale > 1}
-        bounces={false}
-      >
-      <View style={{ width: colScale > 1 ? COL_W * 7 + TIME_W : undefined }}>
+      <View>
         {/* 헤더: 요일 + 날짜 */}
         <View style={{ flexDirection: "row" }}>
           <View style={{ width: TIME_W }} />
@@ -1180,7 +1173,6 @@ export default function TrainerScheduleScreen() {
           ))}
         </ScrollView>
       </View>
-      </ScrollView>
     );
   };
 
@@ -1868,7 +1860,7 @@ export default function TrainerScheduleScreen() {
 
             <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 크기</Text>
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-              {([{ label: "좁게", value: 1 }, { label: "보통", value: 2 }, { label: "넓게", value: 3 }] as const).map((opt) => (
+              {([{ label: "작게", value: 1 }, { label: "보통", value: 2 }, { label: "크게", value: 3 }] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
                   onPress={async () => {
