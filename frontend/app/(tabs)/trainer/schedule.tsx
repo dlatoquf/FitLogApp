@@ -185,6 +185,17 @@ export default function TrainerScheduleScreen() {
   const [weekStartHour, setWeekStartHour] = useState(9);
   const [weekEndHour, setWeekEndHour] = useState(23);
   const SLOT_H_REF = useRef(30);
+  const weekStartScrollRef = useRef<ScrollView>(null);
+  const weekEndScrollRef = useRef<ScrollView>(null);
+  const PICKER_ITEM_H = 44;
+
+  useEffect(() => {
+    if (!showOffsetModal) return;
+    setTimeout(() => {
+      weekStartScrollRef.current?.scrollTo({ y: weekStartHour * PICKER_ITEM_H, animated: false });
+      weekEndScrollRef.current?.scrollTo({ y: (weekEndHour - 12) * PICKER_ITEM_H, animated: false });
+    }, 100);
+  }, [showOffsetModal]);
 
   // 주간 long press 상태 모달
   const [slotActionModal, setSlotActionModal] = useState(false);
@@ -1894,75 +1905,59 @@ export default function TrainerScheduleScreen() {
 
             <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
               {/* 시작 시간 피커 */}
-              {(() => {
-                const ITEM_H = 44;
-                const VISIBLE = 5;
-                const saveStart = async (h: number) => {
-                  setWeekStartHour(h);
-                  try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekStartHour: h }) }); } catch {}
-                };
-                return (
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>시작 시간</Text>
-                    <View style={{ height: ITEM_H * VISIBLE, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
-                      {/* 선택줄 — scrollview 뒤에 깔림 */}
-                      <View pointerEvents="none" style={{ position: "absolute", top: ITEM_H * 2, left: 0, right: 0, height: ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
-                      <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        snapToInterval={ITEM_H}
-                        decelerationRate="fast"
-                        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-                        onMomentumScrollEnd={(e) => saveStart(Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H))))}
-                        onScrollEndDrag={(e) => saveStart(Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H))))}
-                        ref={(ref) => { if (ref) setTimeout(() => ref.scrollTo({ y: weekStartHour * ITEM_H, animated: false }), 80); }}
-                      >
-                        {Array.from({ length: 24 }, (_, h) => (
-                          <View key={h} style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 14, fontWeight: h === weekStartHour ? "800" : "500", color: h === weekStartHour ? Colors.green : Colors.textMuted }}>
-                              {String(h).padStart(2, "0")}:00
-                            </Text>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </View>
-                );
-              })()}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>시작 시간</Text>
+                <View style={{ height: PICKER_ITEM_H * 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
+                  <View pointerEvents="none" style={{ position: "absolute", top: PICKER_ITEM_H * 2, left: 0, right: 0, height: PICKER_ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
+                  <ScrollView
+                    ref={weekStartScrollRef}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={PICKER_ITEM_H}
+                    decelerationRate="fast"
+                    contentContainerStyle={{ paddingVertical: PICKER_ITEM_H * 2 }}
+                    onMomentumScrollEnd={(e) => {
+                      const h = Math.max(0, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / PICKER_ITEM_H)));
+                      setWeekStartHour(h);
+                      (async () => { try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekStartHour: h }) }); } catch {} })();
+                    }}
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <View key={h} style={{ height: PICKER_ITEM_H, justifyContent: "center", alignItems: "center" }}>
+                        <Text style={{ fontSize: 14, fontWeight: h === weekStartHour ? "800" : "500", color: h === weekStartHour ? Colors.green : Colors.textMuted }}>
+                          {String(h).padStart(2, "0")}:00
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
               {/* 마지막 시간 피커 */}
-              {(() => {
-                const ITEM_H = 44;
-                const VISIBLE = 5;
-                const hours = Array.from({ length: 12 }, (_, i) => i + 12);
-                const saveEnd = async (h: number) => {
-                  setWeekEndHour(h);
-                  try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekEndHour: h }) }); } catch {}
-                };
-                return (
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>마지막 시간</Text>
-                    <View style={{ height: ITEM_H * VISIBLE, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
-                      <View pointerEvents="none" style={{ position: "absolute", top: ITEM_H * 2, left: 0, right: 0, height: ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
-                      <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        snapToInterval={ITEM_H}
-                        decelerationRate="fast"
-                        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-                        onMomentumScrollEnd={(e) => saveEnd(Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H) + 12)))}
-                        onScrollEndDrag={(e) => saveEnd(Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / ITEM_H) + 12)))}
-                        ref={(ref) => { if (ref) setTimeout(() => ref.scrollTo({ y: (weekEndHour - 12) * ITEM_H, animated: false }), 80); }}
-                      >
-                        {hours.map((h) => (
-                          <View key={h} style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}>
-                            <Text style={{ fontSize: 17, fontWeight: h === weekEndHour ? "800" : "500", color: h === weekEndHour ? Colors.green : Colors.textMuted }}>
-                              {String(h).padStart(2, "0")}:00
-                            </Text>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </View>
-                );
-              })()}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>마지막 시간</Text>
+                <View style={{ height: PICKER_ITEM_H * 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, overflow: "hidden", backgroundColor: Colors.bgSub }}>
+                  <View pointerEvents="none" style={{ position: "absolute", top: PICKER_ITEM_H * 2, left: 0, right: 0, height: PICKER_ITEM_H, backgroundColor: Colors.greenLight, borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: Colors.green + "88" }} />
+                  <ScrollView
+                    ref={weekEndScrollRef}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={PICKER_ITEM_H}
+                    decelerationRate="fast"
+                    contentContainerStyle={{ paddingVertical: PICKER_ITEM_H * 2 }}
+                    onMomentumScrollEnd={(e) => {
+                      const h = Math.max(12, Math.min(23, Math.round(e.nativeEvent.contentOffset.y / PICKER_ITEM_H) + 12));
+                      setWeekEndHour(h);
+                      (async () => { try { const jwt = await AsyncStorage.getItem("jwt"); await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ weekEndHour: h }) }); } catch {} })();
+                    }}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 12).map((h) => (
+                      <View key={h} style={{ height: PICKER_ITEM_H, justifyContent: "center", alignItems: "center" }}>
+                        <Text style={{ fontSize: 14, fontWeight: h === weekEndHour ? "800" : "500", color: h === weekEndHour ? Colors.green : Colors.textMuted }}>
+                          {String(h).padStart(2, "0")}:00
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
             </View>
 
             <TouchableOpacity
