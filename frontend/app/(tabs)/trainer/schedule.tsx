@@ -127,6 +127,7 @@ export default function TrainerScheduleScreen() {
 
   // 슬롯 데이터 (해당 월 전체)
   const [slots, setSlots] = useState<any[]>([]);
+  const hasLoadedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -262,9 +263,9 @@ export default function TrainerScheduleScreen() {
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, silent = false) => {
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (!silent) setLoading(true);
       try {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
@@ -293,6 +294,7 @@ export default function TrainerScheduleScreen() {
         if (calRes.ok) {
           const fetched = await calRes.json();
           setSlots(fetched.filter((s: any) => !cancelledIdsRef.current.has(s.id)));
+          hasLoadedRef.current = true;
         }
         if (memoRes?.ok) {
           const data = await memoRes.json();
@@ -323,7 +325,7 @@ export default function TrainerScheduleScreen() {
       }
       dateNavRef.current = false;
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
-      fetchAll();
+      fetchAll(false, hasLoadedRef.current); // 이미 데이터 있으면 스피너 없이 백그라운드 갱신
       fetchMembers();
       // 탭 복귀 시에도 이번 주 가장 빠른 슬롯 vs 출근 시간 기준 스크롤
       if (viewMode === "week") {
