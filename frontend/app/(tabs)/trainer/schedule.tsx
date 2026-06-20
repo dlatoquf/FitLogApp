@@ -3213,19 +3213,21 @@ export default function TrainerScheduleScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              onPress={() => { setSlotActionModal(false); cancelSlot(slotActionTarget); }}
-              style={{
-                backgroundColor: Colors.redBg,
-                borderWidth: 1,
-                borderColor: Colors.red + "44",
-                borderRadius: 12,
-                paddingVertical: 14,
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
-            </TouchableOpacity>
+            {slotActionTarget?.status === "CONFIRMED" && (
+              <TouchableOpacity
+                onPress={() => { setSlotActionModal(false); cancelSlot(slotActionTarget); }}
+                style={{
+                  backgroundColor: Colors.redBg,
+                  borderWidth: 1,
+                  borderColor: Colors.red + "44",
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
