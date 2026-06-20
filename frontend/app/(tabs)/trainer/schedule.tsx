@@ -466,6 +466,18 @@ export default function TrainerScheduleScreen() {
     }
   }, [yearMonthStr, fetchAll]);
 
+  // 주간 뷰 진입 or 시작 시간 변경 시 해당 시간으로 스크롤
+  useEffect(() => {
+    if (viewMode !== "week") return;
+    const effectiveOffset = slotOffset === 30 ? 30 : 0;
+    const times = makeTimeOptions(effectiveOffset as 0 | 30);
+    const idx = times.findIndex(t => t.startsWith(String(weekStartHour).padStart(2, "0") + ":"));
+    if (idx <= 0) return;
+    setTimeout(() => {
+      weekScrollRef.current?.scrollTo({ y: idx * SLOT_H_REF.current, animated: false });
+    }, 100);
+  }, [viewMode, weekStartHour, slotOffset]);
+
   // ─── 메모 저장 ───────────────────────────────────────────────────────────
 
   const saveMemo = async () => {
