@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +38,7 @@ interface DisplayMember {
   goal?: string;
   phone?: string;
   otCount?: number; // OT 체험 후 PT 전환된 회원의 OT 완료 횟수
+  latestMemo?: string;
 }
 
 interface Memo {
@@ -125,6 +126,7 @@ export default function TrainerMembersScreen() {
             ptRemaining: m.ptRemaining ?? 0,
             ptTotal: m.ptTotal ?? 0,
             goal: m.goal,
+            latestMemo: m.latestMemo ?? undefined,
           }))
         : [];
 
@@ -141,6 +143,7 @@ export default function TrainerMembersScreen() {
             phone: m.phone,
             ptEndedAt: m.ptEndedAt ?? undefined,
             otCount: m.otCount ?? undefined,
+            latestMemo: m.latestMemo ?? undefined,
           }))
         : [];
 
@@ -681,8 +684,8 @@ export default function TrainerMembersScreen() {
             const graceDaysLeft = ptGraceDaysLeft(m);
 
             return (
+            <React.Fragment key={m.key}>
               <TouchableOpacity
-                key={m.key}
                 onPress={() => {
                   if (m.isLinked) {
                     router.push(
@@ -861,6 +864,33 @@ export default function TrainerMembersScreen() {
                   )}
                 </View>
               </TouchableOpacity>
+              {m.latestMemo ? (
+                <TouchableOpacity
+                  onPress={() => { openMemos(m); }}
+                  style={{
+                    marginTop: -8,
+                    marginBottom: 6,
+                    backgroundColor: "#fff",
+                    borderWidth: 1,
+                    borderTopWidth: 0,
+                    borderColor: Colors.border,
+                    borderBottomLeftRadius: 10,
+                    borderBottomRightRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingTop: 10,
+                    paddingBottom: 6,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.green }} />
+                  <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textSub, flex: 1 }}>
+                    {m.latestMemo.length > 30 ? m.latestMemo.slice(0, 30) + "..." : m.latestMemo}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </React.Fragment>
             );
           })
         )}

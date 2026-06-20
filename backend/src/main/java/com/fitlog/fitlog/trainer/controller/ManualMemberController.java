@@ -1,5 +1,7 @@
 package com.fitlog.fitlog.trainer.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
+import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 
@@ -33,26 +36,47 @@ public class ManualMemberController {
     private final JwtService jwtService;
     private final PtContractRepository ptContractRepository;
     private final WorkoutLogRepository workoutLogRepository;
+    private final MemberMemoRepository memberMemoRepository;
 
     public ManualMemberController(ManualMemberRepository manualMemberRepository,
                                    TrainerRepository trainerRepository,
                                    JwtService jwtService,
                                    PtContractRepository ptContractRepository,
-                                   WorkoutLogRepository workoutLogRepository) {
+                                   WorkoutLogRepository workoutLogRepository,
+                                   MemberMemoRepository memberMemoRepository) {
         this.manualMemberRepository = manualMemberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
         this.ptContractRepository = ptContractRepository;
         this.workoutLogRepository = workoutLogRepository;
+        this.memberMemoRepository = memberMemoRepository;
     }
 
     // 미연동 회원 목록 조회 (OT 회원 제외 — OT는 체험 회원으로 별도 관리)
     @GetMapping
-    public List<ManualMember> getAll(@RequestHeader("Authorization") String authorization) {
+    public List<Map<String, Object>> getAll(@RequestHeader("Authorization") String authorization) {
         Long userId = jwtService.getUserIdFromToken(authorization.replace("Bearer ", ""));
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
-        return manualMemberRepository.findNonOtByTrainer(trainer);
+        List<ManualMember> members = manualMemberRepository.findNonOtByTrainer(trainer);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ManualMember m : members) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", m.getId());
+            map.put("name", m.getName());
+            map.put("phone", m.getPhone());
+            map.put("memo", m.getMemo());
+            map.put("ptTotal", m.getPtTotal());
+            map.put("ptRemaining", m.getPtRemaining());
+            map.put("amount", m.getAmount());
+            map.put("paymentDate", m.getPaymentDate());
+            map.put("ptEndedAt", m.getPtEndedAt());
+            map.put("otCount", m.getOtCount());
+            memberMemoRepository.findTop1ByManualMemberOrderByCreatedAtDesc(m)
+                    .ifPresent(memo -> map.put("latestMemo", memo.getContent()));
+            result.add(map);
+        }
+        return result;
     }
 
     // 미연동 회원 단건 조회

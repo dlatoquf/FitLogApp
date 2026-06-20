@@ -10,6 +10,8 @@ import com.fitlog.fitlog.schedule.entity.Schedule;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.schedule.service.ScheduleService;
 import com.fitlog.fitlog.trainer.entity.Trainer;
+import com.fitlog.fitlog.trainer.entity.MemberMemo;
+import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.trainer.service.TrainerDeleteService;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ public class TrainerController {
 
     private final TrainerRepository trainerRepository;
     private final MemberRepository memberRepository;
+    private final MemberMemoRepository memberMemoRepository;
     private final ScheduleRepository scheduleRepository;
     private final ScheduleService scheduleService;
     private final JwtService jwtService;
@@ -32,12 +35,14 @@ public class TrainerController {
 
     public TrainerController(TrainerRepository trainerRepository,
                              MemberRepository memberRepository,
+                             MemberMemoRepository memberMemoRepository,
                              ScheduleRepository scheduleRepository,
                              ScheduleService scheduleService,
                              JwtService jwtService,
                              UserRepository userRepository,
                              TrainerDeleteService trainerDeleteService) {
         this.trainerRepository = trainerRepository;
+        this.memberMemoRepository = memberMemoRepository;
         this.memberRepository = memberRepository;
         this.scheduleRepository = scheduleRepository;
         this.scheduleService = scheduleService;
@@ -100,7 +105,12 @@ public class TrainerController {
 
         return memberRepository.findAllMembersByTrainerIdWithUser(trainerId)
                 .stream()
-                .map(MemberResponse::new)
+                .map(m -> {
+                    MemberResponse res = new MemberResponse(m);
+                    memberMemoRepository.findTop1ByMemberOrderByCreatedAtDesc(m)
+                            .ifPresent(memo -> res.setLatestMemo(memo.getContent()));
+                    return res;
+                })
                 .collect(Collectors.toList());
     }
 

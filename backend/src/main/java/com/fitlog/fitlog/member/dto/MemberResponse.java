@@ -22,6 +22,7 @@ public class MemberResponse {
     private boolean moved;           // true = 다른 트레이너로 이동한 전 회원
     private String disconnectedAt;   // 연결 해제일 (이전 트레이너 기록 열람 기준일)
     private String ptEndedAt;        // PT 잔여 0회가 된 날짜 (7일 유예 기준)
+    private String latestMemo;
 
     public MemberResponse(Member member) {
         this.id = member.getId();
@@ -72,6 +73,8 @@ public class MemberResponse {
     public boolean isMoved() { return moved; }
     public String getDisconnectedAt() { return disconnectedAt; }
     public String getPtEndedAt() { return ptEndedAt; }
+    public String getLatestMemo() { return latestMemo; }
+    public void setLatestMemo(String latestMemo) { this.latestMemo = latestMemo; }
 
     public static class UserInfo {
         private Long id;
