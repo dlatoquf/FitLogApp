@@ -1175,7 +1175,6 @@ export default function TrainerScheduleScreen() {
                       // 확정/완료/노쇼 슬롯
                       <TouchableOpacity
                         onPress={() => {
-                          if ((slot.status === "COMPLETED" || slot.status === "NO_SHOW") && !slot.note) return;
                           setSlotActionTarget({ ...slot, _date: d });
                           setSlotActionModal(true);
                         }}
