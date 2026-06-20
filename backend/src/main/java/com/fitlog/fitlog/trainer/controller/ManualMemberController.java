@@ -329,18 +329,6 @@ public class ManualMemberController {
         return ResponseEntity.ok(m);
     }
 
-    @PostMapping("/{id}/reactivate")
-    @org.springframework.transaction.annotation.Transactional
-    public ResponseEntity<Map<String, Object>> reactivate(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long id) {
-        ManualMember m = manualMemberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
-        m.setPtEndedAt(null);
-        manualMemberRepository.save(m);
-        return ResponseEntity.ok(java.util.Map.of("message", "재활성화됐어요."));
-    }
-
     @DeleteMapping("/{id}")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<Void> delete(
