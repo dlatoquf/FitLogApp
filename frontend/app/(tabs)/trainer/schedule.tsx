@@ -154,10 +154,9 @@ export default function TrainerScheduleScreen() {
   const [manualTime, setManualTime] = useState("09:00");
   const [manualTimeFixed, setManualTimeFixed] = useState(false); // 주간 셀 탭 시 시간 고정
   const [addingManual, setAddingManual] = useState(false);
-  const [trainerStartTime, setTrainerStartTime] = useState<string | null>(null); // 출근 시간 (null = 아직 로드 안됨)
+  const [trainerStartTime, setTrainerStartTime] = useState("09:00");
   const trainerStartTimeRef = useRef("09:00");
   const weekScrollRef = useRef<ScrollView>(null);
-  const hasScrolledRef = useRef(false); // 주간 뷰 초기 스크롤 1회만
 
   // 요일 다중 선택 (수업 추가 시)
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -432,28 +431,11 @@ export default function TrainerScheduleScreen() {
     return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
   };
 
-  // 주간 뷰 진입 시 — 이번 주 가장 빠른 슬롯 vs 출근 시간 중 더 이른 시간으로 스크롤 (1회만)
-  useEffect(() => {
-    if (viewMode !== "week") { hasScrolledRef.current = false; return; }
-    if (loading) return;
-    if (trainerStartTime === null) return; // 서버에서 출근시간 오기 전엔 대기
-    if (hasScrolledRef.current) return;
-    hasScrolledRef.current = true;
-    const effectiveOffset = slotOffset === 30 ? 30 : 0;
-    const times = makeTimeOptions(effectiveOffset as 0 | 30);
-    const startIdx = times.indexOf(trainerStartTime);
-    if (startIdx <= 0) return;
-    const timer = setTimeout(() => {
-      weekScrollRef.current?.scrollTo({ y: startIdx * 47, animated: false });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [viewMode, trainerStartTime, slotOffset, slots, currentWeekDates, loading]);
 
   // ─── 주간 이동 ───────────────────────────────────────────────────────────
 
   const goWeek = (delta: number) => {
     const newOffset = weekOffset + delta;
-    hasScrolledRef.current = false;
     setWeekOffset(newOffset);
     // 주가 다른 달로 넘어가면 viewMonth도 업데이트
     const dates = getWeekDatesForOffset(newOffset);
@@ -967,7 +949,7 @@ export default function TrainerScheduleScreen() {
     const TIME_W = 30;
     const WEEK_GRID_PADDING = 32; // 화면 padding 16*2
     const COL_W = (SCREEN_W - WEEK_GRID_PADDING - TIME_W) / 7;
-    const SLOT_H = 46;
+    const SLOT_H = 30;
     const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
 
     // 이번 주 슬롯 필터
@@ -1151,78 +1133,40 @@ export default function TrainerScheduleScreen() {
                           setSlotActionTarget({ ...slot, _date: d });
                           setSlotActionModal(true);
                         }}
-                        delayLongPress={400}
                         style={{
                           backgroundColor:
                             slot.status === "COMPLETED"
                               ? Colors.blue
                               : slot.status === "NO_SHOW"
                                 ? "#9CA3AF"
-                                : slot.status === "CANCELLED"
-                                  ? Colors.red
-                                  : sessionColor(slot.sessionType ?? "PT"),
+                                : sessionColor(slot.sessionType ?? "PT"),
                           borderRadius: 0,
-                          paddingVertical: 4,
-                          paddingHorizontal: 3,
+                          paddingHorizontal: 2,
                           alignItems: "center",
-                          height: SLOT_H,
                           justifyContent: "center",
+                          height: SLOT_H,
                         }}
                       >
                         <Text
-                          style={{
-                            fontSize: 9,
-                            fontWeight: "800",
-                            color: "#fff",
-                            textAlign: "center",
-                          }}
+                          style={{ fontSize: 8, fontWeight: "800", color: "#fff", textAlign: "center" }}
                           numberOfLines={1}
                         >
-                          {isNoShowSlot
-                            ? (slot.memberName ?? "노쇼")
-                            : isPersonalType(slot.sessionType ?? "")
-                              ? slot.note ||
-                                sessionLabel(slot.sessionType ?? "")
-                              : (slot.memberName ?? "-")}
+                          {isPersonalType(slot.sessionType ?? "")
+                            ? sessionLabel(slot.sessionType ?? "")
+                            : (slot.memberName ?? (slot.sessionType === "OT" ? "OT" : "-"))}
                         </Text>
-                        {isPersonalType(slot.sessionType ?? "") ? (
-                          <Text
-                            style={{
-                              fontSize: 7,
-                              color: "#ffffffdd",
-                              textAlign: "center",
-                            }}
-                          >
-                            {sessionLabel(slot.sessionType ?? "")}
-                          </Text>
-                        ) : slot.sessionType === "OT" ||
-                          (slot.ptTotal === 0 && slot.manualMemberId) ? (
-                          <Text
-                            style={{
-                              fontSize: 7,
-                              color: "#ffffffdd",
-                              textAlign: "center",
-                            }}
-                          >
-                            OT
-                          </Text>
-                        ) : slot.ptRemaining != null &&
-                          slot.ptTotal != null &&
-                          slot.ptTotal > 0 ? (
-                          <Text
-                            style={{
-                              fontSize: 8,
-                              color: "#ffffffcc",
-                              textAlign: "center",
-                            }}
-                          >
-                            {slot.ptRemaining}/{slot.ptTotal}회
-                          </Text>
-                        ) : slot.status === "COMPLETED" ? (
-                          <Text style={{ fontSize: 8, color: "#ffffffbb" }}>
-                            완료
-                          </Text>
-                        ) : null}
+                        <Text
+                          style={{ fontSize: 7, color: "#ffffffcc", textAlign: "center" }}
+                          numberOfLines={1}
+                        >
+                          {isPersonalType(slot.sessionType ?? "")
+                            ? (slot.note ?? "")
+                            : slot.sessionType === "OT" || (slot.ptTotal === 0 && slot.manualMemberId)
+                              ? "OT"
+                              : slot.ptRemaining != null && slot.ptTotal != null && slot.ptTotal > 0
+                                ? `${slot.ptRemaining}/${slot.ptTotal}회`
+                                : slot.status === "COMPLETED" ? "완료" : isNoShowSlot ? "노쇼" : ""}
+                        </Text>
                       </TouchableOpacity>
                     ) : (
                       // 빈 칸 (활성 + 과거 모두 터치 가능)
