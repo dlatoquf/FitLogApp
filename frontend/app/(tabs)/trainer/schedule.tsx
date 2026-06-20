@@ -3161,6 +3161,7 @@ export default function TrainerScheduleScreen() {
                         setSlots((prev) => prev.map((s) => s.id === slotActionTarget.id ? { ...s, note: editingNoteText || null } : s));
                         setSlotActionTarget((prev: any) => prev ? { ...prev, note: editingNoteText || null } : prev);
                         setEditingNoteSlotId(null);
+                        Alert.alert("완료", "메모가 저장됐어요.");
                       } catch { Alert.alert("오류", "메모 저장에 실패했어요."); }
                     }}
                     style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, backgroundColor: Colors.green }}
