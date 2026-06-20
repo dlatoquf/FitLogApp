@@ -1817,67 +1817,51 @@ export default function TrainerScheduleScreen() {
           onPress={() => setShowOffsetModal(false)}
         >
           <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
-            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 16 }}>일정 설정</Text>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 14 }}>일정 설정</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>수업 시작 시간</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
-              {([{ label: "정각", value: 0 }, { label: "30분", value: 30 }] as const).map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  onPress={async () => {
-                    try {
-                      const jwt = await AsyncStorage.getItem("jwt");
-                      await fetch(`${API_URL}/api/trainer/slot-settings`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                        body: JSON.stringify({ slotOffset: opt.value }),
-                      });
-                      setSlotOffset(opt.value);
-                    } catch (e) {
-                      Alert.alert("오류", "설정 저장에 실패했어요.");
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    alignItems: "center",
-                    borderWidth: 1.5,
-                    borderColor: slotOffset === opt.value ? Colors.green : Colors.border,
-                    backgroundColor: slotOffset === opt.value ? Colors.greenLight : Colors.bgSub,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: slotOffset === opt.value ? Colors.green : Colors.textSub }}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* ── 공통 설정 (월간 + 주간) ── */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>수업 시작 시간</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {([{ label: "정각", value: 0 }, { label: "30분", value: 30 }] as const).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={async () => {
+                        try {
+                          const jwt = await AsyncStorage.getItem("jwt");
+                          await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ slotOffset: opt.value }) });
+                          setSlotOffset(opt.value);
+                        } catch { Alert.alert("오류", "설정 저장에 실패했어요."); }
+                      }}
+                      style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", borderWidth: 1.5, borderColor: slotOffset === opt.value ? Colors.green : Colors.border, backgroundColor: slotOffset === opt.value ? Colors.greenLight : Colors.bgSub }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: slotOffset === opt.value ? Colors.green : Colors.textSub }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>주 시작 요일</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {([{ label: "월요일", value: 1 }, { label: "일요일", value: 0 }] as const).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => setWeekStartDay(opt.value)}
+                      style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", borderWidth: 1.5, borderColor: weekStartDay === opt.value ? Colors.green : Colors.border, backgroundColor: weekStartDay === opt.value ? Colors.greenLight : Colors.bgSub }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartDay === opt.value ? Colors.green : Colors.textSub }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
 
-            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>주 시작 요일</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-              {([{ label: "월요일", value: 1 }, { label: "일요일", value: 0 }] as const).map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  onPress={() => setWeekStartDay(opt.value)}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    alignItems: "center",
-                    borderWidth: 1.5,
-                    borderColor: weekStartDay === opt.value ? Colors.green : Colors.border,
-                    backgroundColor: weekStartDay === opt.value ? Colors.greenLight : Colors.bgSub,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: weekStartDay === opt.value ? Colors.green : Colors.textSub }}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* ── 구분선 ── */}
+            <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 14 }} />
+            <Text style={{ fontSize: 11, fontWeight: "600", color: Colors.textMuted, marginBottom: 10 }}>주간 뷰 설정</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8, marginTop: 12 }}>주간 뷰 크기</Text>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 8 }}>주간 뷰 크기</Text>
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
               {([{ label: "작게", value: 1 }, { label: "보통", value: 2 }, { label: "크게", value: 3 }] as const).map((opt) => (
                 <TouchableOpacity
