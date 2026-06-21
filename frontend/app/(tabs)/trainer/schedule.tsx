@@ -368,6 +368,7 @@ export default function TrainerScheduleScreen() {
         setSelectedDate(now);
         setViewYear(now.getFullYear());
         setViewMonth(now.getMonth() + 1);
+        setWeekOffset(0);
       }
       dateNavRef.current = false;
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
