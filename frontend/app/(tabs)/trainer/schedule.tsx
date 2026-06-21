@@ -150,13 +150,14 @@ export default function TrainerScheduleScreen() {
   const [addModal, setAddModal] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
 
-  useEffect(() => { if (!addModal) { setMemberSearchQuery(""); setPtNote(""); } }, [addModal]);
-  useEffect(() => { if (!manualModal) { setMemberSearchQuery(""); setPtNote(""); } }, [manualModal]);
   const [addingSlot, setAddingSlot] = useState<any | null>(null);
   const [addingMember, setAddingMember] = useState(false);
 
   // 수동 슬롯 추가 모달 (시간 직접 선택)
   const [manualModal, setManualModal] = useState(false);
+
+  useEffect(() => { if (!addModal) { setMemberSearchQuery(""); setPtNote(""); } }, [addModal]);
+  useEffect(() => { if (!manualModal) { setMemberSearchQuery(""); setPtNote(""); } }, [manualModal]);
   const [manualTime, setManualTime] = useState("09:00");
   const [manualTimeFixed, setManualTimeFixed] = useState(false); // 주간 셀 탭 시 시간 고정
   const [addingManual, setAddingManual] = useState(false);
