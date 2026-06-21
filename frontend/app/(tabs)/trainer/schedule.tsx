@@ -149,6 +149,9 @@ export default function TrainerScheduleScreen() {
   // 회원 추가 모달 (슬롯 선택 후)
   const [addModal, setAddModal] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
+
+  useEffect(() => { if (!addModal) { setMemberSearchQuery(""); setPtNote(""); } }, [addModal]);
+  useEffect(() => { if (!manualModal) { setMemberSearchQuery(""); setPtNote(""); } }, [manualModal]);
   const [addingSlot, setAddingSlot] = useState<any | null>(null);
   const [addingMember, setAddingMember] = useState(false);
 
@@ -1039,8 +1042,16 @@ export default function TrainerScheduleScreen() {
       }
     };
 
+    const weekSwipePan = PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dx) > Math.abs(gs.dy),
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -50) goWeek(1);
+        else if (gs.dx > 50) goWeek(-1);
+      },
+    });
+
     return (
-      <View>
+      <View {...weekSwipePan.panHandlers}>
         {/* 헤더: 요일 + 날짜 */}
         <View style={{ flexDirection: "row" }}>
           <View style={{ width: TIME_W }} />
@@ -2453,16 +2464,17 @@ export default function TrainerScheduleScreen() {
                 >
                   이 시간에 추가할 회원을 선택하세요
                 </Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 4 }}>메모</Text>
                 <TextInput
                   value={ptNote}
                   onChangeText={setPtNote}
-                  placeholder="메모 (선택)"
+                  placeholder="수업 메모를 입력하세요 (선택)"
                   placeholderTextColor={Colors.textMuted}
                   style={{
                     backgroundColor: Colors.bgSub,
                     borderRadius: 10,
                     borderWidth: 1,
-                    borderColor: Colors.border,
+                    borderColor: Colors.green + "66",
                     paddingHorizontal: 14,
                     paddingVertical: 10,
                     fontSize: 13,
@@ -2943,16 +2955,17 @@ export default function TrainerScheduleScreen() {
                 >
                   회원 선택
                 </Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 4 }}>메모</Text>
                 <TextInput
                   value={ptNote}
                   onChangeText={setPtNote}
-                  placeholder="메모 (선택)"
+                  placeholder="수업 메모를 입력하세요 (선택)"
                   placeholderTextColor={Colors.textMuted}
                   style={{
                     backgroundColor: Colors.bgSub,
                     borderRadius: 10,
                     borderWidth: 1,
-                    borderColor: Colors.border,
+                    borderColor: Colors.green + "66",
                     paddingHorizontal: 14,
                     paddingVertical: 10,
                     fontSize: 13,
