@@ -784,7 +784,7 @@ export default function TrainerHomeScreen() {
     if (!payNewPhone.trim()) {
       Alert.alert(
         "알림",
-        "전화번호를 입력해주세요.\n운동 기록 문자(SMS) 발송에 사용됩니다.",
+        "전화번호를 입력해주세요.",
       );
       return;
     }
@@ -2924,7 +2924,7 @@ export default function TrainerHomeScreen() {
                       marginBottom: 8,
                     }}
                   >
-                    전화번호 * (문자(SMS) 발송용)
+                    전화번호 *
                   </Text>
                   <TextInput
                     value={payNewPhone}

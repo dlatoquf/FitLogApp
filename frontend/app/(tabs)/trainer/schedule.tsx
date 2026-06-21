@@ -218,6 +218,30 @@ export default function TrainerScheduleScreen() {
   // 주 시작 요일: 0=일요일, 1=월요일
   const [weekStartDay, setWeekStartDay] = useState<0 | 1>(1);
 
+  // ── 주간 슬라이드 애니메이션 ─────────────────────────────────────────────
+  const SCREEN_W = Dimensions.get("window").width;
+  const weekSlideX = useRef(new Animated.Value(0)).current;
+
+  const weekSwipePanRef = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dx) > Math.abs(gs.dy),
+      onPanResponderMove: (_, gs) => {
+        const clamped = Math.max(-12, Math.min(12, gs.dx * 0.05));
+        weekSlideX.setValue(clamped);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -50) {
+          goWeekRef.current(1);
+        } else if (gs.dx > 50) {
+          goWeekRef.current(-1);
+        } else {
+          weekSlideX.stopAnimation();
+          weekSlideX.setValue(0);
+        }
+      },
+    })
+  );
+
   // ── 모달 스와이프 다운 닫기 ──────────────────────────────────────────────
   const addModalPanY = useRef(new Animated.Value(0)).current;
   const manualModalPanY = useRef(new Animated.Value(0)).current;
@@ -459,9 +483,19 @@ export default function TrainerScheduleScreen() {
 
   // ─── 주간 이동 ───────────────────────────────────────────────────────────
 
+  const goWeekRef = useRef<(delta: number) => void>(() => {});
+
   const goWeek = (delta: number) => {
     const newOffset = weekOffset + delta;
+    weekSlideX.stopAnimation();
+    weekSlideX.setValue(delta > 0 ? SCREEN_W : -SCREEN_W);
     setWeekOffset(newOffset);
+    Animated.spring(weekSlideX, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 12,
+    }).start(() => weekSlideX.setValue(0));
     // 주가 다른 달로 넘어가면 viewMonth도 업데이트
     const dates = getWeekDatesForOffset(newOffset);
     const monday = dates[0];
@@ -472,6 +506,15 @@ export default function TrainerScheduleScreen() {
       setViewMonth(m);
     }
   };
+  goWeekRef.current = goWeek;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      weekSlideX.stopAnimation();
+      weekSlideX.setValue(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [weekOffset]);
 
   // ─── 월 이동 ─────────────────────────────────────────────────────────────
 
@@ -1043,16 +1086,9 @@ export default function TrainerScheduleScreen() {
       }
     };
 
-    const weekSwipePan = PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dx) > Math.abs(gs.dy),
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dx < -50) goWeek(1);
-        else if (gs.dx > 50) goWeek(-1);
-      },
-    });
-
     return (
-      <View {...weekSwipePan.panHandlers}>
+      <View {...weekSwipePanRef.current.panHandlers} style={{ overflow: "hidden" }}>
+        <Animated.View style={{ transform: [{ translateX: weekSlideX }] }}>
         {/* 헤더: 요일 + 날짜 */}
         <View style={{ flexDirection: "row" }}>
           <View style={{ width: TIME_W }} />
@@ -1248,6 +1284,7 @@ export default function TrainerScheduleScreen() {
             </View>
           ))}
         </ScrollView>
+        </Animated.View>
       </View>
     );
   };
@@ -2268,7 +2305,7 @@ export default function TrainerScheduleScreen() {
                       fontWeight: "400",
                     }}
                   >
-                    (선택 · SMS 발송 및 정회원 전환 시 자동 연동)
+                    (선택 · 정회원 전환 시 자동 연동)
                   </Text>
                 </Text>
                 <TextInput
@@ -2805,7 +2842,7 @@ export default function TrainerScheduleScreen() {
                       fontWeight: "400",
                     }}
                   >
-                    (선택 · SMS 및 정회원 전환 자동 연동)
+                    (선택 · 정회원 전환 자동 연동)
                   </Text>
                 </Text>
                 <TextInput
@@ -2946,16 +2983,6 @@ export default function TrainerScheduleScreen() {
                     );
                   })}
                 </View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.textSub,
-                    marginBottom: 4,
-                  }}
-                >
-                  회원 선택
-                </Text>
                 <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 4 }}>메모</Text>
                 <TextInput
                   value={ptNote}
@@ -2974,6 +3001,16 @@ export default function TrainerScheduleScreen() {
                     marginBottom: 10,
                   }}
                 />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.textSub,
+                    marginBottom: 4,
+                  }}
+                >
+                  회원 선택
+                </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, marginBottom: 8, height: 36 }}>
                   <Text style={{ fontSize: 13, color: Colors.textMuted, marginRight: 6 }}>🔍</Text>
                   <TextInput
