@@ -874,7 +874,7 @@ export default function TrainerHomeScreen() {
         try {
           const CURRENT_VERSION = Application.nativeApplicationVersion ?? "0.0.0";
           console.log("[업데이트 체크] 시작 - 현재 버전:", CURRENT_VERSION);
-          const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
+          const res = await fetch("https://itunes.apple.com/lookup?id=6503695939&country=kr");
           const json = await res.json();
           const latest = json.results?.[0]?.version;
           console.log("[업데이트 체크] App Store 최신 버전:", latest);
