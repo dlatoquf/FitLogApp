@@ -618,7 +618,7 @@ export default function TrainerMoreScreen() {
 
         {/* 플랜 */}
         <FlatSectionHeader title="플랜" />
-        <View style={{ backgroundColor: Colors.bgCard, marginBottom: 8 }}>
+        <View style={{ backgroundColor: Colors.bgSub, marginBottom: 8 }}>
           <FlatRow
             label="현재 플랜"
             right={
