@@ -2300,7 +2300,7 @@ export default function TrainerScheduleScreen() {
                   }}
                 />
                 <TouchableOpacity
-                  onPress={() => {
+                  onPress={async () => {
                     const name = otName.trim();
                     if (!name) {
                       Alert.alert("오류", "OT 고객 이름을 입력해주세요.");
