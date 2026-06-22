@@ -1837,15 +1837,15 @@ export default function TrainerHomeScreen() {
                     });
                     if (isOt) {
                       router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`,
                       );
                     } else if (item.isManual) {
                       router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=1`,
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`,
                       );
                     } else {
                       router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=1`,
+                        `/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=0`,
                       );
                     }
                   }}

@@ -2201,7 +2201,7 @@ export default function MemberDetailScreen() {
       fetchingFitLogHistoryRef.current = false;
       fetchingFitLogKeyRef.current = null;
       // 탭도 파라미터 기준으로 리셋
-      setTab(initialTab ? Number(initialTab) : type === "manual" ? 1 : 0);
+      setTab(initialTab ? Number(initialTab) : 0);
       await fetchMember();
       setRenderedMemberId(memberId); // 새 회원 데이터 준비 완료
       setLoading(false);

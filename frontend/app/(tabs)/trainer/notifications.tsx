@@ -124,12 +124,12 @@ export default function TrainerNotificationsScreen() {
         }
         if (n.type === "DIET_PHOTO") {
             const dateParam = n.targetDate ? `&date=${n.targetDate}` : "";
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=0${dateParam}` as any); return;
+            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=1${dateParam}` as any); return;
         }
         if (n.type === "WORKOUT_LOG") {
             const id = n.memberId ?? n.targetId;
             const dateParam = n.targetDate ? `&date=${n.targetDate}` : "";
-            router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=1${dateParam}` as any); return;
+            router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=0${dateParam}` as any); return;
         }
         if (n.type === "MISSION_DONE") {
             const id = n.memberId ?? n.targetId;

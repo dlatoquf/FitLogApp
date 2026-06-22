@@ -43,14 +43,14 @@ function navigateByType(type: string, date?: string, targetId?: string) {
         );
       } else if (type === "DIET_PHOTO") {
         if (targetId) {
-          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "0", ...(date ? { date } : {}) } } as any);
+          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
         } else {
           router.push("/(tabs)/trainer/members" as any);
         }
       } else if (type === "WORKOUT_LOG") {
         if (isTrainer) {
           if (targetId) {
-            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
+            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "0", ...(date ? { date } : {}) } } as any);
           } else {
             router.push("/(tabs)/trainer/members" as any);
           }
