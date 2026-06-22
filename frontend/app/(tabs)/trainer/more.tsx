@@ -54,7 +54,6 @@ export default function TrainerMoreScreen() {
   const [isAffiliated, setIsAffiliated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
-  const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
 
   // 구글 시트 연동
@@ -116,7 +115,6 @@ export default function TrainerMoreScreen() {
         if (homeRes.ok) {
           const homeData = await homeRes.json();
           if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
-          setTrialEndDate(homeData.trialEndDate ?? null);
         }
       } catch {}
 
@@ -536,16 +534,14 @@ export default function TrainerMoreScreen() {
                 {plan === "PRO" && (
                   <View
                     style={{
-                      backgroundColor: trialEndDate ? "#FEF3C7" : Colors.green,
-                      borderWidth: trialEndDate ? 1 : 0,
-                      borderColor: "#FCD34D",
+                      backgroundColor: Colors.green,
                       paddingHorizontal: 7,
                       paddingVertical: 2,
                       borderRadius: 6,
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: "900", color: trialEndDate ? "#D97706" : "#fff" }}>
-                      {trialEndDate ? "무료체험" : "PRO"}
+                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>
+                      PRO
                     </Text>
                   </View>
                 )}
@@ -620,21 +616,31 @@ export default function TrainerMoreScreen() {
           </View>
         </View>
 
-        {/* 플랜 - App Store 심사 대응으로 비활성화 */}
-        {/* <FlatSectionHeader title="플랜" />
-        <View style={{ backgroundColor: "#fff", marginBottom: 8 }}>
+        {/* 플랜 */}
+        <FlatSectionHeader title="플랜" />
+        <View style={{ backgroundColor: Colors.bgCard, marginBottom: 8 }}>
           <FlatRow
             label="현재 플랜"
             right={
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <View style={{ backgroundColor: "#F59E0B", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>무료체험</Text>
+              plan === "PRO" ? (
+                <View style={{ backgroundColor: Colors.green, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>PRO</Text>
                 </View>
-                <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "700" }}>30일 무료 체험 중</Text>
-              </View>
+              ) : (
+                <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
+                </View>
+              )
             }
           />
-        </View> */}
+          {plan === "FREE" && (
+            <FlatRow
+              label="PRO로 업그레이드"
+              onPress={() => setPaymentVisible(true)}
+              right={<Text style={{ fontSize: 14, color: Colors.textMuted }}>{">"}</Text>}
+            />
+          )}
+        </View>
 
         {/* 연동 */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 20, marginBottom: 4, paddingHorizontal: 4 }}>
@@ -1057,9 +1063,9 @@ export default function TrainerMoreScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
-        {/* 업그레이드 바텀시트 (비활성화 - 전체 무료 제공 중) */}
+        {/* 업그레이드 바텀시트 */}
         <Modal
-          visible={false}
+          visible={paymentVisible}
           transparent
           animationType="slide"
           onRequestClose={() => setPaymentVisible(false)}
@@ -1108,18 +1114,18 @@ export default function TrainerMoreScreen() {
                 >
                   PRO 플랜으로 업그레이드
                 </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: Colors.textMuted,
-                    marginBottom: 20,
-                    lineHeight: 20,
-                  }}
-                >
-                  무료 플랜은 회원을 최대 5명까지 등록할 수 있어요.{"\n"}PRO로
-                  업그레이드하면 회원 수 제한이 없어져요.
-                  {isAffiliated ? "\n제휴 헬스장 회원 특별가가 적용됐어요." : ""}
-                </Text>
+                {isAffiliated && (
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: Colors.textMuted,
+                      marginBottom: 20,
+                      lineHeight: 20,
+                    }}
+                  >
+                    제휴 헬스장 회원 특별가가 적용됐어요.
+                  </Text>
+                )}
 
                 {/* PRO 단일 카드 */}
                 <View
@@ -1264,7 +1270,35 @@ export default function TrainerMoreScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{ marginTop: 12 }}
+                  style={{ marginTop: 16 }}
+                  onPress={() =>
+                    Linking.openURL("https://apps.apple.com/account/subscriptions")
+                  }
+                >
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      fontSize: 13,
+                      color: "#ef4444",
+                      marginBottom: 4,
+                    }}
+                  >
+                    구독 취소하기
+                  </Text>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      fontSize: 11,
+                      color: Colors.textMuted,
+                      lineHeight: 16,
+                    }}
+                  >
+                    취소 후에도 현재 구독 기간이 끝날 때까지 PRO를 사용할 수 있어요.
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ marginTop: 16 }}
                   onPress={() => setPaymentVisible(false)}
                 >
                   <Text

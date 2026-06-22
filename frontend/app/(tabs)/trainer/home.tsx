@@ -66,7 +66,6 @@ interface HomeData {
     manualMemberId?: number;
   }[];
   noShowCount: number;
-  trialEndDate?: string | null; // 무료 체험 중일 때만 "YYYY-MM-DD", 정식 PRO면 null
 }
 
 interface Member {
@@ -1012,28 +1011,15 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(() => {
-                const plan = (data?.plan ?? "FREE").toUpperCase();
-                const trialEndDate = data?.trialEndDate;
-                if (trialEndDate) {
-                  const daysLeft = Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-                  if (daysLeft > 0) return (
-                    <View style={{ backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FCD34D", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#D97706" }}>무료체험 {daysLeft}일</Text>
-                    </View>
-                  );
-                }
-                if (plan === "PRO") return (
-                  <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>PRO</Text>
-                  </View>
-                );
-                return (
-                  <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
-                  </View>
-                );
-              })()}
+              {(data?.plan ?? "FREE").toUpperCase() === "PRO" ? (
+                <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>PRO</Text>
+                </View>
+              ) : (
+                <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
+                </View>
+              )}
             </View>
           </View>
           <View
@@ -3496,16 +3482,6 @@ export default function TrainerHomeScreen() {
                 }}
               >
                 PRO 플랜으로 업그레이드
-              </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textMuted,
-                  marginBottom: 20,
-                  lineHeight: 20,
-                }}
-              >
-                무료 플랜은 회원 5명까지 연결할 수 있어요.
               </Text>
 
               <View
