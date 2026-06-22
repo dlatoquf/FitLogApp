@@ -509,8 +509,12 @@ export default function TrainerHomeScreen() {
 
   // ── 초대 버튼 핸들러 ──────────────────────────────────────────────────────
   const handleInvitePress = () => {
-    // 전체 무료 제공 중 - 제한 없음
-    setInviteVisible(true);
+    const plan = (data?.plan ?? "FREE").toUpperCase();
+    if (plan === "FREE" && (data?.totalMembers ?? 0) >= 5) {
+      setPaymentVisible(true);
+    } else {
+      setInviteVisible(true);
+    }
   };
 
   const inviteDragGesture = Gesture.Pan()
@@ -574,7 +578,25 @@ export default function TrainerHomeScreen() {
         }
       } catch {}
 
-      // RevenueCat 비활성화 (전체 무료 제공 중)
+      // RevenueCat 초기화 + 트레이너 userId 연결
+      try {
+        if (Purchases && typeof Purchases.configure === "function") {
+          const revenueCatKey =
+            Platform.OS === "ios"
+              ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
+              : "goog_basbVZDtouCQZzqQwYIsKIlwCdx";
+          await Purchases.configure({ apiKey: revenueCatKey });
+          const jwt = await AsyncStorage.getItem("jwt");
+          if (jwt) {
+            const payload = JSON.parse(atob(jwt.split(".")[1]));
+            const userId = String(payload.sub ?? payload.userId ?? payload.id);
+            await Purchases.logIn(userId);
+          }
+        }
+      } catch (e) {
+        console.log("RevenueCat 초기화 실패:", e);
+      }
+
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));
     } catch (e: any) {
       Alert.alert("오류", e?.message ?? "데이터를 불러오지 못했어요.");
@@ -618,6 +640,13 @@ export default function TrainerHomeScreen() {
   };
 
   const openPayModal = async () => {
+    if (
+      (data?.plan ?? "FREE").toUpperCase() === "FREE" &&
+      (data?.totalMembers ?? 0) >= 5
+    ) {
+      setPaymentVisible(true);
+      return;
+    }
     setPaySelectedMember(null);
     setPaySelectedManualMember(null);
     setPaySessionsInput("");
@@ -884,7 +913,7 @@ export default function TrainerHomeScreen() {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
     const installUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
-    const safeText = String(`안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}` ?? "");
+    const safeText = String(`안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
     const safeUrl = String(installUrl ?? "https://fitlog.app");
     const safeWebUrl = String(APP_STORE_URL ?? "https://fitlog.app");
     console.log("[Kakao] shareTextTemplate 시작");
@@ -983,15 +1012,28 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {/* 무료체험 카운트다운 - App Store 심사 대응으로 비활성화 */}
-              {/* {data?.trialEndDate && (() => {
-                const days = Math.max(0, Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-                return (
-                  <View style={{ backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FCD34D", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>무료체험 {days}일 남음</Text>
+              {(() => {
+                const plan = (data?.plan ?? "FREE").toUpperCase();
+                const trialEndDate = data?.trialEndDate;
+                if (trialEndDate) {
+                  const daysLeft = Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  if (daysLeft > 0) return (
+                    <View style={{ backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FCD34D", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#D97706" }}>무료체험 {daysLeft}일</Text>
+                    </View>
+                  );
+                }
+                if (plan === "PRO") return (
+                  <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>PRO</Text>
                   </View>
                 );
-              })()} */}
+                return (
+                  <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
           <View

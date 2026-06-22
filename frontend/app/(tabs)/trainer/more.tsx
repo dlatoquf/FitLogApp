@@ -53,7 +53,7 @@ export default function TrainerMoreScreen() {
   const [affiliateVerifying, setAffiliateVerifying] = useState(false);
   const [isAffiliated, setIsAffiliated] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [plan, setPlan] = useState<"FREE" | "PRO">("PRO");
+  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
   const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
 
@@ -96,8 +96,18 @@ export default function TrainerMoreScreen() {
   const [inquiries, setInquiries] = useState<any[]>([]);
 
   const fetchProfile = async () => {
-      // 전체 무료 제공 중 (인앱 결제 비활성화) - trial_end_date만 표시용으로 읽어옴
-      setPlan("PRO");
+      // RevenueCat 구독 상태 확인
+      try {
+        if (Purchases && typeof Purchases.getCustomerInfo === "function") {
+          const info = await Purchases.getCustomerInfo();
+          const isPro = typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
+          if (isPro) setPlan("PRO");
+        }
+      } catch (e) {
+        console.log("RevenueCat 상태 확인 실패:", e);
+      }
+
+      // 백엔드 plan도 확인 (RevenueCat 미인식 시 대비)
       try {
         const jwt = await AsyncStorage.getItem("jwt");
         const homeRes = await fetch(`${API_URL}/api/trainer/home`, {
@@ -105,6 +115,7 @@ export default function TrainerMoreScreen() {
         });
         if (homeRes.ok) {
           const homeData = await homeRes.json();
+          if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
           setTrialEndDate(homeData.trialEndDate ?? null);
         }
       } catch {}
@@ -522,8 +533,7 @@ export default function TrainerMoreScreen() {
                 <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
-                {/* PRO/무료체험 배지 - App Store 심사 대응으로 비활성화 */}
-                {/* {plan === "PRO" && (
+                {plan === "PRO" && (
                   <View
                     style={{
                       backgroundColor: trialEndDate ? "#FEF3C7" : Colors.green,
@@ -538,7 +548,7 @@ export default function TrainerMoreScreen() {
                       {trialEndDate ? "무료체험" : "PRO"}
                     </Text>
                   </View>
-                )} */}
+                )}
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                 <Text style={{ fontSize: 13, color: Colors.textMuted }}>{profile?.gymName ?? "-"}</Text>
