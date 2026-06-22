@@ -6,7 +6,7 @@
  */
 
 // ── DEV / TEST (현재 활성화) ──────────────────────────────────────
-//export const API_URL = "http://192.168.219.129:8080"; // 집 와이파이
+//export const API_URL = "http://192.168.0.182:8080"; // 집 와이파이
 //export const ANALYTICS_URL = "http://localhost:8001";
 
 // ── PROD (운영 배포 시 위 두 줄 주석 처리 후 아래 활성화) ──────────
