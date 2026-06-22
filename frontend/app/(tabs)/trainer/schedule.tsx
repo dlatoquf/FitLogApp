@@ -577,17 +577,7 @@ export default function TrainerScheduleScreen() {
 
   const addMemberToSlot = async (m: any) => {
     if (!addingSlot) return;
-    const startT = addingSlot.startTime.slice(0, 5);
-    const endT = getEndTime(startT);
-    // 시간 확인 다이얼로그
-    Alert.alert(
-      "수업 확정",
-      `${m.name}님\n${startT} ~ ${endT}\n\n위 시간으로 수업을 확정할까요?`,
-      [
-        { text: "취소", style: "cancel" },
-        { text: "확정", onPress: () => doAddMemberToSlot(m) },
-      ],
-    );
+    doAddMemberToSlot(m);
   };
 
   const doAddMemberToSlot = async (m: any) => {
@@ -624,17 +614,7 @@ export default function TrainerScheduleScreen() {
   };
 
   const addManualSchedule = (m: any) => {
-    const endT = getEndTime(manualTime);
-    const dayCount = selectedDays.length;
-    const dayLabel = dayCount > 1 ? ` (${dayCount}일)` : "";
-    Alert.alert(
-      "수업 확정",
-      `${m.name}님\n${manualTime} ~ ${endT}${dayLabel}\n\n위 시간으로 수업을 확정할까요?`,
-      [
-        { text: "취소", style: "cancel" },
-        { text: "확정", onPress: () => doAddManualSchedule(m) },
-      ],
-    );
+    doAddManualSchedule(m);
   };
 
   const doAddManualSchedule = async (m: any) => {
@@ -688,15 +668,7 @@ export default function TrainerScheduleScreen() {
       Alert.alert("오류", "OT 고객 이름을 입력해주세요.");
       return;
     }
-    const endT = getEndTime(manualTime);
-    Alert.alert(
-      "OT 수업 확정",
-      `${name}님\n${manualTime} ~ ${endT}\n\nOT 수업으로 확정할까요?`,
-      [
-        { text: "취소", style: "cancel" },
-        { text: "확정", onPress: doAddOtSchedule },
-      ],
-    );
+    doAddOtSchedule();
   };
 
   const doAddOtSchedule = async () => {
@@ -2336,74 +2308,61 @@ export default function TrainerScheduleScreen() {
                     }
                     if (!addingSlot) return;
                     const startT = addingSlot.startTime.slice(0, 5);
-                    const endT = getEndTime(startT);
-                    Alert.alert(
-                      "OT 수업 확정",
-                      `${name}님\n${startT} ~ ${endT}\n\nOT 수업으로 확정할까요?`,
-                      [
-                        { text: "취소", style: "cancel" },
+                    setAddingOt(true);
+                    try {
+                      const jwt = await AsyncStorage.getItem("jwt");
+                      const headers = {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${jwt}`,
+                      };
+                      const phone = otPhone.trim();
+                      const memberRes = await fetch(
+                        `${API_URL}/api/trainer/manual-members`,
                         {
-                          text: "확정",
-                          onPress: async () => {
-                            setAddingOt(true);
-                            try {
-                              const jwt = await AsyncStorage.getItem("jwt");
-                              const headers = {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${jwt}`,
-                              };
-                              const phone = otPhone.trim();
-                              const memberRes = await fetch(
-                                `${API_URL}/api/trainer/manual-members`,
-                                {
-                                  method: "POST",
-                                  headers,
-                                  body: JSON.stringify({
-                                    name,
-                                    phone: phone || undefined,
-                                    memo: "OT",
-                                  }),
-                                },
-                              );
-                              if (!memberRes.ok)
-                                throw new Error("고객 생성 실패");
-                              const newMember = await memberRes.json();
-                              const schedRes = await fetch(
-                                `${API_URL}/api/schedule/create-and-confirm`,
-                                {
-                                  method: "POST",
-                                  headers,
-                                  body: JSON.stringify({
-                                    date: addingSlot.date,
-                                    startTime: startT,
-                                    manualMemberId: newMember.id,
-                                    sessionType: "OT",
-                                  }),
-                                },
-                              );
-                              if (!schedRes.ok)
-                                throw new Error(
-                                  (await schedRes.text()) || "스케줄 추가 실패",
-                                );
-                              setAddModal(false);
-                              setOtName("");
-                              setOtPhone("");
-                              setSessionType("PT");
-                              cancelledIdsRef.current.clear();
-                              fetchAll();
-                              Alert.alert(
-                                "완료 ✓",
-                                `${name}님 OT 수업이 추가됐어요!`,
-                              );
-                            } catch (e: any) {
-                              Alert.alert("오류", e.message);
-                            } finally {
-                              setAddingOt(false);
-                            }
-                          },
+                          method: "POST",
+                          headers,
+                          body: JSON.stringify({
+                            name,
+                            phone: phone || undefined,
+                            memo: "OT",
+                          }),
                         },
-                      ],
-                    );
+                      );
+                      if (!memberRes.ok)
+                        throw new Error("고객 생성 실패");
+                      const newMember = await memberRes.json();
+                      const schedRes = await fetch(
+                        `${API_URL}/api/schedule/create-and-confirm`,
+                        {
+                          method: "POST",
+                          headers,
+                          body: JSON.stringify({
+                            date: addingSlot.date,
+                            startTime: startT,
+                            manualMemberId: newMember.id,
+                            sessionType: "OT",
+                          }),
+                        },
+                      );
+                      if (!schedRes.ok)
+                        throw new Error(
+                          (await schedRes.text()) || "스케줄 추가 실패",
+                        );
+                      setAddModal(false);
+                      setOtName("");
+                      setOtPhone("");
+                      setSessionType("PT");
+                      cancelledIdsRef.current.clear();
+                      fetchAll();
+                      Alert.alert(
+                        "완료 ✓",
+                        `${name}님 OT 수업이 추가됐어요!`,
+                      );
+                    } catch (e: any) {
+                      Alert.alert("오류", e.message);
+                    } finally {
+                      setAddingOt(false);
+                    }
                   }}
                   disabled={addingOt || !otName.trim()}
                   style={{
