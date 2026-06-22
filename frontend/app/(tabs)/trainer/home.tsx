@@ -3630,9 +3630,13 @@ export default function TrainerHomeScreen() {
                       }
                     };
 
-                    setPendingPurchase(() => doPurchase);
-                    setPaymentVisible(false);
-                    setTimeout(() => setTrialNoticeVisible(true), 400);
+                    if (data?.trialEndDate) {
+                      setPendingPurchase(() => doPurchase);
+                      setPaymentVisible(false);
+                      setTimeout(() => setTrialNoticeVisible(true), 400);
+                    } else {
+                      await doPurchase();
+                    }
                   }}
                   style={{
                     marginTop: 16,

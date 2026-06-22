@@ -1313,9 +1313,13 @@ export default function TrainerMoreScreen() {
                         }
                       };
 
-                      setTrialNoticePending(() => doPurchase);
-                      setPaymentVisible(false);
-                      setTimeout(() => setTrialNoticeVisible(true), 400);
+                      if (trialEndDate) {
+                        setTrialNoticePending(() => doPurchase);
+                        setPaymentVisible(false);
+                        setTimeout(() => setTrialNoticeVisible(true), 400);
+                      } else {
+                        await doPurchase();
+                      }
                     }}
                     style={{
                       marginTop: 16,
