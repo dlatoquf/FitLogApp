@@ -54,7 +54,10 @@ export default function TrainerMoreScreen() {
   const [isAffiliated, setIsAffiliated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
+  const [trialNoticeVisible, setTrialNoticeVisible] = useState(false);
+  const [trialNoticePending, setTrialNoticePending] = useState<(() => void) | null>(null);
 
   // 구글 시트 연동
   const [sheetsConnected, setSheetsConnected] = useState(false);
@@ -95,18 +98,7 @@ export default function TrainerMoreScreen() {
   const [inquiries, setInquiries] = useState<any[]>([]);
 
   const fetchProfile = async () => {
-      // RevenueCat 구독 상태 확인
-      try {
-        if (Purchases && typeof Purchases.getCustomerInfo === "function") {
-          const info = await Purchases.getCustomerInfo();
-          const isPro = typeof info.entitlements.active["FitLogApp Pro"] !== "undefined";
-          if (isPro) setPlan("PRO");
-        }
-      } catch (e) {
-        console.log("RevenueCat 상태 확인 실패:", e);
-      }
-
-      // 백엔드 plan도 확인 (RevenueCat 미인식 시 대비)
+      // 백엔드 plan 기준으로 설정
       try {
         const jwt = await AsyncStorage.getItem("jwt");
         const homeRes = await fetch(`${API_URL}/api/trainer/home`, {
@@ -114,7 +106,13 @@ export default function TrainerMoreScreen() {
         });
         if (homeRes.ok) {
           const homeData = await homeRes.json();
-          if ((homeData.plan ?? "").toUpperCase() === "PRO") setPlan("PRO");
+          // trialEndDate가 있으면 무료체험 중 → FREE로 표시
+          if (homeData.trialEndDate) {
+            setTrialEndDate(homeData.trialEndDate);
+            setPlan("FREE");
+          } else {
+            setPlan((homeData.plan ?? "FREE").toUpperCase() === "PRO" ? "PRO" : "FREE");
+          }
         }
       } catch {}
 
@@ -531,18 +529,20 @@ export default function TrainerMoreScreen() {
                 <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
-                {plan === "PRO" && (
-                  <View
-                    style={{
-                      backgroundColor: Colors.green,
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                    }}
-                  >
-                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>
-                      PRO
-                    </Text>
+                {trialEndDate ? (() => {
+                  const d = Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  return (
+                    <View style={{ backgroundColor: d > 0 ? "#FFF0E6" : "#FEF9C3", borderWidth: 1, borderColor: d > 0 ? "#F97316" : "#FDE047", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: d > 0 ? "#EA6C00" : "#CA8A04" }}>{d > 0 ? `무료체험 ${d}일` : "FREE"}</Text>
+                    </View>
+                  );
+                })() : plan === "PRO" ? (
+                  <View style={{ backgroundColor: Colors.green, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>PRO</Text>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: "#FEF9C3", borderWidth: 1, borderColor: "#FDE047", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "700", color: "#CA8A04" }}>FREE</Text>
                   </View>
                 )}
               </View>
@@ -618,29 +618,81 @@ export default function TrainerMoreScreen() {
 
         {/* 플랜 */}
         <FlatSectionHeader title="플랜" />
-        <View style={{ backgroundColor: Colors.bgSub, marginBottom: 8 }}>
-          <FlatRow
-            label="현재 플랜"
-            right={
-              plan === "PRO" ? (
-                <View style={{ backgroundColor: Colors.green, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>PRO</Text>
+        {(() => {
+          const daysLeft = trialEndDate
+            ? Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+            : null;
+          return plan === "PRO" && !trialEndDate ? (
+            <View style={{
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: Colors.green + "66",
+              backgroundColor: Colors.greenLight,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginBottom: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.green }}>PRO 플랜</Text>
+                <View style={{ backgroundColor: Colors.green, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>구독 중</Text>
                 </View>
-              ) : (
-                <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
-                </View>
-              )
-            }
-          />
-          {plan === "FREE" && (
-            <FlatRow
-              label="PRO로 업그레이드"
-              onPress={() => setPaymentVisible(true)}
-              right={<Text style={{ fontSize: 14, color: Colors.textMuted }}>{">"}</Text>}
-            />
-          )}
-        </View>
+              </View>
+              <TouchableOpacity
+                onPress={() =>
+                  Platform.OS === "android"
+                    ? Linking.openURL("https://play.google.com/store/account/subscriptions")
+                    : Linking.openURL("https://apps.apple.com/account/subscriptions")
+                }
+                style={{
+                  borderWidth: 1,
+                  borderColor: "#ef4444" + "88",
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>구독 취소</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: "#FDE047",
+              backgroundColor: "#FEF9C3",
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginBottom: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>무료 플랜</Text>
+                {daysLeft !== null && daysLeft > 0 && (
+                  <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#EA6C00" }}>무료체험 {daysLeft}일 남음</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => setPaymentVisible(true)}
+                style={{
+                  backgroundColor: Colors.green,
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>업그레이드</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         {/* 연동 */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 20, marginBottom: 4, paddingHorizontal: 4 }}>
@@ -1063,6 +1115,45 @@ export default function TrainerMoreScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
+        {/* 무료체험 구독 안내 팝업 */}
+        <Modal visible={trialNoticeVisible} transparent animationType="fade" onRequestClose={() => setTrialNoticeVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}>
+            <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 28, width: "100%" }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text, marginBottom: 8, textAlign: "center" }}>
+                지금 구독하기
+              </Text>
+              {trialEndDate && (() => {
+                const trialEnd = new Date(trialEndDate);
+                const billingStart = new Date(trialEnd);
+                billingStart.setDate(billingStart.getDate() + 1);
+                const fmt = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
+                return (
+                  <View style={{ backgroundColor: Colors.greenLight, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22, textAlign: "center" }}>
+                      <Text style={{ fontWeight: "800", color: Colors.green }}>{fmt(trialEnd)}</Text>
+                      {"까지 무료체험이 제공됩니다.\n이후 "}
+                      <Text style={{ fontWeight: "800", color: Colors.green }}>{fmt(billingStart)}</Text>
+                      {"부터 구독이 자동 시작되며\n언제든 해지할 수 있어요."}
+                    </Text>
+                  </View>
+                );
+              })()}
+              <TouchableOpacity
+                onPress={() => {
+                  setTrialNoticeVisible(false);
+                  if (trialNoticePending) trialNoticePending();
+                }}
+                style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>구독 시작하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setTrialNoticeVisible(false)} style={{ alignItems: "center", paddingVertical: 8 }}>
+                <Text style={{ fontSize: 14, color: Colors.textMuted }}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* 업그레이드 바텀시트 */}
         <Modal
           visible={paymentVisible}
@@ -1194,36 +1285,45 @@ export default function TrainerMoreScreen() {
                   </Text>
                   <TouchableOpacity
                     onPress={async () => {
-                      try {
-                        if (
-                          !Purchases ||
-                          typeof Purchases.getOfferings !== "function"
-                        ) {
-                          Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
-                          return;
+                      const doPurchase = async () => {
+                        try {
+                          if (
+                            !Purchases ||
+                            typeof Purchases.getOfferings !== "function"
+                          ) {
+                            Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                            return;
+                          }
+                          const offerings = await Purchases.getOfferings();
+                          const pkg = isAffiliated
+                            ? offerings.current?.availablePackages.find(
+                                (p: any) => p.identifier === "pro_monthly_affiliate",
+                              ) ?? offerings.current?.monthly
+                            : offerings.current?.monthly ??
+                              offerings.current?.availablePackages[0];
+                          if (!pkg) {
+                            Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                            return;
+                          }
+                          await Purchases.purchasePackage(pkg);
+                          setPlan("PRO");
+                          setPaymentVisible(false);
+                          Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                          setTimeout(() => fetchProfile(), 3000);
+                        } catch (e: any) {
+                          if (!e.userCancelled)
+                            Alert.alert(
+                              "결제 실패",
+                              e.message ?? "다시 시도해주세요.",
+                            );
                         }
-                        const offerings = await Purchases.getOfferings();
-                        const pkg = isAffiliated
-                          ? offerings.current?.availablePackages.find(
-                              (p: any) => p.identifier === "pro_monthly_affiliate",
-                            ) ?? offerings.current?.monthly
-                          : offerings.current?.monthly ??
-                            offerings.current?.availablePackages[0];
-                        if (!pkg) {
-                          Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
-                          return;
-                        }
-                        await Purchases.purchasePackage(pkg);
-                        setPlan("PRO");
-                        setPaymentVisible(false);
-                        Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
-                        setTimeout(() => fetchProfile(), 3000);
-                      } catch (e: any) {
-                        if (!e.userCancelled)
-                          Alert.alert(
-                            "결제 실패",
-                            e.message ?? "다시 시도해주세요.",
-                          );
+                      };
+
+                      if (trialEndDate) {
+                        setTrialNoticePending(() => doPurchase);
+                        setTrialNoticeVisible(true);
+                      } else {
+                        doPurchase();
                       }
                     }}
                     style={{
@@ -1272,7 +1372,9 @@ export default function TrainerMoreScreen() {
                 <TouchableOpacity
                   style={{ marginTop: 16 }}
                   onPress={() =>
-                    Linking.openURL("https://apps.apple.com/account/subscriptions")
+                    Platform.OS === "android"
+                      ? Linking.openURL("https://play.google.com/store/account/subscriptions")
+                      : Linking.openURL("https://apps.apple.com/account/subscriptions")
                   }
                 >
                   <Text

@@ -52,6 +52,7 @@ interface HomeData {
   todayPtList: TodayPt[];
   trainerCode: string;
   plan: string;
+  trialEndDate?: string | null;
   goalSessions: number | null;
   goalRevenue: number | null;
   monthSessions: number;
@@ -116,6 +117,8 @@ export default function TrainerHomeScreen() {
   const [actionModal, setActionModal] = useState<{ visible: boolean; item: TodayPt | null }>({ visible: false, item: null });
   const [notifications, setNotifications] = useState<Noti[]>([]);
   const [paymentVisible, setPaymentVisible] = useState(false);
+  const [trialNoticeVisible, setTrialNoticeVisible] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState<(() => void) | null>(null);
 
   // 목표 설정 모달
   const [goalModal, setGoalModal] = useState(false);
@@ -1011,15 +1014,32 @@ export default function TrainerHomeScreen() {
               >
                 {data?.trainerName ?? "-"}님
               </Text>
-              {(data?.plan ?? "FREE").toUpperCase() === "PRO" ? (
-                <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>PRO</Text>
-                </View>
-              ) : (
-                <View style={{ backgroundColor: Colors.bgSub, borderWidth: 1, borderColor: Colors.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>FREE</Text>
-                </View>
-              )}
+              {(() => {
+                if (data?.trialEndDate) {
+                  const daysLeft = Math.max(0, Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  return daysLeft > 0 ? (
+                    <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#EA6C00" }}>무료체험 {daysLeft}일</Text>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: "#FEF9C3", borderWidth: 1, borderColor: "#FDE047", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#CA8A04" }}>FREE</Text>
+                    </View>
+                  );
+                }
+                if ((data?.plan ?? "FREE").toUpperCase() === "PRO") {
+                  return (
+                    <View style={{ backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "44", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "900", color: Colors.green }}>PRO</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View style={{ backgroundColor: "#FEF9C3", borderWidth: 1, borderColor: "#FDE047", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#CA8A04" }}>FREE</Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
           <View
@@ -1161,7 +1181,7 @@ export default function TrainerHomeScreen() {
             }}
           >
             <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
-              {data?.todayPtList?.filter(item => item.sessionType === "PT" || item.sessionType === "OT").length ?? 0}
+              {data?.todayPtList?.filter(item => item.sessionType === "PT").length ?? 0}
             </Text>
             <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
               오늘 수업
@@ -3425,6 +3445,45 @@ export default function TrainerHomeScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      {/* ── 무료체험 구독 안내 팝업 ─────────────────────────────────────────── */}
+      <Modal visible={trialNoticeVisible} transparent animationType="fade" onRequestClose={() => setTrialNoticeVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 28, width: "100%" }}>
+            <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text, marginBottom: 8, textAlign: "center" }}>
+              지금 구독하기
+            </Text>
+            {data?.trialEndDate && (() => {
+              const trialEnd = new Date(data.trialEndDate!);
+              const billingStart = new Date(trialEnd);
+              billingStart.setDate(billingStart.getDate() + 1);
+              const fmt = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
+              return (
+                <View style={{ backgroundColor: Colors.greenLight, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22, textAlign: "center" }}>
+                    <Text style={{ fontWeight: "800", color: Colors.green }}>{fmt(trialEnd)}</Text>
+                    {"까지 무료체험이 제공됩니다.\n이후 "}
+                    <Text style={{ fontWeight: "800", color: Colors.green }}>{fmt(billingStart)}</Text>
+                    {"부터 구독이 자동 시작되며\n언제든 해지할 수 있어요."}
+                  </Text>
+                </View>
+              );
+            })()}
+            <TouchableOpacity
+              onPress={() => {
+                setTrialNoticeVisible(false);
+                if (pendingPurchase) pendingPurchase();
+              }}
+              style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 10 }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>구독 시작하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setTrialNoticeVisible(false)} style={{ alignItems: "center", paddingVertical: 8 }}>
+              <Text style={{ fontSize: 14, color: Colors.textMuted }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── 결제 바텀시트 ──────────────────────────────────────────────────────
           TODO: 실제 결제 연동 시 각 버튼 onPress에 아래 연동 추가
           - 애플 인앱결제: react-native-iap 라이브러리 사용
@@ -3550,32 +3609,41 @@ export default function TrainerHomeScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {
-                    try {
-                      if (
-                        !Purchases ||
-                        typeof Purchases.getOfferings !== "function"
-                      ) {
-                        Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
-                        return;
+                    const doPurchase = async () => {
+                      try {
+                        if (
+                          !Purchases ||
+                          typeof Purchases.getOfferings !== "function"
+                        ) {
+                          Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                          return;
+                        }
+                        const offerings = await Purchases.getOfferings();
+                        const pkg =
+                          offerings.current?.monthly ??
+                          offerings.current?.availablePackages[0];
+                        if (!pkg) {
+                          Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                          return;
+                        }
+                        await Purchases.purchasePackage(pkg);
+                        setPaymentVisible(false);
+                        Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                        setTimeout(() => fetchHome(), 3000);
+                      } catch (e: any) {
+                        if (!e.userCancelled)
+                          Alert.alert(
+                            "결제 실패",
+                            e.message ?? "다시 시도해주세요.",
+                          );
                       }
-                      const offerings = await Purchases.getOfferings();
-                      const pkg =
-                        offerings.current?.monthly ??
-                        offerings.current?.availablePackages[0];
-                      if (!pkg) {
-                        Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
-                        return;
-                      }
-                      await Purchases.purchasePackage(pkg);
-                      setPaymentVisible(false);
-                      Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
-                      setTimeout(() => fetchHome(), 3000);
-                    } catch (e: any) {
-                      if (!e.userCancelled)
-                        Alert.alert(
-                          "결제 실패",
-                          e.message ?? "다시 시도해주세요.",
-                        );
+                    };
+
+                    if (data?.trialEndDate) {
+                      setPendingPurchase(() => doPurchase);
+                      setTrialNoticeVisible(true);
+                    } else {
+                      doPurchase();
                     }
                   }}
                   style={{
