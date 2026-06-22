@@ -554,6 +554,7 @@ export default function TrainerHomeScreen() {
       ]);
       if (!homeRes.ok) throw new Error("홈 데이터 조회 실패");
       const homeData = await homeRes.json();
+      console.log("[Home] plan:", homeData.plan, "trialEndDate:", homeData.trialEndDate);
       setData(homeData);
 
       // 결제 추가용 회원 목록 미리 로드
@@ -1017,13 +1018,11 @@ export default function TrainerHomeScreen() {
               {(() => {
                 if (data?.trialEndDate) {
                   const daysLeft = Math.max(0, Math.ceil((new Date(data.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-                  return daysLeft > 0 ? (
+                  return (
                     <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#EA6C00" }}>무료체험 {daysLeft}일</Text>
-                    </View>
-                  ) : (
-                    <View style={{ backgroundColor: "#FEF9C3", borderWidth: 1, borderColor: "#FDE047", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#CA8A04" }}>FREE</Text>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#EA6C00" }}>
+                        {daysLeft === 0 ? "무료체험 오늘까지" : `무료체험 ${daysLeft}일`}
+                      </Text>
                     </View>
                   );
                 }
@@ -3492,7 +3491,7 @@ export default function TrainerHomeScreen() {
           현재는 UI만 구현된 상태 (Alert으로 준비 중 표시)
       ──────────────────────────────────────────────────────────────────────── */}
       <Modal
-        visible={false}
+        visible={paymentVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setPaymentVisible(false)}
@@ -3537,7 +3536,7 @@ export default function TrainerHomeScreen() {
                   fontSize: 20,
                   fontWeight: "800",
                   color: Colors.text,
-                  marginBottom: 4,
+                  marginBottom: 20,
                 }}
               >
                 PRO 플랜으로 업그레이드
@@ -3550,7 +3549,7 @@ export default function TrainerHomeScreen() {
                   borderWidth: 1.5,
                   borderColor: Colors.green + "55",
                   backgroundColor: Colors.greenLight,
-                  marginBottom: 20,
+                  marginBottom: 24,
                 }}
               >
                 <View
@@ -3598,15 +3597,7 @@ export default function TrainerHomeScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: Colors.textSub,
-                    lineHeight: 22,
-                  }}
-                >
-                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 5명)
-                </Text>
+                <Text style={{ fontSize: 13, color: Colors.textSub, marginBottom: 16 }}>✓ 회원 무제한</Text>
                 <TouchableOpacity
                   onPress={async () => {
                     const doPurchase = async () => {
@@ -3639,12 +3630,9 @@ export default function TrainerHomeScreen() {
                       }
                     };
 
-                    if (data?.trialEndDate) {
-                      setPendingPurchase(() => doPurchase);
-                      setTrialNoticeVisible(true);
-                    } else {
-                      doPurchase();
-                    }
+                    setPendingPurchase(() => doPurchase);
+                    setPaymentVisible(false);
+                    setTimeout(() => setTrialNoticeVisible(true), 400);
                   }}
                   style={{
                     marginTop: 16,

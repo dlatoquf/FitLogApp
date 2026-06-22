@@ -532,8 +532,8 @@ export default function TrainerMoreScreen() {
                 {trialEndDate ? (() => {
                   const d = Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
                   return (
-                    <View style={{ backgroundColor: d > 0 ? "#FFF0E6" : "#FEF9C3", borderWidth: 1, borderColor: d > 0 ? "#F97316" : "#FDE047", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: d > 0 ? "#EA6C00" : "#CA8A04" }}>{d > 0 ? `무료체험 ${d}일` : "FREE"}</Text>
+                    <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#EA6C00" }}>{d === 0 ? "무료체험 오늘까지" : `무료체험 ${d}일`}</Text>
                     </View>
                   );
                 })() : plan === "PRO" ? (
@@ -673,9 +673,11 @@ export default function TrainerMoreScreen() {
             }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>무료 플랜</Text>
-                {daysLeft !== null && daysLeft > 0 && (
+                {daysLeft !== null && (
                   <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#EA6C00" }}>무료체험 {daysLeft}일 남음</Text>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#EA6C00" }}>
+                      {daysLeft === 0 ? "무료체험 오늘까지" : `무료체험 ${daysLeft}일 남음`}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -1200,7 +1202,7 @@ export default function TrainerMoreScreen() {
                     fontSize: 20,
                     fontWeight: "800",
                     color: Colors.text,
-                    marginBottom: 4,
+                    marginBottom: 20,
                   }}
                 >
                   PRO 플랜으로 업그레이드
@@ -1226,7 +1228,7 @@ export default function TrainerMoreScreen() {
                     borderWidth: 1.5,
                     borderColor: Colors.green + "55",
                     backgroundColor: Colors.greenLight,
-                    marginBottom: 20,
+                    marginBottom: 24,
                   }}
                 >
                   <View
@@ -1274,15 +1276,7 @@ export default function TrainerMoreScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: Colors.textSub,
-                      lineHeight: 22,
-                    }}
-                  >
-                    ✓ 회원 무제한{"\n"}(무료 플랜: 최대 5명)
-                  </Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSub, marginBottom: 16 }}>✓ 회원 무제한</Text>
                   <TouchableOpacity
                     onPress={async () => {
                       const doPurchase = async () => {
@@ -1319,12 +1313,9 @@ export default function TrainerMoreScreen() {
                         }
                       };
 
-                      if (trialEndDate) {
-                        setTrialNoticePending(() => doPurchase);
-                        setTrialNoticeVisible(true);
-                      } else {
-                        doPurchase();
-                      }
+                      setTrialNoticePending(() => doPurchase);
+                      setPaymentVisible(false);
+                      setTimeout(() => setTrialNoticeVisible(true), 400);
                     }}
                     style={{
                       marginTop: 16,
