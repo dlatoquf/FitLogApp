@@ -8,6 +8,7 @@ import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
 import com.fitlog.fitlog.bodylog.repository.ManualBodyLogRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.repository.MemberRepository;
+import com.fitlog.fitlog.member.service.MemberDataCleanupService;
 import com.fitlog.fitlog.member.service.MemberDeleteService;
 import com.fitlog.fitlog.member.service.MemberHomeService;
 import com.fitlog.fitlog.notification.service.NotificationService;
@@ -46,6 +47,7 @@ public class MemberHomeController {
     private final ScheduleRepository scheduleRepository;
     private final ManualBodyLogRepository manualBodyLogRepository;
     private final BodyLogRepository bodyLogRepository;
+    private final MemberDataCleanupService memberDataCleanupService;
 
     public MemberHomeController(MemberHomeService memberHomeService,
                                 MemberRepository memberRepository,
@@ -60,7 +62,8 @@ public class MemberHomeController {
                                 PtContractRepository ptContractRepository,
                                 ScheduleRepository scheduleRepository,
                                 ManualBodyLogRepository manualBodyLogRepository,
-                                BodyLogRepository bodyLogRepository) {
+                                BodyLogRepository bodyLogRepository,
+                                MemberDataCleanupService memberDataCleanupService) {
         this.memberHomeService = memberHomeService;
         this.memberRepository = memberRepository;
         this.trainerRepository = trainerRepository;
@@ -75,6 +78,7 @@ public class MemberHomeController {
         this.scheduleRepository = scheduleRepository;
         this.manualBodyLogRepository = manualBodyLogRepository;
         this.bodyLogRepository = bodyLogRepository;
+        this.memberDataCleanupService = memberDataCleanupService;
     }
 
     @GetMapping("/home")
@@ -367,6 +371,7 @@ public class MemberHomeController {
             return ResponseEntity.badRequest().body(Map.of("message", "연결된 트레이너가 없어요."));
         Trainer trainer = member.getTrainer();
         String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
+        memberDataCleanupService.cleanupMemberData(member);
         member.setStatus(com.fitlog.fitlog.member.entity.Member.Status.INACTIVE);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);

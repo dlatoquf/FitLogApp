@@ -21,6 +21,7 @@ import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.entity.MemberMemo;
 import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
+import com.fitlog.fitlog.member.service.MemberDataCleanupService;
 import com.fitlog.fitlog.trainer.service.TrainerDeleteService;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +51,7 @@ public class TrainerController {
     private final TrainerNoticeRepository trainerNoticeRepository;
     private final BodyLogRepository bodyLogRepository;
     private final MemberGoalRepository memberGoalRepository;
+    private final MemberDataCleanupService memberDataCleanupService;
 
     public TrainerController(TrainerRepository trainerRepository,
                              MemberRepository memberRepository,
@@ -67,7 +69,8 @@ public class TrainerController {
                              MissionRepository missionRepository,
                              TrainerNoticeRepository trainerNoticeRepository,
                              BodyLogRepository bodyLogRepository,
-                             MemberGoalRepository memberGoalRepository) {
+                             MemberGoalRepository memberGoalRepository,
+                             MemberDataCleanupService memberDataCleanupService) {
         this.trainerRepository = trainerRepository;
         this.memberMemoRepository = memberMemoRepository;
         this.memberRepository = memberRepository;
@@ -85,6 +88,7 @@ public class TrainerController {
         this.trainerNoticeRepository = trainerNoticeRepository;
         this.bodyLogRepository = bodyLogRepository;
         this.memberGoalRepository = memberGoalRepository;
+        this.memberDataCleanupService = memberDataCleanupService;
     }
 
     /*// 트레이너 프로필 조회
@@ -382,19 +386,7 @@ public class TrainerController {
         if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
-        Long mId = member.getId();
-        // PT 결제(PtContract)·회원 계정(User)·Member 행만 유지, 나머지 전부 삭제
-        scheduleRepository.deleteByMember(member);
-        missionRepository.deleteByMemberId(mId);
-        memberMemoRepository.deleteByMember(member);
-        workoutLogRepository.deleteByMember(member);
-        dietPhotoFeedbackRepository.deleteByMemberId(mId);
-        dietDayFeedbackRepository.deleteByMember(member);
-        dietPhotoRepository.deleteByMember(member);
-        bodyLogRepository.deleteByMember(member);
-        memberGoalRepository.deleteByMember(member);
-        trainerNoticeRepository.deleteByMemberId(mId);
-        notificationRepository.deleteByMemberId(mId);
+        memberDataCleanupService.cleanupMemberData(member);
         member.setTrainer(null);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);

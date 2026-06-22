@@ -18,8 +18,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fitlog.fitlog.auth.service.JwtService;
+import com.fitlog.fitlog.bodylog.repository.ManualBodyLogRepository;
 import com.fitlog.fitlog.member.entity.PtContract;
 import com.fitlog.fitlog.member.repository.PtContractRepository;
+import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
@@ -37,19 +39,25 @@ public class ManualMemberController {
     private final PtContractRepository ptContractRepository;
     private final WorkoutLogRepository workoutLogRepository;
     private final MemberMemoRepository memberMemoRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final ManualBodyLogRepository manualBodyLogRepository;
 
     public ManualMemberController(ManualMemberRepository manualMemberRepository,
                                    TrainerRepository trainerRepository,
                                    JwtService jwtService,
                                    PtContractRepository ptContractRepository,
                                    WorkoutLogRepository workoutLogRepository,
-                                   MemberMemoRepository memberMemoRepository) {
+                                   MemberMemoRepository memberMemoRepository,
+                                   ScheduleRepository scheduleRepository,
+                                   ManualBodyLogRepository manualBodyLogRepository) {
         this.manualMemberRepository = manualMemberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
         this.ptContractRepository = ptContractRepository;
         this.workoutLogRepository = workoutLogRepository;
         this.memberMemoRepository = memberMemoRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.manualBodyLogRepository = manualBodyLogRepository;
     }
 
     // 미연동 회원 목록 조회 (OT 회원 제외 — OT는 체험 회원으로 별도 관리)
@@ -340,7 +348,10 @@ public class ManualMemberController {
                 c.setManualMember(null);
                 ptContractRepository.save(c);
             });
+            memberMemoRepository.deleteByManualMemberId(m.getId());
+            manualBodyLogRepository.deleteByManualMemberId(m.getId());
             workoutLogRepository.deleteByManualMember(m);
+            scheduleRepository.detachManualMemberFromSchedules(m);
         });
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();

@@ -176,8 +176,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
             @Param("to") LocalDate to
     );
 
-    // 이번 달 수업 수 (CONFIRMED + COMPLETED)
-    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to AND s.status IN ('CONFIRMED', 'COMPLETED')")
+    // 이번 달 수업 수 (CONFIRMED + COMPLETED, PT만)
+    @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date BETWEEN :from AND :to AND s.status IN ('CONFIRMED', 'COMPLETED') AND s.sessionType = 'PT'")
     int countMonthSessions(@Param("trainer") Trainer trainer,
                            @Param("from") java.time.LocalDate from,
                            @Param("to") java.time.LocalDate to);
@@ -237,9 +237,21 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("SELECT COUNT(s) FROM Schedule s WHERE s.trainer = :trainer AND s.date = :date AND s.status = 'CONFIRMED'")
     long countConfirmedByTrainerAndDate(@Param("trainer") Trainer trainer, @Param("date") java.time.LocalDate date);
 
-    // 연동 회원 해제 시 미완료 스케줄만 삭제 (COMPLETED·NO_SHOW는 통계용으로 유지)
+    // 연동 회원 해제 시 OPEN/REQUESTED 스케줄만 삭제 (CONFIRMED·COMPLETED·NO_SHOW는 유지)
     @Transactional
     @Modifying
-    @Query("DELETE FROM Schedule s WHERE s.member = :member AND s.status NOT IN ('COMPLETED', 'NO_SHOW')")
+    @Query("DELETE FROM Schedule s WHERE s.member = :member AND s.status IN ('OPEN', 'REQUESTED')")
     void deleteByMember(@Param("member") Member member);
+
+    // 연동 회원 해제 시 CONFIRMED·COMPLETED·NO_SHOW 스케줄에서 회원 참조만 해제
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member AND s.status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')")
+    void detachMemberFromRecordedSchedules(@Param("member") Member member);
+
+    // 미연동 회원 삭제 시 스케줄에서 회원 참조만 해제 (스케줄 유지)
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Schedule s SET s.manualMember = null WHERE s.manualMember = :manualMember")
+    void detachManualMemberFromSchedules(@Param("manualMember") ManualMember manualMember);
 }

@@ -24,19 +24,22 @@ public class MemberDeleteService {
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final ScheduleRepository scheduleRepository;
     private final NotificationRepository notificationRepository;
+    private final MemberDataCleanupService memberDataCleanupService;
 
     public MemberDeleteService(JwtService jwtService,
                                MemberRepository memberRepository,
                                UserRepository userRepository,
                                ScheduleRequestRepository scheduleRequestRepository,
                                ScheduleRepository scheduleRepository,
-                               NotificationRepository notificationRepository) {
+                               NotificationRepository notificationRepository,
+                               MemberDataCleanupService memberDataCleanupService) {
         this.jwtService = jwtService;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.scheduleRequestRepository = scheduleRequestRepository;
         this.scheduleRepository = scheduleRepository;
         this.notificationRepository = notificationRepository;
+        this.memberDataCleanupService = memberDataCleanupService;
     }
 
     // 탈퇴 처리: deletedAt만 기록하고 데이터는 보존 (7일 후 스케줄러가 개인정보 삭제)
@@ -86,17 +89,8 @@ public class MemberDeleteService {
         User user = member.getUser();
         Long userId = user.getId();
 
-        // 1. 미래 수업 신청 취소 및 슬롯 정리
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.util.List<com.fitlog.fitlog.schedule.entity.Schedule> futureSchedules =
-                scheduleRepository.findFutureSchedulesByMember(member, today);
-        if (!futureSchedules.isEmpty()) {
-            java.util.List<Long> futureIds = futureSchedules.stream()
-                    .map(com.fitlog.fitlog.schedule.entity.Schedule::getId)
-                    .toList();
-            scheduleRequestRepository.deleteByScheduleIds(futureIds);
-            scheduleRepository.deleteAll(futureSchedules);
-        }
+        // 1. 데이터 정리 (PT/확정스케줄 제외 전부 삭제)
+        memberDataCleanupService.cleanupMemberData(member);
         scheduleRequestRepository.deleteAll(scheduleRequestRepository.findNonCompletedByMember(member));
 
         // 2. 알림 삭제 (개인 식별 정보이므로 제거)
