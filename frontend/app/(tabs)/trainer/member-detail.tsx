@@ -1259,9 +1259,9 @@ export default function MemberDetailScreen() {
   const [loading, setLoading] = useState(true);
   // 현재 렌더링 중인 memberId 추적 — 이전 회원 데이터가 노출되는 것 방지
   const [renderedMemberId, setRenderedMemberId] = useState<number>(memberId);
-  // 미연동 회원은 운동로그 탭(1)에서 시작
+  // 연동 회원은 운동로그 탭(0)에서 시작, 미연동 회원도 운동로그 탭(0)에서 시작
   const [tab, setTab] = useState(
-    initialTab ? Number(initialTab) : type === "manual" ? 1 : 0,
+    initialTab ? Number(initialTab) : 0,
   );
   const [selectedDate, setSelectedDate] = useState(() =>
     notifDate ? parseDateStr(notifDate) : new Date(),
@@ -2224,9 +2224,9 @@ export default function MemberDetailScreen() {
     }
   }, [notifDate]);
 
-  // 탭 전환 시 운동/바디만 처리
+  // 탭 전환 시 데이터 로드 (운동=0, 식단=1, 바디=2)
   useEffect(() => {
-    if (tab === 1) {
+    if (tab === 0) {
       if (!didLoadWorkoutRef.current) {
         didLoadWorkoutRef.current = true;
         fetchFitLogs();
@@ -2239,14 +2239,14 @@ export default function MemberDetailScreen() {
 
   // 식단 탭: 날짜 변경 시 사진 조회
   useEffect(() => {
-    if (tab === 0) {
+    if (tab === 1) {
       fetchDietPhotos();
     }
   }, [tab, selectedDate, memberId]);
 
   // 운동 탭: 주 변경 시만
   useEffect(() => {
-    if (tab !== 1 || !didLoadWorkoutRef.current) return;
+    if (tab !== 0 || !didLoadWorkoutRef.current) return;
     fetchFitLogs();
     fetchWeekDietDates();
   }, [weekOffset]);
@@ -2332,7 +2332,17 @@ export default function MemberDetailScreen() {
 
     const formData = new FormData();
     const filename = uploadUri.split("/").pop() ?? "upload";
-    const mimeType = type === "video" ? "video/mp4" : "image/jpeg";
+
+    // 파일 확장자로 실제 mimeType 판별 (iPhone .mov / Android .mp4 등 대응)
+    let mimeType: string;
+    if (type === "video") {
+      const ext = filename.split(".").pop()?.toLowerCase();
+      if (ext === "mov") mimeType = "video/quicktime";
+      else if (ext === "hevc") mimeType = "video/hevc";
+      else mimeType = "video/mp4";
+    } else {
+      mimeType = "image/jpeg";
+    }
 
     formData.append("file", {
       uri: uploadUri,
@@ -2348,7 +2358,10 @@ export default function MemberDetailScreen() {
       { method: "POST", body: formData },
     );
 
-    if (!res.ok) throw new Error("Cloudinary 업로드 실패");
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error?.message ?? "Cloudinary 업로드 실패");
+    }
     const data = await res.json();
     return {
       url: data.secure_url,
@@ -2374,7 +2387,12 @@ export default function MemberDetailScreen() {
       return;
     }
 
-    const addAsset = (asset: any) => {
+    const addAsset = async (asset: any) => {
+      // 파일 크기 100MB 초과 시 경고 (Cloudinary 무료 플랜 제한)
+      if (asset.fileSize && asset.fileSize > 100 * 1024 * 1024) {
+        Alert.alert("파일 크기 초과", "영상 파일이 100MB를 초과해요. 더 짧은 영상을 선택해주세요.");
+        return;
+      }
       const u = [...exercises];
       u[exerciseIndex].mediaFiles = [
         ...u[exerciseIndex].mediaFiles,
@@ -4236,7 +4254,7 @@ export default function MemberDetailScreen() {
         {isManual ? (
           <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
             {[
-              { label: "운동로그", idx: 1 },
+              { label: "운동로그", idx: 0 },
               { label: "바디로그", idx: 2 },
             ].map(({ label, idx }) => (
               <TouchableOpacity
@@ -4266,7 +4284,7 @@ export default function MemberDetailScreen() {
           </View>
         ) : (
           <View style={{ flexDirection: "row", gap: 6, marginBottom: 16 }}>
-            {["식단로그", "운동로그", "바디로그"].map((t, i) => (
+            {["운동로그", "식단로그", "바디로그"].map((t, i) => (
               <TouchableOpacity
                 key={i}
                 onPress={() => setTab(i)}
@@ -4295,7 +4313,7 @@ export default function MemberDetailScreen() {
         )}
 
         {/* ── 식단 탭 — 미연동 회원은 표시 안 함 ── */}
-        {tab === 0 && !isManual && (
+        {tab === 1 && !isManual && (
           <View>
             {/* 주간 캘린더 */}
             <WeekCalendar />
@@ -4471,7 +4489,7 @@ export default function MemberDetailScreen() {
         )}
 
         {/* ── 운동 탭 ── */}
-        {tab === 1 && (
+        {tab === 0 && (
           <View>
             <WeekCalendar />
 
