@@ -1548,7 +1548,7 @@ export default function TrainerMembersScreen() {
 
       {/* ── 업그레이드 바텀시트 (비활성화 - 전체 무료 제공 중) ──────────────────────────────────────────── */}
       <Modal
-        visible={false}
+        visible={paymentVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setPaymentVisible(false)}
