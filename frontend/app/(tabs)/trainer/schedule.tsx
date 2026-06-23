@@ -290,6 +290,8 @@ export default function TrainerScheduleScreen() {
   const DAYS_KR = weekStartDay === 0 ? DAYS_KR_SUN : DAYS_KR_MON;
 
   const yearMonthStr = `${viewYear}-${String(viewMonth).padStart(2, "0")}`;
+  // 주간 뷰가 두 달에 걸칠 때 두 번째 달
+  const [secondYearMonthStr, setSecondYearMonthStr] = useState<string | null>(null);
   const dateKey = toDateKey(selectedDate);
   const activeRange = getActiveRange(weekStartDay);
 
@@ -329,7 +331,11 @@ export default function TrainerScheduleScreen() {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
 
-        const [calRes, memoRes, slotSettingsRes, profileRes] =
+        const extraFetch = secondYearMonthStr
+          ? fetch(`${API_URL}/api/schedule/calendar/month?yearMonth=${secondYearMonthStr}`, { headers })
+          : Promise.resolve(null);
+
+        const [calRes, memoRes, slotSettingsRes, profileRes, calRes2] =
           await Promise.all([
             fetch(
               `${API_URL}/api/schedule/calendar/month?yearMonth=${yearMonthStr}`,
@@ -340,6 +346,7 @@ export default function TrainerScheduleScreen() {
             }),
             fetch(`${API_URL}/api/trainer/slot-settings`, { headers }),
             fetch(`${API_URL}/api/profile/trainer`, { headers }),
+            extraFetch,
           ]);
         if (profileRes?.ok) {
           const profileData = await profileRes.json();
@@ -352,7 +359,9 @@ export default function TrainerScheduleScreen() {
 
         if (calRes.ok) {
           const fetched = await calRes.json();
-          setSlots(fetched.filter((s: any) => !cancelledIdsRef.current.has(s.id)));
+          const extra = calRes2?.ok ? await calRes2.json() : [];
+          const merged = [...fetched, ...extra];
+          setSlots(merged.filter((s: any) => !cancelledIdsRef.current.has(s.id)));
           hasLoadedRef.current = true;
         }
         if (memoRes?.ok) {
@@ -387,7 +396,7 @@ export default function TrainerScheduleScreen() {
         setRefreshing(false);
       }
     },
-    [yearMonthStr],
+    [yearMonthStr, secondYearMonthStr],
   );
 
   useFocusEffect(
@@ -398,6 +407,14 @@ export default function TrainerScheduleScreen() {
         setViewYear(now.getFullYear());
         setViewMonth(now.getMonth() + 1);
         setWeekOffset(0);
+        setSecondYearMonthStr(null);
+      }
+      // 현재 주가 두 달에 걸치는지 확인
+      const weekDates = getWeekDatesForOffset(0);
+      const monthSet = new Set(weekDates.map((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`));
+      if (monthSet.size > 1) {
+        const months = [...monthSet];
+        setSecondYearMonthStr(months[1]);
       }
       dateNavRef.current = false;
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
@@ -507,18 +524,24 @@ export default function TrainerScheduleScreen() {
       tension: 60,
       friction: 12,
     }).start(() => weekSlideX.setValue(0));
-    // 주 중 가장 많은 날이 속한 달로 viewMonth 업데이트
+    // 주 중 가장 많은 날이 속한 달로 viewMonth 업데이트, 두 달에 걸치면 secondYearMonthStr 설정
     const dates = getWeekDatesForOffset(newOffset);
     const monthCount: Record<string, number> = {};
     dates.forEach((d) => {
-      const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       monthCount[key] = (monthCount[key] ?? 0) + 1;
     });
-    const [dominantKey] = Object.entries(monthCount).sort((a, b) => b[1] - a[1])[0];
+    const sorted = Object.entries(monthCount).sort((a, b) => b[1] - a[1]);
+    const dominantKey = sorted[0][0];
     const [dy, dm] = dominantKey.split("-").map(Number);
     if (dy !== viewYear || dm !== viewMonth) {
       setViewYear(dy);
       setViewMonth(dm);
+    }
+    if (sorted.length > 1) {
+      setSecondYearMonthStr(sorted[1][0]);
+    } else {
+      setSecondYearMonthStr(null);
     }
   };
   goWeekRef.current = goWeek;
