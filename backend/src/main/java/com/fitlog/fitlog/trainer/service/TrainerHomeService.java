@@ -142,14 +142,16 @@ public class TrainerHomeService {
         List<Schedule> todaySchedules = scheduleRepository.findTodayPtWithMember(trainer, today);
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm");
         List<TrainerHomeResponse.TodayPt> todayPtList = todaySchedules.stream()
-                .filter(s -> s.getMember() != null || s.getManualMember() != null)
+                .filter(s -> s.getMember() != null || s.getManualMember() != null || s.getMemberName() != null)
                 .map(s -> {
                     boolean isManual = s.getMember() == null && s.getManualMember() != null;
-                    Long id = isManual ? s.getManualMember().getId() : s.getMember().getId();
-                    String name = isManual ? s.getManualMember().getName() : s.getMember().getUser().getName();
-                    int remaining = isManual
+                    boolean isDeleted = s.getMember() == null && s.getManualMember() == null;
+                    Long id = isDeleted ? null : (isManual ? s.getManualMember().getId() : s.getMember().getId());
+                    String name = isDeleted ? (s.getMemberName() != null ? s.getMemberName() : "탈퇴 회원")
+                            : (isManual ? s.getManualMember().getName() : s.getMember().getUser().getName());
+                    int remaining = isDeleted ? 0 : (isManual
                             ? (s.getManualMember().getPtRemaining() != null ? s.getManualMember().getPtRemaining() : 0)
-                            : (s.getMember().getPtRemaining() != null ? s.getMember().getPtRemaining() : 0);
+                            : (s.getMember().getPtRemaining() != null ? s.getMember().getPtRemaining() : 0));
                     String sessionType = s.getSessionType() != null ? s.getSessionType() : "PT";
                     int otSessionCount = "OT".equals(sessionType) && isManual && s.getManualMember() != null
                             ? scheduleRepository.countOtSessionsBefore(s.getManualMember(), s.getDate(), s.getStartTime()) + 1

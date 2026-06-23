@@ -128,6 +128,12 @@ public class ScheduleService {
                 map.put("manualMemberId", s.getManualMember().getId());
                 map.put("ptRemaining",    s.getManualMember().getPtRemaining());
                 map.put("ptTotal",        s.getManualMember().getPtTotal());
+            } else if (s.getMemberName() != null) {
+                map.put("memberName", s.getMemberName());
+                map.put("deleted", true);
+            } else {
+                map.put("memberName", "탈퇴 회원");
+                map.put("deleted", true);
             }
             return map;
 
@@ -175,6 +181,12 @@ public class ScheduleService {
                 map.put("isManual",       true);
                 map.put("ptRemaining",    s.getManualMember().getPtRemaining());
                 map.put("ptTotal",        s.getManualMember().getPtTotal());
+            } else if (s.getMemberName() != null) {
+                map.put("memberName", s.getMemberName());
+                map.put("deleted", true);
+            } else {
+                map.put("memberName", "탈퇴 회원");
+                map.put("deleted", true);
             }
             return map;
         }).collect(Collectors.toList());
@@ -276,6 +288,7 @@ public class ScheduleService {
                     .orElseThrow(() -> new RuntimeException("미연동 회원 없음"));
             schedule.setManualMember(manual);
             schedule.setMember(null);
+            schedule.setMemberName(manual.getName());
             scheduleRepository.save(schedule);
             // (SOLAPI 제거 — 카카오 공유하기로 대체)
         } else {
@@ -284,6 +297,7 @@ public class ScheduleService {
                     .orElseThrow(() -> new RuntimeException("회원 없음"));
             schedule.setMember(member);
             schedule.setManualMember(null);
+            schedule.setMemberName(member.getUser().getName());
             scheduleRepository.save(schedule);
 
             if (member.getNotifSchedule()) {

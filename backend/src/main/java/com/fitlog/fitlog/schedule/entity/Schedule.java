@@ -53,6 +53,10 @@ public class Schedule {
     @Column(name = "note", length = 200)
     private String note;
 
+    // 회원 탈퇴/해제 후에도 이름 보존
+    @Column(name = "member_name", length = 100)
+    private String memberName;
+
     @JsonIgnore
     @OneToMany(mappedBy = "schedule", fetch = FetchType.LAZY)
     private List<ScheduleRequest> requests;
@@ -89,5 +93,7 @@ public class Schedule {
     public void setSessionType(String sessionType) { this.sessionType = sessionType; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public String getMemberName() { return memberName; }
+    public void setMemberName(String memberName) { this.memberName = memberName; }
 
 }

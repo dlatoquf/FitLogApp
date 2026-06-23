@@ -3,9 +3,9 @@ import { router } from "expo-router";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
+import * as ExpoClipboard from "expo-clipboard";
 import {
   Alert,
-  Clipboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -414,7 +414,7 @@ export default function TrainerMoreScreen() {
   };
 
   const copyCode = () => {
-    Clipboard.setString(profile?.trainerCode ?? "");
+    ExpoClipboard.setStringAsync(profile?.trainerCode ?? "");
     Alert.alert("복사 완료", `트레이너 코드 ${profile?.trainerCode}가 복사됐어요.`);
   };
 
@@ -834,7 +834,7 @@ export default function TrainerMoreScreen() {
               onPress={() => setShowEditModal(false)}
             />
             <GestureDetector
-              gesture={Gesture.Pan().onEnd((e) => {
+              gesture={Gesture.Pan().runOnJS(true).onEnd((e) => {
                 if (e.translationY > 60) setShowEditModal(false);
               })}
             >
@@ -1436,7 +1436,7 @@ export default function TrainerMoreScreen() {
               onPress={() => setInquiryVisible(false)}
             />
             <GestureDetector
-              gesture={Gesture.Pan().onEnd((e) => {
+              gesture={Gesture.Pan().runOnJS(true).onEnd((e) => {
                 if (e.translationY > 60) setInquiryVisible(false);
               })}
             >

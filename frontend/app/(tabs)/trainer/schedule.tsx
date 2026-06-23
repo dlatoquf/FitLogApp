@@ -641,16 +641,7 @@ export default function TrainerScheduleScreen() {
       setAddModal(false);
       setPtNote("");
       cancelledIdsRef.current.clear();
-      // 추가한 날짜가 현재 보는 월과 다르면 viewMonth 업데이트 (useEffect가 fetchAll 트리거)
-      const slotDateObj = new Date(addingSlot.date);
-      const slotY = slotDateObj.getFullYear();
-      const slotM = slotDateObj.getMonth() + 1;
-      if (slotY !== viewYear || slotM !== viewMonth) {
-        setViewYear(slotY);
-        setViewMonth(slotM);
-      } else {
-        fetchAll();
-      }
+      fetchAll();
       Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
@@ -693,21 +684,7 @@ export default function TrainerScheduleScreen() {
       setManualModal(false);
       setPtNote("");
       cancelledIdsRef.current.clear();
-      // 추가된 날짜 중 현재 viewMonth와 다른 달이 있으면 그 달로 업데이트
-      const lastDate = succeeded[succeeded.length - 1] ?? dates[0];
-      if (lastDate) {
-        const ld = new Date(lastDate);
-        const ly = ld.getFullYear();
-        const lm = ld.getMonth() + 1;
-        if (ly !== viewYear || lm !== viewMonth) {
-          setViewYear(ly);
-          setViewMonth(lm);
-        } else {
-          fetchAll();
-        }
-      } else {
-        fetchAll();
-      }
+      fetchAll();
       if (failed.length === 0) {
         const suffix = dates.length > 1 ? ` ${dates.length}일 일정이` : " 수업이";
         Alert.alert("완료 ✓", `${m.name}님${suffix} 추가됐어요!`);
@@ -2569,9 +2546,9 @@ export default function TrainerScheduleScreen() {
                         if (isIncomplete) return true;
                         return m.name.includes(memberSearchQuery);
                       });
-                    // FREE 플랜: 잔여 적은 순 5명만 unlock
+                    // FREE 플랜: 잔여 적은 순 5명만 unlock (0 포함 전체 기준)
                     const freeUnlockedIds = plan === "FREE"
-                      ? new Set([...members].filter((m: any) => (m.ptRemaining ?? 0) > 0).sort((a: any, b: any) => a.ptRemaining - b.ptRemaining).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
+                      ? new Set([...members].sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0)).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
                       : null;
                     return filtered.map((m: any, idx: number, arr: any[]) => {
                       const key = `${m.isManual ? "manual" : "linked"}-${m.id}`;
@@ -3097,7 +3074,7 @@ export default function TrainerScheduleScreen() {
                       })
                       .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"));
                     const freeUnlockedIds = plan === "FREE"
-                      ? new Set([...members].filter((m: any) => (m.ptRemaining ?? 0) > 0).sort((a: any, b: any) => a.ptRemaining - b.ptRemaining).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
+                      ? new Set([...members].sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0)).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
                       : null;
                     return filtered.map((m: any, idx: number, arr: any[]) => {
                       const key = `${m.isManual ? "manual" : "linked"}-${m.id}`;
@@ -3387,7 +3364,7 @@ export default function TrainerScheduleScreen() {
                     <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>원/월</Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>{"✓ 회원 무제한\n(무료 플랜: 최대 5명)"}</Text>
+                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>{"✓ 회원 무제한"}</Text>
                 <TouchableOpacity
                   onPress={async () => {
                     try {
