@@ -485,6 +485,10 @@ export default function TrainerMembersScreen() {
             {/* 회원 추가 버튼 */}
             <TouchableOpacity
               onPress={() => {
+                if (plan === "FREE" && activeMembers.length >= 5) {
+                  setPaymentVisible(true);
+                  return;
+                }
                 setAddName("");
                 setAddPhone("");
                 setAddPt("");
@@ -493,7 +497,7 @@ export default function TrainerMembersScreen() {
                 setAddModal(true);
               }}
               style={{
-                backgroundColor: Colors.bgSub,
+                backgroundColor: plan === "FREE" && activeMembers.length >= 5 ? "#F3F4F6" : Colors.bgSub,
                 borderRadius: 8,
                 paddingHorizontal: 10,
                 paddingVertical: 6,
@@ -501,25 +505,13 @@ export default function TrainerMembersScreen() {
                 alignItems: "center",
                 gap: 3,
                 borderWidth: 1,
-                borderColor: Colors.border,
+                borderColor: plan === "FREE" && activeMembers.length >= 5 ? "#E5E7EB" : Colors.border,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textSub,
-                  fontWeight: "700",
-                }}
-              >
-                +
+              <Text style={{ fontSize: 13, color: plan === "FREE" && activeMembers.length >= 5 ? "#9CA3AF" : Colors.textSub, fontWeight: "700" }}>
+                {plan === "FREE" && activeMembers.length >= 5 ? "🔒" : "+"}
               </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textSub,
-                  fontWeight: "600",
-                }}
-              >
+              <Text style={{ fontSize: 12, color: plan === "FREE" && activeMembers.length >= 5 ? "#9CA3AF" : Colors.textSub, fontWeight: "600" }}>
                 기존 회원 추가
               </Text>
             </TouchableOpacity>
