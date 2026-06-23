@@ -3075,32 +3075,45 @@ export default function TrainerScheduleScreen() {
                     style={{ flex: 1, fontSize: 13, color: Colors.text, paddingVertical: 0 }}
                   />
                 </View>
+                {/* FREE 5명 제한 안내 */}
+                {plan === "FREE" && (
+                  <TouchableOpacity onPress={() => { setManualModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
+                    <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
+                  </TouchableOpacity>
+                )}
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   style={{ maxHeight: 260 }}
                 >
-                  {[...members]
-                    .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .filter((m: any) => {
-                      if (!memberSearchQuery) return true;
-                      // 자음/모음 단독 입력(미완성 음절)이면 필터링 건너뜀
-                      const isIncomplete = /^[ㄱ-ㅎㅏ-ㅣ]+$/.test(memberSearchQuery);
-                      if (isIncomplete) return true;
-                      return m.name.includes(memberSearchQuery);
-                    })
-                    .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
-                    .map((m: any, idx: number, arr: any[]) => (
+                  {(() => {
+                    const filtered = [...members]
+                      .filter((m: any) => (m.ptRemaining ?? 0) > 0)
+                      .filter((m: any) => {
+                        if (!memberSearchQuery) return true;
+                        const isIncomplete = /^[ㄱ-ㅎㅏ-ㅣ]+$/.test(memberSearchQuery);
+                        if (isIncomplete) return true;
+                        return m.name.includes(memberSearchQuery);
+                      })
+                      .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"));
+                    const freeUnlockedIds = plan === "FREE"
+                      ? new Set([...members].filter((m: any) => (m.ptRemaining ?? 0) > 0).sort((a: any, b: any) => a.ptRemaining - b.ptRemaining).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
+                      : null;
+                    return filtered.map((m: any, idx: number, arr: any[]) => {
+                      const key = `${m.isManual ? "manual" : "linked"}-${m.id}`;
+                      const locked = freeUnlockedIds !== null && !freeUnlockedIds.has(key);
+                      return (
                       <TouchableOpacity
-                        key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
-                        onPress={() => addManualSchedule(m)}
-                        disabled={addingManual}
+                        key={key}
+                        onPress={() => { if (locked) { setManualModal(false); setTimeout(() => setPaymentVisible(true), 350); } else { addManualSchedule(m); } }}
+                        disabled={addingManual && !locked}
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
                           paddingVertical: 12,
                           borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
                           borderBottomColor: Colors.border,
-                          opacity: addingManual ? 0.5 : 1,
+                          opacity: (addingManual && !locked) ? 0.5 : 1,
                         }}
                       >
                         <View
@@ -3167,13 +3180,15 @@ export default function TrainerScheduleScreen() {
                           style={{
                             fontSize: 13,
                             fontWeight: "700",
-                            color: Colors.green,
+                            color: locked ? Colors.textMuted : Colors.green,
                           }}
                         >
-                          {addingManual ? "..." : "추가"}
+                          {locked ? "🔒" : addingManual ? "..." : "추가"}
                         </Text>
                       </TouchableOpacity>
-                    ))}
+                      );
+                    });
+                  })()}
                 </ScrollView>
               </>
             )}
