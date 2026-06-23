@@ -24,6 +24,7 @@ import com.fitlog.fitlog.member.repository.PtContractRepository;
 import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.entity.Trainer;
+import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
 import com.fitlog.fitlog.trainer.repository.MemberMemoRepository;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
@@ -41,6 +42,7 @@ public class ManualMemberController {
     private final MemberMemoRepository memberMemoRepository;
     private final ScheduleRepository scheduleRepository;
     private final ManualBodyLogRepository manualBodyLogRepository;
+    private final MemberRepository memberRepository;
 
     public ManualMemberController(ManualMemberRepository manualMemberRepository,
                                    TrainerRepository trainerRepository,
@@ -49,7 +51,8 @@ public class ManualMemberController {
                                    WorkoutLogRepository workoutLogRepository,
                                    MemberMemoRepository memberMemoRepository,
                                    ScheduleRepository scheduleRepository,
-                                   ManualBodyLogRepository manualBodyLogRepository) {
+                                   ManualBodyLogRepository manualBodyLogRepository,
+                                   MemberRepository memberRepository) {
         this.manualMemberRepository = manualMemberRepository;
         this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
@@ -58,6 +61,7 @@ public class ManualMemberController {
         this.memberMemoRepository = memberMemoRepository;
         this.scheduleRepository = scheduleRepository;
         this.manualBodyLogRepository = manualBodyLogRepository;
+        this.memberRepository = memberRepository;
     }
 
     // 미연동 회원 목록 조회 (OT 회원 제외 — OT는 체험 회원으로 별도 관리)
@@ -110,7 +114,7 @@ public class ManualMemberController {
         boolean isOtNew = "OT".equals(body.get("memo"));
         if (!isOtNew && !trainer.isProEffective()) {
             long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer)
-                    + trainer.getMembers().size();
+                    + memberRepository.countByTrainer(trainer);
             if (nonOtCount >= 5) {
                 return ResponseEntity.status(403).body(null);
             }
