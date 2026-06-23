@@ -110,8 +110,12 @@ export default function TrainerMembersScreen() {
         fetch(`${API_URL}/api/trainer/home`, { headers }),
       ]);
 
-      // 전체 무료 제공 중 - plan 항상 PRO
-      setPlan("PRO");
+      if (homeRes.ok) {
+        const homeData = await homeRes.json();
+        const p = (homeData?.plan ?? "FREE").toUpperCase();
+        setPlan(p === "PRO" ? "PRO" : "FREE");
+        setTrialEndDate(homeData?.trialEndDate ?? null);
+      }
 
       const linked: DisplayMember[] = linkedRes.ok
         ? (await linkedRes.json()).map((m: any) => ({
@@ -376,6 +380,19 @@ export default function TrainerMembersScreen() {
 
   // 메인 목록: 활성 회원만
   const activeMembers = allMembers.filter((m) => !isInactive(m));
+
+  // FREE 플랜: 잔여 적은순으로 정렬 후 5명까지만 활성, 나머지 잠금
+  const freeUnlockedKeys = plan === "FREE"
+    ? new Set(
+        [...activeMembers]
+          .sort((a, b) => a.ptRemaining - b.ptRemaining)
+          .slice(0, 5)
+          .map((m) => m.key)
+      )
+    : null;
+
+  const isLocked = (m: { key: string }) =>
+    freeUnlockedKeys !== null && !freeUnlockedKeys.has(m.key);
 
   const displayed = activeMembers
     .filter((m) => {
@@ -689,23 +706,25 @@ export default function TrainerMembersScreen() {
           displayed.map((m, index) => {
             const color = ptColor(m.ptRemaining, m.ptTotal);
             const graceDaysLeft = ptGraceDaysLeft(m);
+            const locked = isLocked(m);
 
             return (
             <React.Fragment key={m.key}>
               <View
                 style={{
                   flexDirection: "row",
-                  backgroundColor: "#fff",
+                  backgroundColor: locked ? "#F9FAFB" : "#fff",
                   borderRadius: 10,
                   marginBottom: 6,
                   borderWidth: 1,
-                  borderColor: Colors.border,
+                  borderColor: locked ? "#E5E7EB" : Colors.border,
                   overflow: "hidden",
                 }}
               >
-                {/* 왼쪽: 회원상세로 이동 */}
+                {/* 왼쪽: 회원상세로 이동 (잠금 시 결제 모달) */}
                 <TouchableOpacity
                   onPress={() => {
+                    if (locked) { setPaymentVisible(true); return; }
                     if (m.isLinked) {
                       router.push(`/(tabs)/trainer/member-detail?id=${m.id}` as any);
                     } else {
@@ -715,58 +734,73 @@ export default function TrainerMembersScreen() {
                   style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 12 }}
                 >
                   {/* 아바타 */}
-                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center", marginRight: 10 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>{m.name[0]}</Text>
+                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: locked ? "#D1D5DB" : Colors.green, justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                    {locked
+                      ? <Text style={{ fontSize: 16 }}>🔒</Text>
+                      : <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>{m.name[0]}</Text>
+                    }
                   </View>
 
                   {/* 이름 + 뱃지 + 메모 미리보기 */}
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>{m.name}</Text>
-                      {!m.isLinked && (
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: locked ? Colors.textMuted : Colors.text }}>{m.name}</Text>
+                      {!m.isLinked && !locked && (
                         <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "33" }}>
                           <Text style={{ fontSize: 9, fontWeight: "700", color: Colors.green + "AA" }}>미연동</Text>
                         </View>
                       )}
+                      {locked && (
+                        <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#9CA3AF" }}>PRO</Text>
+                        </View>
+                      )}
                     </View>
-                    {m.latestMemo ? (
+                    {!locked && m.latestMemo ? (
                       <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
                         {m.latestMemo.length > 18 ? m.latestMemo.slice(0, 18) + "..." : m.latestMemo}
                       </Text>
                     ) : null}
+                    {locked && (
+                      <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>PRO로 업그레이드하면 열려요</Text>
+                    )}
                   </View>
 
                   {/* PT 잔여 */}
-                  <View style={{ alignItems: "center", minWidth: 44 }}>
-                    {m.ptTotal > 0 ? (
-                      <>
-                        <Text style={{ fontSize: 20, fontWeight: "900", color }}>{m.ptRemaining}</Text>
-                        <Text style={{ fontSize: 10, color: Colors.textMuted }}>/ {m.ptTotal}회</Text>
-                      </>
-                    ) : (
-                      <View style={{ backgroundColor: Colors.goldBg, borderWidth: 1, borderColor: Colors.gold + "44", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                        <Text style={{ fontSize: 10, color: Colors.gold, fontWeight: "700" }}>미등록</Text>
-                      </View>
-                    )}
-                  </View>
+                  {!locked && (
+                    <View style={{ alignItems: "center", minWidth: 44 }}>
+                      {m.ptTotal > 0 ? (
+                        <>
+                          <Text style={{ fontSize: 20, fontWeight: "900", color }}>{m.ptRemaining}</Text>
+                          <Text style={{ fontSize: 10, color: Colors.textMuted }}>/ {m.ptTotal}회</Text>
+                        </>
+                      ) : (
+                        <View style={{ backgroundColor: Colors.goldBg, borderWidth: 1, borderColor: Colors.gold + "44", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, color: Colors.gold, fontWeight: "700" }}>미등록</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </TouchableOpacity>
 
-                {/* 오른쪽: 메모 칸 (완전히 분리) */}
-                <TouchableOpacity
-                  onPress={() => openMemos(m)}
-                  style={{
-                    width: 46,
-                    borderLeftWidth: 1,
-                    borderLeftColor: Colors.border,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {m.latestMemo ? (
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 3 }} />
-                  ) : null}
-                  <Text style={{ fontSize: 10, fontWeight: "700", color: m.latestMemo ? Colors.green : Colors.textMuted }}>메모</Text>
-                </TouchableOpacity>
+                {/* 오른쪽: 메모 칸 (잠금 시 숨김) */}
+                {!locked && (
+                  <TouchableOpacity
+                    onPress={() => openMemos(m)}
+                    style={{
+                      width: 46,
+                      borderLeftWidth: 1,
+                      borderLeftColor: Colors.border,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {m.latestMemo ? (
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 3 }} />
+                    ) : null}
+                    <Text style={{ fontSize: 10, fontWeight: "700", color: m.latestMemo ? Colors.green : Colors.textMuted }}>메모</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </React.Fragment>
             );
