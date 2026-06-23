@@ -507,14 +507,18 @@ export default function TrainerScheduleScreen() {
       tension: 60,
       friction: 12,
     }).start(() => weekSlideX.setValue(0));
-    // 주가 다른 달로 넘어가면 viewMonth도 업데이트
+    // 주 중 가장 많은 날이 속한 달로 viewMonth 업데이트
     const dates = getWeekDatesForOffset(newOffset);
-    const monday = dates[0];
-    const y = monday.getFullYear();
-    const m = monday.getMonth() + 1;
-    if (y !== viewYear || m !== viewMonth) {
-      setViewYear(y);
-      setViewMonth(m);
+    const monthCount: Record<string, number> = {};
+    dates.forEach((d) => {
+      const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+      monthCount[key] = (monthCount[key] ?? 0) + 1;
+    });
+    const [dominantKey] = Object.entries(monthCount).sort((a, b) => b[1] - a[1])[0];
+    const [dy, dm] = dominantKey.split("-").map(Number);
+    if (dy !== viewYear || dm !== viewMonth) {
+      setViewYear(dy);
+      setViewMonth(dm);
     }
   };
   goWeekRef.current = goWeek;
@@ -614,7 +618,16 @@ export default function TrainerScheduleScreen() {
       setAddModal(false);
       setPtNote("");
       cancelledIdsRef.current.clear();
-      fetchAll();
+      // 추가한 날짜가 현재 보는 월과 다르면 viewMonth 업데이트 (useEffect가 fetchAll 트리거)
+      const slotDateObj = new Date(addingSlot.date);
+      const slotY = slotDateObj.getFullYear();
+      const slotM = slotDateObj.getMonth() + 1;
+      if (slotY !== viewYear || slotM !== viewMonth) {
+        setViewYear(slotY);
+        setViewMonth(slotM);
+      } else {
+        fetchAll();
+      }
       Alert.alert("완료 ✓", `${m.name}님 수업이 추가됐어요!`);
     } catch (e: any) {
       Alert.alert("오류", e.message);
@@ -657,7 +670,21 @@ export default function TrainerScheduleScreen() {
       setManualModal(false);
       setPtNote("");
       cancelledIdsRef.current.clear();
-      fetchAll();
+      // 추가된 날짜 중 현재 viewMonth와 다른 달이 있으면 그 달로 업데이트
+      const lastDate = succeeded[succeeded.length - 1] ?? dates[0];
+      if (lastDate) {
+        const ld = new Date(lastDate);
+        const ly = ld.getFullYear();
+        const lm = ld.getMonth() + 1;
+        if (ly !== viewYear || lm !== viewMonth) {
+          setViewYear(ly);
+          setViewMonth(lm);
+        } else {
+          fetchAll();
+        }
+      } else {
+        fetchAll();
+      }
       if (failed.length === 0) {
         const suffix = dates.length > 1 ? ` ${dates.length}일 일정이` : " 수업이";
         Alert.alert("완료 ✓", `${m.name}님${suffix} 추가됐어요!`);
