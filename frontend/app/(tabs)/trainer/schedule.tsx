@@ -2553,7 +2553,7 @@ export default function TrainerScheduleScreen() {
                 </View>
                 {/* FREE 5명 제한 안내 */}
                 {plan === "FREE" && (
-                  <TouchableOpacity onPress={() => setPaymentVisible(true)} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
+                  <TouchableOpacity onPress={() => { setAddModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
                     <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
                   </TouchableOpacity>
@@ -2579,7 +2579,7 @@ export default function TrainerScheduleScreen() {
                       return (
                       <TouchableOpacity
                         key={key}
-                        onPress={() => locked ? setPaymentVisible(true) : addMemberToSlot(m)}
+                        onPress={() => { if (locked) { setAddModal(false); setTimeout(() => setPaymentVisible(true), 350); } else { addMemberToSlot(m); } }}
                         disabled={addingMember && !locked}
                         style={{
                           flexDirection: "row",
