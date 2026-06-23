@@ -21,6 +21,7 @@ import {
   FlatList,
   View,
 } from "react-native";
+import Purchases from "react-native-purchases";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 import { toDateKey } from "../../../hooks/useApi";
@@ -177,6 +178,9 @@ export default function TrainerScheduleScreen() {
   const [addingOt, setAddingOt] = useState(false);
   const [personalNote, setPersonalNote] = useState("");
   const [ptNote, setPtNote] = useState("");
+  const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [paymentVisible, setPaymentVisible] = useState(false);
+  const paymentPanY = useRef(new Animated.Value(0)).current;
   const [editingNoteSlotId, setEditingNoteSlotId] = useState<number | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   const [addingPersonal, setAddingPersonal] = useState(false);
@@ -407,10 +411,16 @@ export default function TrainerScheduleScreen() {
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       const headers = { Authorization: `Bearer ${jwt}` };
-      const [linkedRes, manualRes] = await Promise.all([
+      const [linkedRes, manualRes, homeRes] = await Promise.all([
         fetch(`${API_URL}/api/trainer/members`, { headers }),
         fetch(`${API_URL}/api/trainer/manual-members`, { headers }),
+        fetch(`${API_URL}/api/trainer/home`, { headers }),
       ]);
+      if (homeRes.ok) {
+        const homeData = await homeRes.json();
+        const p = (homeData?.plan ?? "FREE").toUpperCase();
+        setPlan(p === "PRO" ? "PRO" : "FREE");
+      }
       const linked = linkedRes.ok
         ? (await linkedRes.json())
             .map((m: any) => ({
@@ -2305,7 +2315,7 @@ export default function TrainerScheduleScreen() {
                     if (!name) {
                       Alert.alert("오류", "OT 고객 이름을 입력해주세요.");
                       return;
-                    } 
+                    }
                     if (!addingSlot) return;
                     const startT = addingSlot.startTime.slice(0, 5);
                     setAddingOt(true);
@@ -2480,22 +2490,54 @@ export default function TrainerScheduleScreen() {
                     marginBottom: 12,
                   }}
                 />
+                {/* 회원 검색 */}
+                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: Colors.bgSub, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 13, color: Colors.textMuted, marginRight: 6 }}>🔍</Text>
+                  <TextInput
+                    value={memberSearchQuery}
+                    onChangeText={setMemberSearchQuery}
+                    placeholder="회원 검색"
+                    placeholderTextColor={Colors.textMuted}
+                    style={{ flex: 1, fontSize: 13, color: Colors.text, padding: 0 }}
+                  />
+                </View>
+                {/* FREE 5명 제한 안내 */}
+                {plan === "FREE" && (
+                  <TouchableOpacity onPress={() => setPaymentVisible(true)} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
+                    <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
+                  </TouchableOpacity>
+                )}
                 <ScrollView showsVerticalScrollIndicator={false}>
-                  {[...members]
-                    .filter((m: any) => (m.ptRemaining ?? 0) > 0)
-                    .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
-                    .map((m: any, idx: number, arr: any[]) => (
+                  {(() => {
+                    const filtered = [...members]
+                      .filter((m: any) => (m.ptRemaining ?? 0) > 0)
+                      .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"))
+                      .filter((m: any) => {
+                        if (!memberSearchQuery) return true;
+                        const isIncomplete = /^[ㄱ-ㅎㅏ-ㅣ]+$/.test(memberSearchQuery);
+                        if (isIncomplete) return true;
+                        return m.name.includes(memberSearchQuery);
+                      });
+                    // FREE 플랜: 잔여 적은 순 5명만 unlock
+                    const freeUnlockedIds = plan === "FREE"
+                      ? new Set([...members].filter((m: any) => (m.ptRemaining ?? 0) > 0).sort((a: any, b: any) => a.ptRemaining - b.ptRemaining).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
+                      : null;
+                    return filtered.map((m: any, idx: number, arr: any[]) => {
+                      const key = `${m.isManual ? "manual" : "linked"}-${m.id}`;
+                      const locked = freeUnlockedIds !== null && !freeUnlockedIds.has(key);
+                      return (
                       <TouchableOpacity
-                        key={`${m.isManual ? "manual" : "linked"}-${m.id}`}
-                        onPress={() => addMemberToSlot(m)}
-                        disabled={addingMember}
+                        key={key}
+                        onPress={() => locked ? setPaymentVisible(true) : addMemberToSlot(m)}
+                        disabled={addingMember && !locked}
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
                           paddingVertical: 12,
                           borderBottomWidth: idx < arr.length - 1 ? 1 : 0,
                           borderBottomColor: Colors.border,
-                          opacity: addingMember ? 0.5 : 1,
+                          opacity: (addingMember && !locked) ? 0.5 : 1,
                         }}
                       >
                         <View
@@ -2562,13 +2604,15 @@ export default function TrainerScheduleScreen() {
                           style={{
                             fontSize: 13,
                             fontWeight: "700",
-                            color: Colors.green,
+                            color: locked ? Colors.textMuted : Colors.green,
                           }}
                         >
-                          {addingMember ? "..." : "추가"}
+                          {locked ? "🔒" : addingMember ? "..." : "추가"}
                         </Text>
                       </TouchableOpacity>
-                    ))}
+                      );
+                    });
+                  })()}
                 </ScrollView>
               </>
             )}
@@ -3239,6 +3283,91 @@ export default function TrainerScheduleScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
               </TouchableOpacity>
             )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── 업그레이드 바텀시트 ──────────────────────────────────────────── */}
+      <Modal
+        visible={paymentVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentVisible(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setPaymentVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: "#fff",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 28,
+                paddingBottom: 40,
+              }}
+            >
+              <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
+              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>PRO 플랜으로 업그레이드</Text>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 20 }}>
+                {"무료 플랜은 잔여횟수 적은 순 5명만 수업 추가가 가능해요.\nPRO로 업그레이드하면 회원 수 제한이 없어져요."}
+              </Text>
+              <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+                    <Text style={{ fontSize: 26, fontWeight: "900", color: Colors.green }}>14,900</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>원/월</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>{"✓ 회원 무제한\n(무료 플랜: 최대 5명)"}</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      if (!Purchases || typeof Purchases.getOfferings !== "function") {
+                        Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
+                        return;
+                      }
+                      const offerings = await Purchases.getOfferings();
+                      const pkg = offerings.current?.monthly ?? offerings.current?.availablePackages[0];
+                      if (!pkg) { Alert.alert("오류", "구독 상품을 불러오지 못했어요."); return; }
+                      await Purchases.purchasePackage(pkg);
+                      setPlan("PRO");
+                      setPaymentVisible(false);
+                      Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
+                    } catch (e: any) {
+                      if (!e.userCancelled) Alert.alert("결제 실패", e.message ?? "다시 시도해주세요.");
+                    }
+                  }}
+                  style={{ marginTop: 16, backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>시작하기</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    const customerInfo = await Purchases.restorePurchases();
+                    if (customerInfo.entitlements.active["FitLogApp Pro"]) {
+                      setPlan("PRO");
+                      setPaymentVisible(false);
+                      Alert.alert("복원 완료", "구독이 복원됐어요.");
+                    } else {
+                      Alert.alert("복원 없음", "복원할 구독이 없어요.");
+                    }
+                  } catch (e: any) {
+                    Alert.alert("오류", e?.message ?? "복원에 실패했어요.");
+                  }
+                }}
+              >
+                <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>구독 복원하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 12 }} onPress={() => setPaymentVisible(false)}>
+                <Text style={{ textAlign: "center", fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>

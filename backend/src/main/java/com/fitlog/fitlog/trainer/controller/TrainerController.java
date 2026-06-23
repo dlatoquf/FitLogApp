@@ -277,6 +277,7 @@ public class TrainerController {
         }
         member.setStatus(Member.Status.ACTIVE);
         member.setDisconnectedAt(null);
+        member.setPtEndedAt(null);
         memberRepository.save(member);
         return ResponseEntity.ok(Map.of("success", true, "message", member.getUser().getName() + "님이 활성 회원으로 복귀됐어요."));
     }
