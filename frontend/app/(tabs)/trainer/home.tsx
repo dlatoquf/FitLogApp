@@ -3506,11 +3506,12 @@ export default function TrainerHomeScreen() {
           onPress={() => setPaymentVisible(false)}
         >
           <GestureDetector
-            gesture={Gesture.Pan().onEnd((e) => {
+            gesture={Gesture.Pan().runOnJS(true).onEnd((e) => {
               if (e.translationY > 80) setPaymentVisible(false);
             })}
           >
             <View
+              onStartShouldSetResponder={() => true}
               style={{
                 backgroundColor: "#fff",
                 borderTopLeftRadius: 24,

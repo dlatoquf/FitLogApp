@@ -976,6 +976,44 @@ export default function TrainerMembersScreen() {
                           </Text>
                         </View>
                         <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                          {m.isLinked && (
+                            <TouchableOpacity
+                              onPress={async (e) => {
+                                e.stopPropagation();
+                                Alert.alert("회원 복귀", `${m.name}님을 활성 회원으로 복귀시킬까요?`, [
+                                  { text: "취소", style: "cancel" },
+                                  {
+                                    text: "복귀",
+                                    onPress: async () => {
+                                      const jwt = await AsyncStorage.getItem("jwt");
+                                      const res = await fetch(`${API_URL}/api/trainer/members/${m.id}/reactivate`, {
+                                        method: "POST",
+                                        headers: { Authorization: `Bearer ${jwt}` },
+                                      });
+                                      const result = await res.json();
+                                      if (res.ok) {
+                                        Alert.alert("완료", result.message);
+                                        setInactiveModal(false);
+                                        fetchMembers();
+                                      } else {
+                                        Alert.alert("오류", result.message);
+                                      }
+                                    },
+                                  },
+                                ]);
+                              }}
+                              style={{
+                                backgroundColor: Colors.greenLight,
+                                borderRadius: 6,
+                                paddingHorizontal: 7,
+                                paddingVertical: 3,
+                                borderWidth: 1,
+                                borderColor: Colors.green + "44",
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
+                            </TouchableOpacity>
+                          )}
                           <View
                             style={{
                               backgroundColor: "#F3F4F6",
@@ -1092,25 +1130,63 @@ export default function TrainerMembersScreen() {
                             {m.ptTotal > 0 ? ` · 잔여 ${m.ptRemaining}회` : ""}
                           </Text>
                         </View>
-                        <View
-                          style={{
-                            backgroundColor: "#F3F4F6",
-                            borderRadius: 6,
-                            paddingHorizontal: 7,
-                            paddingVertical: 3,
-                            borderWidth: 1,
-                            borderColor: "#D1D5DB",
-                          }}
-                        >
-                          <Text
+                        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                          <TouchableOpacity
+                            onPress={async (e) => {
+                              e.stopPropagation();
+                              Alert.alert("회원 복귀", `${m.name}님을 활성 회원으로 복귀시킬까요?`, [
+                                { text: "취소", style: "cancel" },
+                                {
+                                  text: "복귀",
+                                  onPress: async () => {
+                                    const jwt = await AsyncStorage.getItem("jwt");
+                                    const res = await fetch(`${API_URL}/api/trainer/members/${m.id}/reactivate`, {
+                                      method: "POST",
+                                      headers: { Authorization: `Bearer ${jwt}` },
+                                    });
+                                    const result = await res.json();
+                                    if (res.ok) {
+                                      Alert.alert("완료", result.message);
+                                      setInactiveModal(false);
+                                      fetchMembers();
+                                    } else {
+                                      Alert.alert("오류", result.message);
+                                    }
+                                  },
+                                },
+                              ]);
+                            }}
                             style={{
-                              fontSize: 11,
-                              fontWeight: "700",
-                              color: "#6B7280",
+                              backgroundColor: Colors.greenLight,
+                              borderRadius: 6,
+                              paddingHorizontal: 7,
+                              paddingVertical: 3,
+                              borderWidth: 1,
+                              borderColor: Colors.green + "44",
                             }}
                           >
-                            연결해제
-                          </Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
+                          </TouchableOpacity>
+                          <View
+                            style={{
+                              backgroundColor: "#F3F4F6",
+                              borderRadius: 6,
+                              paddingHorizontal: 7,
+                              paddingVertical: 3,
+                              borderWidth: 1,
+                              borderColor: "#D1D5DB",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: "700",
+                                color: "#6B7280",
+                              }}
+                            >
+                              연결해제
+                            </Text>
+                          </View>
                         </View>
                       </TouchableOpacity>
                     ))}

@@ -260,6 +260,27 @@ public class TrainerController {
         return ResponseEntity.ok(result);
     }
 
+    // POST /api/trainer/members/{memberId}/reactivate — 비활성(INACTIVE) 회원 복귀
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/trainer/members/{memberId}/reactivate")
+    public ResponseEntity<Map<String, Object>> reactivateMember(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long memberId) {
+        Trainer trainer = getTrainer(authorization);
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
+        }
+        if (member.getStatus() != Member.Status.INACTIVE) {
+            return ResponseEntity.badRequest().body(Map.of("message", "비활성 회원이 아닙니다."));
+        }
+        member.setStatus(Member.Status.ACTIVE);
+        member.setDisconnectedAt(null);
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("success", true, "message", member.getUser().getName() + "님이 활성 회원으로 복귀됐어요."));
+    }
+
     // POST /api/trainer/members/{memberId}/restore — 삭제된 회원 복구
     @org.springframework.transaction.annotation.Transactional
     @PostMapping("/trainer/members/{memberId}/restore")
