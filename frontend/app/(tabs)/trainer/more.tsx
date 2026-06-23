@@ -68,6 +68,7 @@ export default function TrainerMoreScreen() {
   // Google OAuth (expo-auth-session/providers/google — 시스템 브라우저 사용, Google 정책 준수)
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     iosClientId: "419852916314-onsu7560soqob0037r4plm62902rgh1l.apps.googleusercontent.com",
+    androidClientId: "419852916314-dglb7btdsamc7fivm1j4ilfnvlkv3ss3.apps.googleusercontent.com",
     webClientId: "419852916314-pendk3p11p1eam9acjulj9gclraheejv.apps.googleusercontent.com",
     scopes: [
       "https://www.googleapis.com/auth/spreadsheets",

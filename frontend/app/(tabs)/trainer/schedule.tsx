@@ -435,8 +435,13 @@ export default function TrainerScheduleScreen() {
       ]);
       if (homeRes.ok) {
         const homeData = await homeRes.json();
-        const p = (homeData?.plan ?? "FREE").toUpperCase();
-        setPlan(p === "PRO" ? "PRO" : "FREE");
+        // trialEndDate 있으면 무료체험 중 → FREE로 처리
+        if (homeData.trialEndDate) {
+          setPlan("FREE");
+        } else {
+          const p = (homeData?.plan ?? "FREE").toUpperCase();
+          setPlan(p === "PRO" ? "PRO" : "FREE");
+        }
       }
       const linked = linkedRes.ok
         ? (await linkedRes.json())
@@ -449,8 +454,8 @@ export default function TrainerScheduleScreen() {
               moved: m.moved === true,
               isManual: false,
             }))
-            // 연결해제·타 트레이너 이동·PT 미등록·잔여 없음 제외
-            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0 && m.ptRemaining > 0)
+            // 연결해제·타 트레이너 이동·PT 미등록 제외 (잔여 0은 FREE 계산을 위해 유지)
+            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0)
         : [];
       const manual = manualRes.ok
         ? (await manualRes.json())
@@ -461,8 +466,8 @@ export default function TrainerScheduleScreen() {
               ptTotal: m.ptTotal ?? 0,
               isManual: true,
             }))
-            // PT 미등록·잔여 없음 미연동 회원 제외
-            .filter((m: any) => m.ptTotal > 0 && m.ptRemaining > 0)
+            // PT 미등록 제외 (잔여 0은 FREE 계산을 위해 유지)
+            .filter((m: any) => m.ptTotal > 0)
         : [];
       setMembers([...linked, ...manual].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     } catch (e) {
