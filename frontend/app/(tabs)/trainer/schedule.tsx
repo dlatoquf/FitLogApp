@@ -2305,7 +2305,7 @@ export default function TrainerScheduleScreen() {
                     if (!name) {
                       Alert.alert("오류", "OT 고객 이름을 입력해주세요.");
                       return;
-                    }
+                    } 
                     if (!addingSlot) return;
                     const startT = addingSlot.startTime.slice(0, 5);
                     setAddingOt(true);
