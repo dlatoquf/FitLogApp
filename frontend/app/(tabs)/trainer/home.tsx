@@ -118,6 +118,9 @@ export default function TrainerHomeScreen() {
   const [notifications, setNotifications] = useState<Noti[]>([]);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [trialNoticeVisible, setTrialNoticeVisible] = useState(false);
+  const [allNoticeVisible, setAllNoticeVisible] = useState(false);
+  const [allNoticeContent, setAllNoticeContent] = useState("");
+  const [allNoticeSending, setAllNoticeSending] = useState(false);
   const [pendingPurchase, setPendingPurchase] = useState<(() => void) | null>(null);
 
   // 목표 설정 모달
@@ -720,6 +723,28 @@ export default function TrainerHomeScreen() {
     }
   };
 
+  const sendAllNotice = async () => {
+    if (!allNoticeContent.trim()) return;
+    setAllNoticeSending(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/trainer/notices/all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ content: allNoticeContent.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const result = await res.json();
+      setAllNoticeVisible(false);
+      setAllNoticeContent("");
+      Alert.alert("완료", `${result.count}명의 회원에게 공지를 보냈어요.`);
+    } catch {
+      Alert.alert("오류", "공지 전송 중 오류가 발생했어요.");
+    } finally {
+      setAllNoticeSending(false);
+    }
+  };
+
   const handlePayButtonPress = () => {
     if (data?.goalSessions == null && data?.goalRevenue == null) {
       setGoalNudgeVisible(true);
@@ -1072,6 +1097,25 @@ export default function TrainerHomeScreen() {
                 }}
               >
                 회원초대
+              </Text>
+            </TouchableOpacity>
+            {/* 전체 공지 버튼 */}
+            <TouchableOpacity
+              onPress={() => setAllNoticeVisible(true)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: Colors.bgSub,
+                borderRadius: 20,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: Colors.textSub, fontWeight: "700" }}>
+                📢 전체공지
               </Text>
             </TouchableOpacity>
             {/* 알림 버튼 */}
@@ -3477,6 +3521,52 @@ export default function TrainerHomeScreen() {
               <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>구독 시작하기</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setTrialNoticeVisible(false)} style={{ alignItems: "center", paddingVertical: 8 }}>
+              <Text style={{ fontSize: 14, color: Colors.textMuted }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 전체 공지 모달 */}
+      <Modal visible={allNoticeVisible} transparent animationType="slide" onRequestClose={() => setAllNoticeVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text, marginBottom: 4 }}>📢 전체 공지</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>연동된 모든 회원의 공지사항에 표시돼요.</Text>
+            <TextInput
+              value={allNoticeContent}
+              onChangeText={setAllNoticeContent}
+              placeholder="공지 내용을 입력하세요..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.border,
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 14,
+                color: Colors.text,
+                minHeight: 120,
+                textAlignVertical: "top",
+                marginBottom: 16,
+              }}
+            />
+            <TouchableOpacity
+              onPress={sendAllNotice}
+              disabled={allNoticeSending || !allNoticeContent.trim()}
+              style={{
+                backgroundColor: allNoticeContent.trim() ? Colors.green : Colors.border,
+                borderRadius: 12,
+                paddingVertical: 14,
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>
+                {allNoticeSending ? "전송 중..." : "전체 공지 보내기"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setAllNoticeVisible(false); setAllNoticeContent(""); }} style={{ alignItems: "center", paddingVertical: 8 }}>
               <Text style={{ fontSize: 14, color: Colors.textMuted }}>취소</Text>
             </TouchableOpacity>
           </View>

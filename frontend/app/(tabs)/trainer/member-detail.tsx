@@ -29,6 +29,7 @@ import {
   PanResponder,
   Platform,
   ScrollView,
+  Share,
   Text,
   TextInput,
   TouchableOpacity,
@@ -42,6 +43,7 @@ import { Colors } from "../../../constants/Colors";
 import {
   API_URL,
   APP_STORE_URL,
+  PLAY_STORE_URL,
   CLOUDINARY_UPLOAD_PRESET,
   CLOUDINARY_UPLOAD_URL,
   ENDPOINTS,
@@ -2818,6 +2820,20 @@ export default function MemberDetailScreen() {
       Alert.alert("오류", "운동 기록 복사 중 오류가 발생했어요.");
     }
   };
+
+  const shareWorkoutLog = async (log: any) => {
+    try {
+      const storeLinks = `\n\n📱 FitLog 앱 다운로드\niOS: ${APP_STORE_URL}\nAndroid: ${PLAY_STORE_URL}`;
+      await Share.share({
+        message: buildWorkoutCopyText(log) + storeLinks,
+        title: "운동 기록 공유",
+      });
+    } catch (e: any) {
+      if (e.message !== "The user did not share") {
+        Alert.alert("오류", "공유 중 오류가 발생했어요.");
+      }
+    }
+  };
   const savePT = async () => {
     const isFirst = !member?.ptTotal || member.ptTotal === 0;
     if (!ptForm.sessions || Number(ptForm.sessions) <= 0) {
@@ -3464,39 +3480,59 @@ export default function MemberDetailScreen() {
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             {log.workoutType === "PT" && (
-              <TouchableOpacity
-                onPress={() => copyWorkoutLogText(log)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 5,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  backgroundColor: "#fff",
-                  borderRadius: 999,
-                  paddingHorizontal: 13,
-                  paddingVertical: 7,
-                }}
-              >
-                <Text
+              <>
+                <TouchableOpacity
+                  onPress={() => copyWorkoutLogText(log)}
                   style={{
-                    fontSize: 14,
-                    fontWeight: "900",
-                    color: Colors.text,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    backgroundColor: "#fff",
+                    borderRadius: 999,
+                    paddingHorizontal: 13,
+                    paddingVertical: 7,
                   }}
                 >
-                  ⧉
-                </Text>
-                <Text
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "900",
+                      color: Colors.text,
+                    }}
+                  >
+                    ⧉
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: Colors.text,
+                    }}
+                  >
+                    복사
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => shareWorkoutLog(log)}
                   style={{
-                    fontSize: 12,
-                    fontWeight: "800",
-                    color: Colors.text,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    backgroundColor: "#fff",
+                    borderRadius: 999,
+                    paddingHorizontal: 13,
+                    paddingVertical: 7,
                   }}
                 >
-                  복사
-                </Text>
-              </TouchableOpacity>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.text }}>
+                    공유
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
 
             {onEdit && (

@@ -108,6 +108,35 @@ public class TrainerNoticeController {
     }
 
 
+    // ── 전체 회원 공지
+    @Transactional
+    @PostMapping("/notices/all")
+    public ResponseEntity<Map<String, Object>> createNoticeForAll(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainer(authorization);
+        String content = body.get("content");
+        if (content == null || content.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("message", "내용을 입력해주세요."));
+
+        List<Member> members = memberRepository.findAllByTrainer(trainer);
+        int count = 0;
+        for (Member member : members) {
+            if (member.getUser() == null || member.getUser().getDeletedAt() != null) continue;
+            TrainerNotice notice = new TrainerNotice();
+            notice.setTrainer(trainer);
+            notice.setMember(member);
+            notice.setContent(content.trim());
+            noticeRepository.save(notice);
+            try {
+                notificationService.sendNotification(member.getUser(), "GENERAL",
+                        "[전체 공지] " + trainer.getUser().getName() + " 트레이너: " + content.trim());
+            } catch (Exception ignored) {}
+            count++;
+        }
+        return ResponseEntity.ok(Map.of("message", "전체 공지가 완료됐어요.", "count", count));
+    }
+
     // ── 공지 수정 (연동/미연동 공통)
     @Transactional
     @PatchMapping("/notices/{noticeId}")

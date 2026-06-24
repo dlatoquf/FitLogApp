@@ -160,8 +160,8 @@ export default function MemberNoticesScreen() {
           backgroundColor: "#fff",
         }}
       >
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-          <Text style={{ fontSize: 22, color: Colors.textMuted }}>‹</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12, padding: 8, marginLeft: -8 }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={{ fontSize: 26, color: Colors.textMuted }}>‹</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}>
