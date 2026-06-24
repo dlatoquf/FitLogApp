@@ -108,7 +108,22 @@ public class TrainerNoticeController {
     }
 
 
-    // ── 전체 회원 공지
+    // ── 전체공지 목록 조회
+    @GetMapping("/notices/broadcasts")
+    public List<Map<String, Object>> getBroadcasts(@RequestHeader("Authorization") String authorization) {
+        Trainer trainer = getTrainer(authorization);
+        // broadcastGroupId별 대표 1건씩
+        List<TrainerNotice> all = noticeRepository.findByTrainerIdAndBroadcastTrueOrderByCreatedAtDesc(trainer.getId());
+        Map<Long, TrainerNotice> grouped = new java.util.LinkedHashMap<>();
+        for (TrainerNotice n : all) {
+            if (n.getBroadcastGroupId() != null && !grouped.containsKey(n.getBroadcastGroupId())) {
+                grouped.put(n.getBroadcastGroupId(), n);
+            }
+        }
+        return grouped.values().stream().map(this::toBroadcastMap).toList();
+    }
+
+    // ── 전체 회원 공지 작성
     @Transactional
     @PostMapping("/notices/all")
     public ResponseEntity<Map<String, Object>> createNoticeForAll(
@@ -119,6 +134,8 @@ public class TrainerNoticeController {
         if (content == null || content.isBlank())
             return ResponseEntity.badRequest().body(Map.of("message", "내용을 입력해주세요."));
 
+        // groupId를 위해 임시 저장 후 ID 사용
+        long groupId = System.currentTimeMillis();
         int count = 0;
         // 연동 회원
         List<Member> members = memberRepository.findAllByTrainer(trainer);
@@ -129,6 +146,7 @@ public class TrainerNoticeController {
             notice.setMember(member);
             notice.setContent(content.trim());
             notice.setBroadcast(true);
+            notice.setBroadcastGroupId(groupId);
             noticeRepository.save(notice);
             try {
                 notificationService.sendNotification(member.getUser(), "GENERAL",
@@ -144,10 +162,37 @@ public class TrainerNoticeController {
             notice.setManualMember(mm);
             notice.setContent(content.trim());
             notice.setBroadcast(true);
+            notice.setBroadcastGroupId(groupId);
             noticeRepository.save(notice);
             count++;
         }
-        return ResponseEntity.ok(Map.of("message", "전체 공지가 완료됐어요.", "count", count));
+        return ResponseEntity.ok(Map.of("message", "전체 공지가 완료됐어요.", "count", count, "broadcastGroupId", groupId));
+    }
+
+    // ── 전체공지 수정 (그룹 전체)
+    @Transactional
+    @PatchMapping("/notices/broadcasts/{groupId}")
+    public ResponseEntity<Map<String, Object>> updateBroadcast(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long groupId,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainer(authorization);
+        String content = body.get("content");
+        if (content == null || content.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("message", "내용을 입력해주세요."));
+        noticeRepository.updateContentByBroadcastGroupId(groupId, content.trim());
+        return ResponseEntity.ok(Map.of("message", "전체 공지가 수정됐어요."));
+    }
+
+    // ── 전체공지 삭제 (그룹 전체)
+    @Transactional
+    @DeleteMapping("/notices/broadcasts/{groupId}")
+    public ResponseEntity<Map<String, String>> deleteBroadcast(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long groupId) {
+        getTrainer(authorization);
+        noticeRepository.deleteByBroadcastGroupId(groupId);
+        return ResponseEntity.ok(Map.of("message", "전체 공지가 삭제됐어요."));
     }
 
     // ── 공지 수정 (연동/미연동 공통)
@@ -191,6 +236,15 @@ public class TrainerNoticeController {
         m.put("content", n.getContent());
         m.put("createdAt", n.getCreatedAt() != null ? n.getCreatedAt().format(FMT) : null);
         m.put("broadcast", n.isBroadcast());
+        m.put("broadcastGroupId", n.getBroadcastGroupId());
+        return m;
+    }
+
+    private Map<String, Object> toBroadcastMap(TrainerNotice n) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("broadcastGroupId", n.getBroadcastGroupId());
+        m.put("content", n.getContent());
+        m.put("createdAt", n.getCreatedAt() != null ? n.getCreatedAt().format(FMT) : null);
         return m;
     }
 

@@ -34,6 +34,9 @@ public class TrainerNotice {
     @Column(name = "is_broadcast", nullable = false)
     private boolean broadcast = false;
 
+    @Column(name = "broadcast_group_id")
+    private Long broadcastGroupId;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -55,4 +58,6 @@ public class TrainerNotice {
     public void setContent(String content) { this.content = content; }
     public boolean isBroadcast() { return broadcast; }
     public void setBroadcast(boolean broadcast) { this.broadcast = broadcast; }
+    public Long getBroadcastGroupId() { return broadcastGroupId; }
+    public void setBroadcastGroupId(Long broadcastGroupId) { this.broadcastGroupId = broadcastGroupId; }
 }

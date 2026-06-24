@@ -1101,7 +1101,7 @@ export default function TrainerHomeScreen() {
             </TouchableOpacity>
             {/* 전체 공지 버튼 */}
             <TouchableOpacity
-              onPress={() => setAllNoticeVisible(true)}
+              onPress={() => router.push("/(tabs)/trainer/broadcast-notices")}
               style={{
                 flexDirection: "row",
                 alignItems: "center",

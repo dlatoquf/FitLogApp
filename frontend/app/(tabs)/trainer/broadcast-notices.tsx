@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,51 +17,38 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 
-interface Notice {
-  id: number;
+interface BroadcastNotice {
+  broadcastGroupId: number;
   content: string;
   createdAt: string;
-  broadcast?: boolean;
 }
 
-export default function MemberNoticesScreen() {
+export default function BroadcastNoticesScreen() {
   const insets = useSafeAreaInsets();
-  const { memberId, memberName, isManual } = useLocalSearchParams<{
-    memberId: string;
-    memberName: string;
-    isManual?: string;
-  }>();
-
-  const [notices, setNotices] = useState<Notice[]>([]);
+  const [notices, setNotices] = useState<BroadcastNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [newContent, setNewContent] = useState("");
   const [posting, setPosting] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [saving, setSaving] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const isManualMember = isManual === "true";
-
-  const baseUrl = isManualMember
-    ? `${API_URL}/api/trainer/manual-members/${memberId}/notices`
-    : `${API_URL}/api/trainer/members/${memberId}/notices`;
-
   const fetchNotices = useCallback(async () => {
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(baseUrl, {
+      const res = await fetch(`${API_URL}/api/trainer/notices/broadcasts`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
       setNotices(data);
     } catch {
-      Alert.alert("오류", "공지사항을 불러오지 못했어요.");
+      Alert.alert("오류", "전체공지를 불러오지 못했어요.");
     } finally {
       setLoading(false);
     }
-  }, [baseUrl]);
+  }, []);
 
   useEffect(() => {
     fetchNotices();
@@ -73,18 +60,16 @@ export default function MemberNoticesScreen() {
       setPosting(true);
       Keyboard.dismiss();
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(baseUrl, {
+      const res = await fetch(`${API_URL}/api/trainer/notices/all`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ content: newContent.trim() }),
       });
       if (!res.ok) throw new Error();
-      const created = await res.json();
-      setNotices((prev) => [created, ...prev]);
+      const result = await res.json();
       setNewContent("");
+      Alert.alert("완료", `${result.count}명의 회원에게 공지를 보냈어요.`);
+      fetchNotices();
     } catch {
       Alert.alert("오류", "공지사항 등록에 실패했어요.");
     } finally {
@@ -93,24 +78,21 @@ export default function MemberNoticesScreen() {
   };
 
   const saveEdit = async () => {
-    if (!editContent.trim() || editingId === null) return;
+    if (!editContent.trim() || editingGroupId === null) return;
     try {
       setSaving(true);
       Keyboard.dismiss();
       const jwt = await AsyncStorage.getItem("jwt");
-      const res = await fetch(`${API_URL}/api/trainer/notices/${editingId}`, {
+      const res = await fetch(`${API_URL}/api/trainer/notices/broadcasts/${editingGroupId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ content: editContent.trim() }),
       });
       if (!res.ok) throw new Error();
       setNotices((prev) =>
-        prev.map((n) => (n.id === editingId ? { ...n, content: editContent.trim() } : n))
+        prev.map((n) => n.broadcastGroupId === editingGroupId ? { ...n, content: editContent.trim() } : n)
       );
-      setEditingId(null);
+      setEditingGroupId(null);
       setEditContent("");
     } catch {
       Alert.alert("오류", "수정에 실패했어요.");
@@ -119,8 +101,8 @@ export default function MemberNoticesScreen() {
     }
   };
 
-  const deleteNotice = (id: number) => {
-    Alert.alert("공지 삭제", "이 공지사항을 삭제할까요?", [
+  const deleteNotice = (groupId: number) => {
+    Alert.alert("전체공지 삭제", "모든 회원의 공지사항에서 삭제돼요. 계속할까요?", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
@@ -128,12 +110,12 @@ export default function MemberNoticesScreen() {
         onPress: async () => {
           try {
             const jwt = await AsyncStorage.getItem("jwt");
-            const res = await fetch(`${API_URL}/api/trainer/notices/${id}`, {
+            const res = await fetch(`${API_URL}/api/trainer/notices/broadcasts/${groupId}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${jwt}` },
             });
             if (!res.ok) throw new Error();
-            setNotices((prev) => prev.filter((n) => n.id !== id));
+            setNotices((prev) => prev.filter((n) => n.broadcastGroupId !== groupId));
           } catch {
             Alert.alert("오류", "삭제에 실패했어요.");
           }
@@ -165,83 +147,57 @@ export default function MemberNoticesScreen() {
           <Text style={{ fontSize: 26, color: Colors.textMuted }}>‹</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}>
-            공지사항
-          </Text>
-          <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
-            {memberName}
-          </Text>
+          <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}>전체 공지</Text>
+          <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>모든 회원의 공지사항에 표시돼요.</Text>
         </View>
       </View>
 
       {/* 공지 목록 */}
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
-      >
+      <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
         {loading ? (
           <ActivityIndicator color={Colors.green} style={{ marginTop: 40 }} />
         ) : notices.length === 0 ? (
           <View style={{ alignItems: "center", paddingTop: 60 }}>
             <Text style={{ fontSize: 32, marginBottom: 12 }}>📢</Text>
-            <Text style={{ fontSize: 15, color: Colors.textMuted }}>
-              아직 작성된 공지사항이 없어요
-            </Text>
-            <Text style={{ fontSize: 13, color: Colors.textPlaceholder, marginTop: 6 }}>
-              아래 입력창에서 공지를 작성해보세요
-            </Text>
+            <Text style={{ fontSize: 15, color: Colors.textMuted }}>아직 작성된 전체공지가 없어요</Text>
+            <Text style={{ fontSize: 13, color: Colors.textPlaceholder, marginTop: 6 }}>아래 입력창에서 공지를 작성해보세요</Text>
           </View>
         ) : (
           notices.map((n) => (
             <View
-              key={n.id}
+              key={n.broadcastGroupId}
               style={{
                 backgroundColor: Colors.bgSub,
                 borderRadius: 14,
                 padding: 14,
                 marginBottom: 12,
                 borderWidth: 1,
-                borderColor: editingId === n.id ? Colors.green : Colors.border,
+                borderColor: editingGroupId === n.broadcastGroupId ? Colors.green : Colors.border,
               }}
             >
-              {/* 상단: 날짜 + 수정/삭제 */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  {n.broadcast ? (
-                    <View style={{ backgroundColor: Colors.green + "20", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>전체 공지</Text>
-                    </View>
-                  ) : (
-                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>📢 공지</Text>
-                  )}
+                  <View style={{ backgroundColor: Colors.green + "20", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>전체 공지</Text>
+                  </View>
                   <Text style={{ fontSize: 11, color: Colors.textPlaceholder }}>{n.createdAt}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                  {editingId === n.id ? (
+                  {editingGroupId === n.broadcastGroupId ? (
                     <>
-                      <TouchableOpacity onPress={() => { setEditingId(null); setEditContent(""); }}>
+                      <TouchableOpacity onPress={() => { setEditingGroupId(null); setEditContent(""); }}>
                         <Text style={{ fontSize: 12, color: Colors.textMuted }}>취소</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={saveEdit} disabled={saving}>
-                        <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>
-                          {saving ? "저장 중..." : "저장"}
-                        </Text>
+                        <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>{saving ? "저장 중..." : "저장"}</Text>
                       </TouchableOpacity>
                     </>
-                  ) : n.broadcast ? null : (
+                  ) : (
                     <>
-                      <TouchableOpacity onPress={() => { setEditingId(n.id); setEditContent(n.content); }}>
+                      <TouchableOpacity onPress={() => { setEditingGroupId(n.broadcastGroupId); setEditContent(n.content); }}>
                         <Text style={{ fontSize: 12, color: Colors.green }}>수정</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteNotice(n.id)}>
+                      <TouchableOpacity onPress={() => deleteNotice(n.broadcastGroupId)}>
                         <Text style={{ fontSize: 12, color: "#EF4444" }}>삭제</Text>
                       </TouchableOpacity>
                     </>
@@ -249,8 +205,7 @@ export default function MemberNoticesScreen() {
                 </View>
               </View>
 
-              {/* 내용 or 수정 입력창 */}
-              {editingId === n.id ? (
+              {editingGroupId === n.broadcastGroupId ? (
                 <TextInput
                   value={editContent}
                   onChangeText={setEditContent}
@@ -270,15 +225,7 @@ export default function MemberNoticesScreen() {
                   }}
                 />
               ) : (
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: Colors.text,
-                  lineHeight: 22,
-                }}
-              >
-                {n.content}
-              </Text>
+                <Text style={{ fontSize: 14, color: Colors.text, lineHeight: 22 }}>{n.content}</Text>
               )}
             </View>
           ))
@@ -298,7 +245,7 @@ export default function MemberNoticesScreen() {
         <TextInput
           value={newContent}
           onChangeText={setNewContent}
-          placeholder="공지사항을 입력해주세요..."
+          placeholder="전체 공지 내용을 입력해주세요..."
           placeholderTextColor={Colors.textPlaceholder}
           multiline
           style={{
@@ -320,21 +267,14 @@ export default function MemberNoticesScreen() {
           onPress={postNotice}
           disabled={posting || !newContent.trim()}
           style={{
-            backgroundColor:
-              posting || !newContent.trim() ? Colors.border : Colors.green,
+            backgroundColor: posting || !newContent.trim() ? Colors.border : Colors.green,
             borderRadius: 12,
             paddingVertical: 13,
             alignItems: "center",
           }}
         >
-          <Text
-            style={{
-              color: posting || !newContent.trim() ? Colors.textMuted : "#fff",
-              fontWeight: "700",
-              fontSize: 15,
-            }}
-          >
-            {posting ? "등록 중..." : "공지 등록"}
+          <Text style={{ color: posting || !newContent.trim() ? Colors.textMuted : "#fff", fontWeight: "700", fontSize: 15 }}>
+            {posting ? "등록 중..." : "전체 공지 등록"}
           </Text>
         </TouchableOpacity>
       </View>
