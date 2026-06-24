@@ -6,7 +6,8 @@ import { Colors } from "../../../constants/Colors";
 
 export default function TrainerTabLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === "android" ? Math.max(insets.bottom, 4) : 4;
+  const bottomPadding =
+    Platform.OS === "android" ? Math.max(insets.bottom, 4) : 4;
 
   return (
     <Tabs
@@ -102,6 +103,7 @@ export default function TrainerTabLayout() {
       <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="guide" options={{ href: null }} />
       <Tabs.Screen name="member-notices" options={{ href: null }} />
+      <Tabs.Screen name="broadcast-notices" options={{ href: null }} />
     </Tabs>
   );
 }
