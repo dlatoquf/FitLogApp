@@ -17,6 +17,7 @@ interface Notice {
   id: number;
   content: string;
   createdAt: string;
+  broadcast?: boolean;
 }
 
 export default function MemberNoticesScreen() {
@@ -56,9 +57,10 @@ export default function MemberNoticesScreen() {
       >
         <TouchableOpacity
           onPress={() => router.back()}
-          style={{ marginRight: 12 }}
+          style={{ marginRight: 12, padding: 8, marginLeft: -8 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={{ fontSize: 22, color: Colors.textMuted }}>‹</Text>
+          <Text style={{ fontSize: 26, color: Colors.textMuted }}>‹</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}>
           공지사항
@@ -96,11 +98,13 @@ export default function MemberNoticesScreen() {
                   marginBottom: 8,
                 }}
               >
-                <Text
-                  style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}
-                >
-                  📢 공지
-                </Text>
+                {n.broadcast ? (
+                  <View style={{ backgroundColor: Colors.green + "20", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>전체 공지</Text>
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}>📢 공지</Text>
+                )}
                 <Text style={{ fontSize: 11, color: Colors.textPlaceholder }}>
                   {n.createdAt}
                 </Text>

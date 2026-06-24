@@ -53,6 +53,16 @@ export default function MemberTabLayout() {
       />
 
       <Tabs.Screen
+        name="workout"
+        options={{
+          title: "운동",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="dumbbell" size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="diet"
         options={{
           title: "식단",
@@ -62,16 +72,6 @@ export default function MemberTabLayout() {
               size={23}
               color={color}
             />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="workout"
-        options={{
-          title: "운동",
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="dumbbell" size={24} color={color} />
           ),
         }}
       />

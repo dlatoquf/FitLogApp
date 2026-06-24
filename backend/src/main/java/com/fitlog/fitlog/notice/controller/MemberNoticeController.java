@@ -53,6 +53,7 @@ public class MemberNoticeController {
         m.put("id", n.getId());
         m.put("content", n.getContent());
         m.put("createdAt", n.getCreatedAt() != null ? n.getCreatedAt().format(FMT) : null);
+        m.put("broadcast", n.isBroadcast());
         return m;
     }
 
