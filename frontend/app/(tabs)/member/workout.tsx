@@ -1423,7 +1423,7 @@ export default function WorkoutScreen() {
                   color: showAddModal ? Colors.textSub : Colors.blue,
                 }}
               >
-                {showAddModal ? "접기" : "+ 개인운동"}
+                {showAddModal ? "접기" : "+ 개인운동 등록"}
               </Text>
             </TouchableOpacity>
           )}

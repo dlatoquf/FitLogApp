@@ -55,7 +55,7 @@ export default function MemberTabLayout() {
       <Tabs.Screen
         name="workout"
         options={{
-          title: "개인운동 등록",
+          title: "운동",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="dumbbell" size={24} color={color} />
           ),
