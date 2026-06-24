@@ -84,6 +84,10 @@ public class Trainer {
     @Column(name = "trial_end_date")
     private java.time.LocalDate trialEndDate;
 
+    // 구독 만료일 (취소 후에도 이 날까지 PRO 유지)
+    @Column(name = "pro_expires_at")
+    private java.time.LocalDate proExpiresAt;
+
     // 제휴 헬스장
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gym_id")
@@ -157,10 +161,14 @@ public class Trainer {
         return !gymConfirmedAt.isBefore(jan1);
     }
 
-    /** 무료 체험 또는 구독 중이면 true */
+    public java.time.LocalDate getProExpiresAt() { return proExpiresAt; }
+    public void setProExpiresAt(java.time.LocalDate proExpiresAt) { this.proExpiresAt = proExpiresAt; }
+
+    /** 무료 체험 또는 구독 중(취소 후 만료일 이전 포함)이면 true */
     public boolean isProEffective() {
         if ("PRO".equals(plan)) return true;
         if (trialEndDate != null && !java.time.LocalDate.now().isAfter(trialEndDate)) return true;
+        if (proExpiresAt != null && !java.time.LocalDate.now().isAfter(proExpiresAt)) return true;
         return false;
     }
 }

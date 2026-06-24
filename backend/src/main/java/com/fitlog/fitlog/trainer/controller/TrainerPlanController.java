@@ -43,24 +43,31 @@ public class TrainerPlanController {
 
             Long userId = Long.parseLong(appUserId);
 
+            // expiration_at_ms: 구독 실제 만료 타임스탬프 (ms)
+            Long expirationAtMs = event.get("expiration_at_ms") instanceof Number
+                    ? ((Number) event.get("expiration_at_ms")).longValue() : null;
+
             switch (eventType) {
-                // 최초 구독 결제 성공
                 case "INITIAL_PURCHASE":
-                    // 구독 갱신 성공
                 case "RENEWAL":
-                    // 환불 취소 후 재활성화
                 case "UNCANCELLATION":
-                    updatePlan(userId, "PRO");
+                    updatePlan(userId, "PRO", null);
                     break;
 
-                // 구독 만료
-                case "EXPIRATION":
-                    // 환불
+                // 취소: plan은 FREE로 바꾸되 만료일까지 PRO 유지
                 case "CANCELLATION":
-                    updatePlan(userId, "FREE");
+                    java.time.LocalDate cancelExpiry = expirationAtMs != null
+                            ? java.time.Instant.ofEpochMilli(expirationAtMs)
+                                .atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate()
+                            : null;
+                    updatePlan(userId, "FREE", cancelExpiry);
                     break;
 
-                // 그 외 이벤트 (PRODUCT_CHANGE 등) 무시
+                // 구독 완전 만료: FREE로 전환
+                case "EXPIRATION":
+                    updatePlan(userId, "FREE", null);
+                    break;
+
                 default:
                     break;
             }
@@ -73,11 +80,12 @@ public class TrainerPlanController {
         }
     }
 
-    private void updatePlan(Long userId, String plan) {
+    private void updatePlan(Long userId, String plan, java.time.LocalDate proExpiresAt) {
         trainerRepository.findByUserId(userId).ifPresent(trainer -> {
             trainer.setPlan(plan);
+            trainer.setProExpiresAt(proExpiresAt);
             trainerRepository.save(trainer);
-            System.out.println("플랜 업데이트: userId=" + userId + " → " + plan);
+            System.out.println("플랜 업데이트: userId=" + userId + " → " + plan + " (만료일: " + proExpiresAt + ")");
         });
     }
 }
