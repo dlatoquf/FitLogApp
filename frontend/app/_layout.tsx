@@ -150,6 +150,27 @@ export default function RootLayout() {
     setInitialNotif(null);
   }, [navigationState?.key, initialNotif]);
 
+  // JWT 만료 30일 이내면 자동 갱신
+  const refreshJwtIfNeeded = async () => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      if (!jwt) return;
+      const payload = JSON.parse(atob(jwt.split(".")[1]));
+      const expiresAt = payload.exp * 1000;
+      const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+      if (expiresAt - Date.now() < thirtyDays) {
+        const res = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await AsyncStorage.setItem("jwt", data.token);
+        }
+      }
+    } catch {}
+  };
+
   // 앱 포그라운드 진입 시 뱃지를 읽지 않은 알림 수로 동기화
   useEffect(() => {
     const syncBadge = async () => {
@@ -175,9 +196,13 @@ export default function RootLayout() {
     };
 
     syncBadge();
+    refreshJwtIfNeeded();
     const sub = AppState.addEventListener("change", (state) => {
       console.log("[AppState] 상태 변경:", state);
-      if (state === "active") syncBadge();
+      if (state === "active") {
+        syncBadge();
+        refreshJwtIfNeeded();
+      }
     });
     return () => sub.remove();
   }, []);

@@ -51,6 +51,19 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<java.util.Map<String, String>> refresh(
+            @RequestHeader("Authorization") String authorization
+    ) {
+        try {
+            String oldToken = authorization.replace("Bearer ", "");
+            String newToken = authService.refreshToken(oldToken);
+            return ResponseEntity.ok(java.util.Map.of("token", newToken));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).build();
+        }
+    }
+
     @PostMapping("/profile")
     public void setupProfile(
             @RequestHeader("Authorization") String authorization,

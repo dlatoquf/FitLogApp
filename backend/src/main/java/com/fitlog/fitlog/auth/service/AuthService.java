@@ -98,6 +98,13 @@ public class AuthService {
         return new KakaoLoginResponse(token, false, role);
     }
 
+    public String refreshToken(String oldToken) {
+        Long userId = jwtService.getUserIdFromExpiredToken(oldToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
+        return jwtService.generateToken(userId, user.getEmail());
+    }
+
     public void setupProfile(String authorization, ProfileSetupRequest request) {
         String token = authorization.replace("Bearer ", "");
         Long userId = jwtService.getUserIdFromToken(token);
