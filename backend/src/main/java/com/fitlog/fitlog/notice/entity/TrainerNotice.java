@@ -31,6 +31,9 @@ public class TrainerNotice {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    @Column(name = "is_broadcast", nullable = false)
+    private boolean broadcast = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -50,4 +53,6 @@ public class TrainerNotice {
     public void setMember(Member member) { this.member = member; }
     public void setManualMember(ManualMember manualMember) { this.manualMember = manualMember; }
     public void setContent(String content) { this.content = content; }
+    public boolean isBroadcast() { return broadcast; }
+    public void setBroadcast(boolean broadcast) { this.broadcast = broadcast; }
 }

@@ -3480,59 +3480,39 @@ export default function MemberDetailScreen() {
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             {log.workoutType === "PT" && (
-              <>
-                <TouchableOpacity
-                  onPress={() => copyWorkoutLogText(log)}
+              <TouchableOpacity
+                onPress={() => copyWorkoutLogText(log)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  backgroundColor: "#fff",
+                  borderRadius: 999,
+                  paddingHorizontal: 13,
+                  paddingVertical: 7,
+                }}
+              >
+                <Text
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    backgroundColor: "#fff",
-                    borderRadius: 999,
-                    paddingHorizontal: 13,
-                    paddingVertical: 7,
+                    fontSize: 14,
+                    fontWeight: "900",
+                    color: Colors.text,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "900",
-                      color: Colors.text,
-                    }}
-                  >
-                    ⧉
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "800",
-                      color: Colors.text,
-                    }}
-                  >
-                    복사
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => shareWorkoutLog(log)}
+                  ⧉
+                </Text>
+                <Text
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    backgroundColor: "#fff",
-                    borderRadius: 999,
-                    paddingHorizontal: 13,
-                    paddingVertical: 7,
+                    fontSize: 12,
+                    fontWeight: "800",
+                    color: Colors.text,
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.text }}>
-                    공유
-                  </Text>
-                </TouchableOpacity>
-              </>
+                  복사
+                </Text>
+              </TouchableOpacity>
             )}
 
             {onEdit && (

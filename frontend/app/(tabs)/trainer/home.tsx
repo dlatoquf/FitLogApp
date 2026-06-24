@@ -3529,6 +3529,7 @@ export default function TrainerHomeScreen() {
 
       {/* 전체 공지 모달 */}
       <Modal visible={allNoticeVisible} transparent animationType="slide" onRequestClose={() => setAllNoticeVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, paddingBottom: 40 }}>
             <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text, marginBottom: 4 }}>전체 공지</Text>
@@ -3571,6 +3572,7 @@ export default function TrainerHomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── 결제 바텀시트 ──────────────────────────────────────────────────────

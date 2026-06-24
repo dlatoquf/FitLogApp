@@ -21,6 +21,7 @@ interface Notice {
   id: number;
   content: string;
   createdAt: string;
+  broadcast?: boolean;
 }
 
 export default function MemberNoticesScreen() {
@@ -214,7 +215,13 @@ export default function MemberNoticesScreen() {
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 11, color: Colors.textMuted }}>📢 공지</Text>
+                  {n.broadcast ? (
+                    <View style={{ backgroundColor: Colors.green + "20", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "700" }}>전체 공지</Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>📢 공지</Text>
+                  )}
                   <Text style={{ fontSize: 11, color: Colors.textPlaceholder }}>{n.createdAt}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>

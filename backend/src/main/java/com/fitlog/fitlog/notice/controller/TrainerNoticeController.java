@@ -128,6 +128,7 @@ public class TrainerNoticeController {
             notice.setTrainer(trainer);
             notice.setMember(member);
             notice.setContent(content.trim());
+            notice.setBroadcast(true);
             noticeRepository.save(notice);
             try {
                 notificationService.sendNotification(member.getUser(), "GENERAL",
@@ -142,6 +143,7 @@ public class TrainerNoticeController {
             notice.setTrainer(trainer);
             notice.setManualMember(mm);
             notice.setContent(content.trim());
+            notice.setBroadcast(true);
             noticeRepository.save(notice);
             count++;
         }
@@ -188,6 +190,7 @@ public class TrainerNoticeController {
         m.put("id", n.getId());
         m.put("content", n.getContent());
         m.put("createdAt", n.getCreatedAt() != null ? n.getCreatedAt().format(FMT) : null);
+        m.put("broadcast", n.isBroadcast());
         return m;
     }
 
