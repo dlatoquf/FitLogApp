@@ -119,8 +119,9 @@ public class TrainerNoticeController {
         if (content == null || content.isBlank())
             return ResponseEntity.badRequest().body(Map.of("message", "내용을 입력해주세요."));
 
-        List<Member> members = memberRepository.findAllByTrainer(trainer);
         int count = 0;
+        // 연동 회원
+        List<Member> members = memberRepository.findAllByTrainer(trainer);
         for (Member member : members) {
             if (member.getUser() == null || member.getUser().getDeletedAt() != null) continue;
             TrainerNotice notice = new TrainerNotice();
@@ -132,6 +133,16 @@ public class TrainerNoticeController {
                 notificationService.sendNotification(member.getUser(), "GENERAL",
                         "[전체 공지] " + trainer.getUser().getName() + " 트레이너: " + content.trim());
             } catch (Exception ignored) {}
+            count++;
+        }
+        // 미연동 회원
+        List<ManualMember> manualMembers = manualMemberRepository.findByTrainer(trainer);
+        for (ManualMember mm : manualMembers) {
+            TrainerNotice notice = new TrainerNotice();
+            notice.setTrainer(trainer);
+            notice.setManualMember(mm);
+            notice.setContent(content.trim());
+            noticeRepository.save(notice);
             count++;
         }
         return ResponseEntity.ok(Map.of("message", "전체 공지가 완료됐어요.", "count", count));

@@ -1115,7 +1115,7 @@ export default function TrainerHomeScreen() {
               }}
             >
               <Text style={{ fontSize: 12, color: Colors.textSub, fontWeight: "700" }}>
-                📢 전체공지
+                전체공지
               </Text>
             </TouchableOpacity>
             {/* 알림 버튼 */}
@@ -3531,8 +3531,8 @@ export default function TrainerHomeScreen() {
       <Modal visible={allNoticeVisible} transparent animationType="slide" onRequestClose={() => setAllNoticeVisible(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, paddingBottom: 40 }}>
-            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text, marginBottom: 4 }}>📢 전체 공지</Text>
-            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>연동된 모든 회원의 공지사항에 표시돼요.</Text>
+            <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text, marginBottom: 4 }}>전체 공지</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>모든 회원의 공지사항에 표시돼요.</Text>
             <TextInput
               value={allNoticeContent}
               onChangeText={setAllNoticeContent}

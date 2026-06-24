@@ -435,11 +435,12 @@ export default function TrainerScheduleScreen() {
       ]);
       if (homeRes.ok) {
         const homeData = await homeRes.json();
-        // trialEndDate 있으면 무료체험 중 → FREE로 처리
-        if (homeData.trialEndDate) {
+        // trialEndDate가 미래면 무료체험 중 → FREE, 과거거나 없으면 plan 값 사용
+        const isInTrial = homeData.trialEndDate && new Date(homeData.trialEndDate) > new Date();
+        if (isInTrial) {
           setPlan("FREE");
         } else {
-          const p = (homeData?.plan ?? "FREE").toUpperCase();
+          const p = (homeData?.effectivePlan ?? homeData?.plan ?? "FREE").toUpperCase();
           setPlan(p === "PRO" ? "PRO" : "FREE");
         }
       }
