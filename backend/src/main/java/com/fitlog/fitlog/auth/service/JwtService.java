@@ -15,7 +15,7 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    private static final long EXPIRATION_MS = 1000L * 60 * 60 * 24 * 7; // 7일
+    private static final long EXPIRATION_MS = 1000L * 60 * 60 * 24 * 365; // 365일
 
     public String generateToken(Long userId, String email) {
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

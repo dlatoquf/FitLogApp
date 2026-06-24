@@ -1393,11 +1393,14 @@ export default function TrainerScheduleScreen() {
             >
               {/* 시간 */}
               <Text
+                numberOfLines={1}
+                allowFontScaling={false}
                 style={{
                   fontSize: 14,
                   fontWeight: "800",
                   color: Colors.text,
-                  width: 52,
+                  width: 46,
+                  flexShrink: 0,
                 }}
               >
                 {slot.startTime.slice(0, 5)}
