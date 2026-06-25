@@ -3346,22 +3346,39 @@ export default function TrainerScheduleScreen() {
                     </View>
                   </ScrollView>
                   {/* 시간 선택 */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: "row", gap: 6 }}>
-                      {timeOptions.map((t) => {
-                        const isSelected = t === selectedTimeStr;
-                        return (
-                          <TouchableOpacity
-                            key={t}
-                            onPress={() => setRescheduleTime(t)}
-                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border }}
-                          >
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{t}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </ScrollView>
+                  {(() => {
+                    const selectedIdx = timeOptions.indexOf(selectedTimeStr);
+                    const ITEM_W = 58;
+                    return (
+                      <FlatList
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        data={timeOptions}
+                        keyExtractor={(t) => t}
+                        style={{ marginBottom: 8 }}
+                        contentContainerStyle={{ gap: 6 }}
+                        ref={(ref) => {
+                          if (ref && selectedIdx >= 0) {
+                            ref.scrollToIndex({ index: selectedIdx, animated: false, viewPosition: 0.5 });
+                          }
+                        }}
+                        onScrollToIndexFailed={() => {}}
+                        getItemLayout={(_, index) => ({ length: ITEM_W, offset: (ITEM_W + 6) * index, index })}
+                        renderItem={({ item: t }) => {
+                          const isSelected = t === selectedTimeStr;
+                          return (
+                            <TouchableOpacity
+                              key={t}
+                              onPress={() => setRescheduleTime(t)}
+                              style={{ width: ITEM_W, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border, alignItems: "center" }}
+                            >
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{t}</Text>
+                            </TouchableOpacity>
+                          );
+                        }}
+                      />
+                    );
+                  })()}
                   {/* 변경 버튼 */}
                   {(rescheduleDate !== null || rescheduleTime !== null) && (
                     <View style={{ flexDirection: "row", gap: 6, justifyContent: "flex-end" }}>
