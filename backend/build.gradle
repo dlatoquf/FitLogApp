@@ -49,6 +49,9 @@ dependencies {
 
 	// 이메일 (Gmail SMTP)
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	// AWS S3
+	implementation 'software.amazon.awssdk:s3:2.25.60'
 }
 tasks.named('test') {
 	useJUnitPlatform()

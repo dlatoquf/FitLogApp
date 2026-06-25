@@ -229,9 +229,8 @@ export default function MemberDietScreen() {
     ]);
   };
 
-  // ── Cloudinary 업로드 ────────────────────────────────────────────────────────
+  // ── S3 업로드 ────────────────────────────────────────────────────────
   const uploadToCloudinary = async (uri: string) => {
-    // 업로드 전 압축 (최대 1200px, 품질 75%)
     let uploadUri = uri;
     try {
       const result = await ImageManipulator.manipulateAsync(
@@ -244,20 +243,10 @@ export default function MemberDietScreen() {
       /* 압축 실패 시 원본 사용 */
     }
 
-    const fd = new FormData();
-    fd.append("file", {
-      uri: uploadUri,
-      type: "image/jpeg",
-      name: "diet.jpg",
-    } as any);
-    fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    const res = await fetch(CLOUDINARY_UPLOAD_URL, {
-      method: "POST",
-      body: fd,
-    });
-    if (!res.ok) throw new Error("이미지 업로드 실패");
-    const d = await res.json();
-    return { url: d.secure_url as string, publicId: d.public_id as string };
+    const jwt = await AsyncStorage.getItem("jwt");
+    const { uploadToS3 } = await import("@/utils/s3Upload");
+    const publicUrl = await uploadToS3(uploadUri, "image/jpeg", "diet", jwt ?? "");
+    return { url: publicUrl, publicId: publicUrl };
   };
 
   // ── 사진 추가 (여러 장) ──────────────────────────────────────────────────────

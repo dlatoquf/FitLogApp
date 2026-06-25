@@ -210,9 +210,11 @@ public class ScheduleController {
         scheduleRepository.save(schedule);
 
         // 연동 회원에게 일정 변경 알림
-        String dateLabel = newDate.getMonthValue() + "월 " + newDate.getDayOfMonth() + "일";
+        String dateLabel = newDate.getYear() + "-"
+                + String.format("%02d", newDate.getMonthValue()) + "-"
+                + String.format("%02d", newDate.getDayOfMonth());
         String timeLabel = newStart.toString().substring(0, 5);
-        String msg = "수업 일정이 " + dateLabel + " " + timeLabel + "로 변경됐어요.";
+        String msg = "수업 일정이 " + dateLabel + " " + timeLabel + "으로 변경됐어요.";
         if (schedule.getMember() != null && schedule.getMember().getNotifSchedule()) {
             notificationService.sendNotification(schedule.getMember().getUser(), "SCHEDULE_CHANGE", msg, "HOME", null);
         }

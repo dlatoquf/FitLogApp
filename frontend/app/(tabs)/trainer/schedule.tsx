@@ -1595,51 +1595,24 @@ export default function TrainerScheduleScreen() {
               </View>
 
 
-              {/* 상태 버튼 (확정/노쇼/취소) */}
+              {/* 상태 버튼 */}
               {(slot.status === "CONFIRMED" || isNoShowSlot) && slot.id && (
                 <View style={{ flexDirection: "row", gap: 6 }}>
-                  {slot.status === "CONFIRMED" && !isPersonalType(slot.sessionType ?? "") && (
-                    <TouchableOpacity
-                      onPress={() => completeSlot(slot)}
-                      style={{
-                        backgroundColor: Colors.blueBg,
-                        borderWidth: 1,
-                        borderColor: Colors.blue + "55",
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, color: Colors.blue, fontWeight: "700" }}>완료</Text>
-                    </TouchableOpacity>
-                  )}
-                  {slot.status === "CONFIRMED" && !isPersonalType(slot.sessionType ?? "") && (
-                    <TouchableOpacity
-                      onPress={() => noShowSlot(slot)}
-                      style={{
-                        backgroundColor: "#F3F4F6",
-                        borderWidth: 1,
-                        borderColor: "#D1D5DB",
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "700" }}>노쇼</Text>
-                    </TouchableOpacity>
-                  )}
                   <TouchableOpacity
-                    onPress={() => cancelSlot(slot)}
+                    onPress={() => {
+                      setSlotActionTarget(slot);
+                      setSlotActionModal(true);
+                    }}
                     style={{
-                      backgroundColor: Colors.redBg,
+                      backgroundColor: "#F3F4F6",
                       borderWidth: 1,
-                      borderColor: Colors.red + "44",
+                      borderColor: "#D1D5DB",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ fontSize: 12, color: Colors.red, fontWeight: "700" }}>취소</Text>
+                    <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "700" }}>수업 상태 변경</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -3515,52 +3488,55 @@ export default function TrainerScheduleScreen() {
               );
             })()}
 
-            {slotActionTarget?.status === "CONFIRMED" && !isPersonalType(slotActionTarget?.sessionType ?? "") && (
-              <TouchableOpacity
-                onPress={() => completeSlot(slotActionTarget)}
-                style={{
-                  backgroundColor: Colors.blueBg,
-                  borderWidth: 1,
-                  borderColor: Colors.blue + "55",
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료</Text>
-              </TouchableOpacity>
-            )}
-            {slotActionTarget?.status === "CONFIRMED" && !isPersonalType(slotActionTarget?.sessionType ?? "") && (
-              <TouchableOpacity
-                onPress={() => noShowSlot(slotActionTarget)}
-                style={{
-                  backgroundColor: "#F3F4F6",
-                  borderWidth: 1,
-                  borderColor: "#D1D5DB",
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼</Text>
-              </TouchableOpacity>
-            )}
             {slotActionTarget?.status === "CONFIRMED" && (
-              <TouchableOpacity
-                onPress={() => { setSlotActionModal(false); cancelSlot(slotActionTarget); }}
-                style={{
-                  backgroundColor: Colors.redBg,
-                  borderWidth: 1,
-                  borderColor: Colors.red + "44",
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
-              </TouchableOpacity>
+              <>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textMuted, marginBottom: 10 }}>수업 상태 변경</Text>
+                {!isPersonalType(slotActionTarget?.sessionType ?? "") && (
+                  <TouchableOpacity
+                    onPress={() => completeSlot(slotActionTarget)}
+                    style={{
+                      backgroundColor: Colors.blueBg,
+                      borderWidth: 1,
+                      borderColor: Colors.blue + "55",
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      alignItems: "center",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료</Text>
+                  </TouchableOpacity>
+                )}
+                {!isPersonalType(slotActionTarget?.sessionType ?? "") && (
+                  <TouchableOpacity
+                    onPress={() => noShowSlot(slotActionTarget)}
+                    style={{
+                      backgroundColor: "#F3F4F6",
+                      borderWidth: 1,
+                      borderColor: "#D1D5DB",
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      alignItems: "center",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={() => { setSlotActionModal(false); cancelSlot(slotActionTarget); }}
+                  style={{
+                    backgroundColor: Colors.redBg,
+                    borderWidth: 1,
+                    borderColor: Colors.red + "44",
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
+                </TouchableOpacity>
+              </>
             )}
             </ScrollView>
           </TouchableOpacity>

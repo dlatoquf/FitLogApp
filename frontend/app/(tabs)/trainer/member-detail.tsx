@@ -2317,8 +2317,9 @@ export default function MemberDetailScreen() {
     uri: string,
     type: "image" | "video",
   ): Promise<{ url: string; publicId: string; mediaType: string }> => {
-    // 이미지는 업로드 전 압축 (최대 1200px, 품질 75%) — Cloudinary 용량 절감
     let uploadUri = uri;
+    let contentType = "image/jpeg";
+
     if (type === "image") {
       try {
         const result = await ImageManipulator.manipulateAsync(
@@ -2330,44 +2331,18 @@ export default function MemberDetailScreen() {
       } catch {
         // 압축 실패 시 원본 사용
       }
-    }
-
-    const formData = new FormData();
-    const filename = uploadUri.split("/").pop() ?? "upload";
-
-    // 파일 확장자로 실제 mimeType 판별 (iPhone .mov / Android .mp4 등 대응)
-    let mimeType: string;
-    if (type === "video") {
-      const ext = filename.split(".").pop()?.toLowerCase();
-      if (ext === "mov") mimeType = "video/quicktime";
-      else if (ext === "hevc") mimeType = "video/hevc";
-      else mimeType = "video/mp4";
     } else {
-      mimeType = "image/jpeg";
+      const ext = uri.split(".").pop()?.toLowerCase();
+      contentType = ext === "mov" ? "video/quicktime" : "video/mp4";
     }
 
-    formData.append("file", {
-      uri: uploadUri,
-      name: filename,
-      type: mimeType,
-    } as any);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    formData.append("folder", "fitlog");
+    const jwt = await AsyncStorage.getItem("jwt");
+    const { uploadToS3 } = await import("@/utils/s3Upload");
+    const publicUrl = await uploadToS3(uploadUri, contentType, "fitlog", jwt ?? "");
 
-    const resourceType = type === "video" ? "video" : "image";
-    const res = await fetch(
-      CLOUDINARY_UPLOAD_URL.replace("/upload", `/${resourceType}/upload`),
-      { method: "POST", body: formData },
-    );
-
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody?.error?.message ?? "Cloudinary 업로드 실패");
-    }
-    const data = await res.json();
     return {
-      url: data.secure_url,
-      publicId: data.public_id,
+      url: publicUrl,
+      publicId: publicUrl,
       mediaType: type.toUpperCase(),
     };
   };
@@ -2390,9 +2365,9 @@ export default function MemberDetailScreen() {
     }
 
     const addAsset = async (asset: any) => {
-      // 파일 크기 100MB 초과 시 경고 (Cloudinary 무료 플랜 제한)
-      if (asset.fileSize && asset.fileSize > 100 * 1024 * 1024) {
-        Alert.alert("파일 크기 초과", "영상 파일이 100MB를 초과해요. 더 짧은 영상을 선택해주세요.");
+      // 파일 크기 1GB 초과 시 경고
+      if (asset.fileSize && asset.fileSize > 1024 * 1024 * 1024) {
+        Alert.alert("파일 크기 초과", "영상 파일이 1GB를 초과해요. 더 짧은 영상을 선택해주세요.");
         return;
       }
       const u = [...exercises];
