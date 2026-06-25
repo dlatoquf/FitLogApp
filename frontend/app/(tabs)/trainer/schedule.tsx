@@ -214,6 +214,11 @@ export default function TrainerScheduleScreen() {
   const [slotActionModal, setSlotActionModal] = useState(false);
   const [slotActionTarget, setSlotActionTarget] = useState<any | null>(null);
 
+  // 일정 날짜/시간 변경
+  const [rescheduleDate, setRescheduleDate] = useState<string | null>(null);
+  const [rescheduleTime, setRescheduleTime] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
+
   // 주간→월간 날짜 이동 시 useFocusEffect 리셋 방지용 플래그
   const dateNavRef = useRef(false);
 
@@ -1240,6 +1245,8 @@ export default function TrainerScheduleScreen() {
                       <TouchableOpacity
                         onPress={() => {
                           setSlotActionTarget({ ...slot, _date: d });
+                          setRescheduleDate(null);
+                          setRescheduleTime(null);
                           setSlotActionModal(true);
                         }}
                         style={{
@@ -3286,6 +3293,112 @@ export default function TrainerScheduleScreen() {
                 }
               </TouchableOpacity>
             )}
+
+            {/* 날짜/시간 변경 */}
+            {slotActionTarget?.status === "CONFIRMED" && (() => {
+              const target = slotActionTarget;
+              const targetDate: Date = target._date ?? new Date();
+              // 그 주 월~일 날짜 생성
+              const weekDays: Date[] = [];
+              const dayOfWeek = targetDate.getDay(); // 0=일
+              const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+              const monday = new Date(targetDate);
+              monday.setDate(targetDate.getDate() + mondayOffset);
+              for (let i = 0; i < 7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                weekDays.push(d);
+              }
+              const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+              // 시간 옵션 (트레이너 주간 시작~끝, 슬롯 오프셋 기준)
+              const timeOptions: string[] = [];
+              for (let h = weekStartHour; h < weekEndHour; h++) {
+                if (slotOffset === 30) {
+                  timeOptions.push(`${String(h).padStart(2, "0")}:30`);
+                } else {
+                  timeOptions.push(`${String(h).padStart(2, "0")}:00`);
+                }
+              }
+              const selectedDateStr = rescheduleDate ?? `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`;
+              const selectedTimeStr = rescheduleTime ?? (target.startTime ?? "").slice(0, 5);
+
+              return (
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>날짜/시간 변경</Text>
+                  {/* 요일 선택 */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {weekDays.map((d) => {
+                        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                        const isSelected = ds === selectedDateStr;
+                        return (
+                          <TouchableOpacity
+                            key={ds}
+                            onPress={() => setRescheduleDate(ds)}
+                            style={{ alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border }}
+                          >
+                            <Text style={{ fontSize: 11, color: isSelected ? "#fff" : Colors.textMuted }}>{DAY_LABELS[d.getDay()]}</Text>
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{d.getDate()}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                  {/* 시간 선택 */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      {timeOptions.map((t) => {
+                        const isSelected = t === selectedTimeStr;
+                        return (
+                          <TouchableOpacity
+                            key={t}
+                            onPress={() => setRescheduleTime(t)}
+                            style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border }}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{t}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                  {/* 변경 버튼 */}
+                  {(rescheduleDate !== null || rescheduleTime !== null) && (
+                    <View style={{ flexDirection: "row", gap: 6, justifyContent: "flex-end" }}>
+                      <TouchableOpacity
+                        onPress={() => { setRescheduleDate(null); setRescheduleTime(null); }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, borderWidth: 1, borderColor: Colors.border }}
+                      >
+                        <Text style={{ fontSize: 12, color: Colors.textMuted }}>취소</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={rescheduling}
+                        onPress={async () => {
+                          try {
+                            setRescheduling(true);
+                            const jwt = await AsyncStorage.getItem("jwt");
+                            const res = await fetch(`${API_URL}/api/schedule/${target.id}/reschedule`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                              body: JSON.stringify({ date: selectedDateStr, startTime: selectedTimeStr + ":00" }),
+                            });
+                            if (!res.ok) throw new Error("변경 실패");
+                            setRescheduleDate(null);
+                            setRescheduleTime(null);
+                            setSlotActionModal(false);
+                            fetchAll();
+                            Alert.alert("완료", "일정이 변경됐어요.");
+                          } catch { Alert.alert("오류", "일정 변경에 실패했어요."); }
+                          finally { setRescheduling(false); }
+                        }}
+                        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, backgroundColor: Colors.green }}
+                      >
+                        <Text style={{ fontSize: 12, color: "#fff", fontWeight: "700" }}>{rescheduling ? "변경 중..." : "변경"}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
 
             {slotActionTarget?.status === "CONFIRMED" && !isPersonalType(slotActionTarget?.sessionType ?? "") && (
               <TouchableOpacity

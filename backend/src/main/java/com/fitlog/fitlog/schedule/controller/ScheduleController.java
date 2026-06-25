@@ -186,6 +186,31 @@ public class ScheduleController {
         return ResponseEntity.ok().build();
     }
 
+    // ─── 트레이너: 일정 날짜/시간 변경 ──────────────────────────────────────
+    @PatchMapping("/{scheduleId}/reschedule")
+    @Transactional
+    public ResponseEntity<Void> reschedule(
+            @RequestHeader("Authorization") String auth,
+            @PathVariable Long scheduleId,
+            @RequestBody Map<String, Object> body) {
+        Long userId = jwtService.getUserIdFromToken(auth.replace("Bearer ", ""));
+        Schedule schedule = scheduleRepository.findById(scheduleId).orElseThrow(() -> new RuntimeException("일정 없음"));
+        if (!schedule.getTrainer().getUser().getId().equals(userId)) throw new RuntimeException("권한 없음");
+
+        String dateStr = (String) body.get("date");
+        String startTimeStr = (String) body.get("startTime");
+
+        java.time.LocalDate newDate = java.time.LocalDate.parse(dateStr);
+        java.time.LocalTime newStart = java.time.LocalTime.parse(startTimeStr);
+        java.time.LocalTime newEnd = newStart.plusHours(1);
+
+        schedule.setDate(newDate);
+        schedule.setStartTime(newStart);
+        schedule.setEndTime(newEnd);
+        scheduleRepository.save(schedule);
+        return ResponseEntity.ok().build();
+    }
+
     // ─── 트레이너: 수업 완료 처리 ────────────────────────────────────────────
     @PatchMapping("/{scheduleId}/complete")
     @Transactional
