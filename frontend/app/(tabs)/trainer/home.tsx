@@ -1081,7 +1081,7 @@ export default function TrainerHomeScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 4,
-                backgroundColor: Colors.bgSub,
+                backgroundColor: (data?.plan ?? "FREE").toUpperCase() === "FREE" && (data?.totalMembers ?? 0) >= 5 ? "#F3F4F6" : Colors.bgSub,
                 borderRadius: 20,
                 paddingHorizontal: 12,
                 paddingVertical: 8,
@@ -1089,13 +1089,10 @@ export default function TrainerHomeScreen() {
                 borderColor: Colors.border,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: Colors.textSub,
-                  fontWeight: "700",
-                }}
-              >
+              {(data?.plan ?? "FREE").toUpperCase() === "FREE" && (data?.totalMembers ?? 0) >= 5 && (
+                <Text style={{ fontSize: 12 }}>🔒</Text>
+              )}
+              <Text style={{ fontSize: 12, color: Colors.textSub, fontWeight: "700" }}>
                 회원초대
               </Text>
             </TouchableOpacity>
@@ -3561,11 +3558,11 @@ export default function TrainerHomeScreen() {
               <View
                 style={{
                   borderRadius: 16,
-                  padding: 20,
+                  padding: 14,
                   borderWidth: 1.5,
                   borderColor: Colors.green + "55",
                   backgroundColor: Colors.greenLight,
-                  marginBottom: 24,
+                  marginBottom: 14,
                 }}
               >
                 <View
@@ -3573,7 +3570,7 @@ export default function TrainerHomeScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: 12,
+                    marginBottom: 8,
                   }}
                 >
                   <Text
@@ -3613,7 +3610,9 @@ export default function TrainerHomeScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.textSub, marginBottom: 16 }}>✓ 회원 무제한</Text>
+                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 20, marginBottom: 10 }}>
+                  {"✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."}
+                </Text>
                 <TouchableOpacity
                   onPress={async () => {
                     const doPurchase = async () => {

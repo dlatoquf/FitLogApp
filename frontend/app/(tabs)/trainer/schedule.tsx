@@ -103,6 +103,51 @@ function getActiveRange(startDay: 0 | 1 = 1): { from: Date; to: Date } {
   return { from: start, to };
 }
 
+function RescheduleTimeFlatList({ timeOptions, selectedTimeStr, selectedIdx, ITEM_W, listRef, onSelect }: {
+  timeOptions: string[];
+  selectedTimeStr: string;
+  selectedIdx: number;
+  ITEM_W: number;
+  listRef: React.RefObject<FlatList<string> | null>;
+  onSelect: (t: string) => void;
+}) {
+  const scrollToSelected = (animated: boolean) => {
+    if (listRef.current && selectedIdx >= 0) {
+      listRef.current.scrollToIndex({ index: selectedIdx, animated, viewPosition: 0.5 });
+    }
+  };
+
+  useEffect(() => {
+    scrollToSelected(true);
+  }, [selectedTimeStr]);
+
+  return (
+    <FlatList
+      ref={listRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      data={timeOptions}
+      keyExtractor={(t) => t}
+      style={{ marginBottom: 12 }}
+      contentContainerStyle={{ gap: 6 }}
+      onLayout={() => scrollToSelected(false)}
+      onScrollToIndexFailed={() => {}}
+      getItemLayout={(_, index) => ({ length: ITEM_W, offset: (ITEM_W + 6) * index, index })}
+      renderItem={({ item: t }) => {
+        const isSelected = t === selectedTimeStr;
+        return (
+          <TouchableOpacity
+            onPress={() => onSelect(t)}
+            style={{ width: ITEM_W, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border, alignItems: "center" }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{t}</Text>
+          </TouchableOpacity>
+        );
+      }}
+    />
+  );
+}
+
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
 export default function TrainerScheduleScreen() {
@@ -190,6 +235,7 @@ export default function TrainerScheduleScreen() {
     "loading",
   );
   const [showOffsetModal, setShowOffsetModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // 주간 뷰 열 너비 스케일: 1=좁게(기본), 2=보통, 3=넓게
   const [colScale, setColScale] = useState<1 | 2 | 3>(2);
@@ -217,6 +263,24 @@ export default function TrainerScheduleScreen() {
   // 일정 날짜/시간 변경
   const [rescheduleDate, setRescheduleDate] = useState<string | null>(null);
   const [rescheduleTime, setRescheduleTime] = useState<string | null>(null);
+  const rescheduleTimeListRef = useRef<FlatList<string> | null>(null);
+
+  useEffect(() => {
+    if (slotActionTarget && rescheduleTimeListRef.current) {
+      const target = slotActionTarget;
+      const targetDate: Date = target._date ?? new Date();
+      const slotOffset = target.startTime ? parseInt(target.startTime.slice(3, 5)) : 0;
+      const opts: string[] = [];
+      for (let h = weekStartHour; h <= weekEndHour; h++) {
+        opts.push(slotOffset === 30 ? `${String(h).padStart(2, "0")}:30` : `${String(h).padStart(2, "0")}:00`);
+      }
+      const currentTime = rescheduleTime ?? (target.startTime ?? "").slice(0, 5);
+      const idx = opts.indexOf(currentTime);
+      if (idx >= 0) {
+        rescheduleTimeListRef.current?.scrollToIndex({ index: idx, animated: false, viewPosition: 0.5 });
+      }
+    }
+  }, [slotActionTarget]);
   const [rescheduling, setRescheduling] = useState(false);
 
   // 주간→월간 날짜 이동 시 useFocusEffect 리셋 방지용 플래그
@@ -425,6 +489,7 @@ export default function TrainerScheduleScreen() {
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
       fetchAll(false, hasLoadedRef.current); // 이미 데이터 있으면 스피너 없이 백그라운드 갱신
       fetchMembers();
+      AsyncStorage.getItem("schedule_tutorial_done").then((v) => { if (!v) setShowTutorial(true); });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, slotOffset]),
   );
@@ -1092,19 +1157,10 @@ export default function TrainerScheduleScreen() {
       setSelectedDate(d);
       setManualTime(time);
       setManualTimeFixed(true);
-      if (
-        existingSlot &&
-        existingSlot.status !== "CONFIRMED" &&
-        existingSlot.status !== "COMPLETED"
-      ) {
-        setAddingSlot(existingSlot);
-        setAddModal(true);
-      } else {
-        setSessionType("PT");
-        setOtName("");
-        setSelectedDays([toDateKey(d)]); // selectedDate state는 아직 이전 값이므로 d 직접 사용
-        setManualModal(true);
-      }
+      setSessionType("PT");
+      setOtName("");
+      setSelectedDays([toDateKey(d)]);
+      setManualModal(true);
     };
 
     return (
@@ -1717,22 +1773,21 @@ export default function TrainerScheduleScreen() {
             ))}
           </View>
 
-          {/* 오른쪽: 정각/30분 설정 */}
+          {/* 오른쪽: 설정 버튼 */}
           <TouchableOpacity
             onPress={() => setShowOffsetModal(true)}
             style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 8,
+              width: 34,
+              height: 34,
+              borderRadius: 17,
               backgroundColor: Colors.bgSub,
               borderWidth: 1,
               borderColor: Colors.border,
-              flexDirection: "row",
               alignItems: "center",
-              gap: 4,
+              justifyContent: "center",
             }}
           >
-            <Text style={{ fontSize: 11, color: Colors.textMuted }}>설정</Text>
+            <Text style={{ fontSize: 18 }}>⚙️</Text>
           </TouchableOpacity>
         </View>
 
@@ -1918,6 +1973,65 @@ export default function TrainerScheduleScreen() {
       </ScrollView>
 
 
+      {/* ── 튜토리얼 모달 ───────────────────────────────────────────────────── */}
+      <Modal
+        visible={showTutorial}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 28 }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, width: "100%" }}>
+            <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>일정 화면 사용법</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>처음이신가요? 빠르게 알아볼게요</Text>
+
+            {/* Step 1 */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 16, alignItems: "flex-start" }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.green, justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>1</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 2 }}>빈 칸 선택 → 수업 추가</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{"빈 시간 칸을 선택하면\nPT·OT·개인 일정을 추가할 수 있어요."}</Text>
+              </View>
+            </View>
+
+            {/* Step 2 */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 16, alignItems: "flex-start" }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.blue, justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>2</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 2 }}>확정된 수업 선택 → 상세 관리</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{"확정된 수업을 선택하면\n메모 수정, 날짜/시간 변경,\n완료·노쇼·취소 처리를 할 수 있어요."}</Text>
+              </View>
+            </View>
+
+            {/* Step 3 */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 24, alignItems: "flex-start" }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#F97316", justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>3</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 2 }}>우측 상단 ⚙️ → 일정 설정</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted, lineHeight: 18 }}>{"수업 시작 시간(정각/30분),\n주간 뷰 시작·마지막 시간을 설정할 수 있어요."}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={async () => {
+                await AsyncStorage.setItem("schedule_tutorial_done", "1");
+                setShowTutorial(false);
+                setShowOffsetModal(true);
+              }}
+              style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>시작하기 →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── 메모 수정 모달 ─────────────────────────────────────────────────── */}
       {/* ── 설정 모달 ────────────────────────────────────────────────────── */}
       <Modal
@@ -1947,6 +2061,7 @@ export default function TrainerScheduleScreen() {
                           const jwt = await AsyncStorage.getItem("jwt");
                           await fetch(`${API_URL}/api/trainer/slot-settings`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` }, body: JSON.stringify({ slotOffset: opt.value }) });
                           setSlotOffset(opt.value);
+                          setManualTime(`09:${opt.value === 30 ? "30" : "00"}`);
                         } catch { Alert.alert("오류", "설정 저장에 실패했어요."); }
                       }}
                       style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", borderWidth: 1.5, borderColor: slotOffset === opt.value ? Colors.green : Colors.border, backgroundColor: slotOffset === opt.value ? Colors.greenLight : Colors.bgSub }}
@@ -2016,7 +2131,7 @@ export default function TrainerScheduleScreen() {
                     <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▲</Text>
                   </TouchableOpacity>
                   <View style={{ paddingVertical: 5, paddingHorizontal: 12, backgroundColor: Colors.greenLight, borderRadius: 6, marginVertical: 2 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekStartHour).padStart(2, "0")}:00</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekStartHour).padStart(2, "0")}:{slotOffset === 30 ? "30" : "00"}</Text>
                   </View>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.min(23, weekStartHour + 1);
@@ -2044,7 +2159,7 @@ export default function TrainerScheduleScreen() {
                     <Text style={{ fontSize: 16, color: Colors.green, fontWeight: "700" }}>▲</Text>
                   </TouchableOpacity>
                   <View style={{ paddingVertical: 5, paddingHorizontal: 12, backgroundColor: Colors.greenLight, borderRadius: 6, marginVertical: 2 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekEndHour).padStart(2, "0")}:00</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.green }}>{String(weekEndHour).padStart(2, "0")}:{slotOffset === 30 ? "30" : "00"}</Text>
                   </View>
                   <TouchableOpacity onPress={async () => {
                     const h = Math.min(23, weekEndHour + 1);
@@ -3207,12 +3322,12 @@ export default function TrainerScheduleScreen() {
         visible={slotActionModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setSlotActionModal(false)}
+        onRequestClose={() => { setSlotActionModal(false); setRescheduleDate(null); setRescheduleTime(null); }}
       >
         <TouchableOpacity
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 }}
           activeOpacity={1}
-          onPress={() => setSlotActionModal(false)}
+          onPress={() => { setSlotActionModal(false); setRescheduleDate(null); setRescheduleTime(null); }}
         >
           <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%", maxHeight: "85%" }}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -3222,7 +3337,7 @@ export default function TrainerScheduleScreen() {
                   ? sessionLabel(slotActionTarget?.sessionType ?? "")
                   : (slotActionTarget?.memberName ?? "수업")}
               </Text>
-              <TouchableOpacity onPress={() => setSlotActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => { setSlotActionModal(false); setRescheduleDate(null); setRescheduleTime(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={{ fontSize: 18, color: Colors.textMuted, lineHeight: 22 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -3313,7 +3428,7 @@ export default function TrainerScheduleScreen() {
               const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
               // 시간 옵션 (트레이너 주간 시작~끝, 슬롯 오프셋 기준)
               const timeOptions: string[] = [];
-              for (let h = weekStartHour; h < weekEndHour; h++) {
+              for (let h = weekStartHour; h <= weekEndHour; h++) {
                 if (slotOffset === 30) {
                   timeOptions.push(`${String(h).padStart(2, "0")}:30`);
                 } else {
@@ -3325,9 +3440,9 @@ export default function TrainerScheduleScreen() {
 
               return (
                 <View style={{ marginBottom: 14 }}>
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>날짜/시간 변경</Text>
-                  {/* 요일 선택 */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                  {/* 날짜변경 */}
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>날짜변경</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                     <View style={{ flexDirection: "row", gap: 6 }}>
                       {weekDays.map((d) => {
                         const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -3345,42 +3460,24 @@ export default function TrainerScheduleScreen() {
                       })}
                     </View>
                   </ScrollView>
-                  {/* 시간 선택 */}
+                  {/* 시간변경 */}
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted, marginBottom: 6 }}>시간변경</Text>
                   {(() => {
                     const selectedIdx = timeOptions.indexOf(selectedTimeStr);
                     const ITEM_W = 58;
                     return (
-                      <FlatList
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        data={timeOptions}
-                        keyExtractor={(t) => t}
-                        style={{ marginBottom: 8 }}
-                        contentContainerStyle={{ gap: 6 }}
-                        ref={(ref) => {
-                          if (ref && selectedIdx >= 0) {
-                            ref.scrollToIndex({ index: selectedIdx, animated: false, viewPosition: 0.5 });
-                          }
-                        }}
-                        onScrollToIndexFailed={() => {}}
-                        getItemLayout={(_, index) => ({ length: ITEM_W, offset: (ITEM_W + 6) * index, index })}
-                        renderItem={({ item: t }) => {
-                          const isSelected = t === selectedTimeStr;
-                          return (
-                            <TouchableOpacity
-                              key={t}
-                              onPress={() => setRescheduleTime(t)}
-                              style={{ width: ITEM_W, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: isSelected ? Colors.green : Colors.bgSub, borderWidth: 1, borderColor: isSelected ? Colors.green : Colors.border, alignItems: "center" }}
-                            >
-                              <Text style={{ fontSize: 13, fontWeight: "700", color: isSelected ? "#fff" : Colors.text }}>{t}</Text>
-                            </TouchableOpacity>
-                          );
-                        }}
+                      <RescheduleTimeFlatList
+                        timeOptions={timeOptions}
+                        selectedTimeStr={selectedTimeStr}
+                        selectedIdx={selectedIdx}
+                        ITEM_W={ITEM_W}
+                        listRef={rescheduleTimeListRef}
+                        onSelect={(t) => setRescheduleTime(t)}
                       />
                     );
                   })()}
-                  {/* 변경 버튼 */}
-                  {(rescheduleDate !== null || rescheduleTime !== null) && (
+                  {/* 변경 버튼 (항상 표시) */}
+                  {true && (
                     <View style={{ flexDirection: "row", gap: 6, justifyContent: "flex-end" }}>
                       <TouchableOpacity
                         onPress={() => { setRescheduleDate(null); setRescheduleTime(null); }}
@@ -3493,10 +3590,7 @@ export default function TrainerScheduleScreen() {
               }}
             >
               <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>PRO 플랜으로 업그레이드</Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 20 }}>
-                {"무료 플랜은 잔여횟수 적은 순 5명만 수업 추가가 가능해요.\nPRO로 업그레이드하면 회원 수 제한이 없어져요."}
-              </Text>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 20 }}>PRO 플랜으로 업그레이드</Text>
               <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>
@@ -3505,7 +3599,7 @@ export default function TrainerScheduleScreen() {
                     <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green, marginBottom: 3 }}>원/월</Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 22 }}>{"✓ 회원 무제한"}</Text>
+                <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 20, marginBottom: 10 }}>{"✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."}</Text>
                 <TouchableOpacity
                   onPress={async () => {
                     try {

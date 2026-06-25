@@ -6,7 +6,7 @@
  */
 
 // ── DEV / TEST (로컬 개발 시 아래 주석 해제) ─────────────────────
-//export const API_URL = "http://192.168.0.117:8080"; // 집 와이파이
+//export const API_URL = "http://192.168.0.182:8080"; // 집 와이파이
 //export const ANALYTICS_URL = "http://localhost:8001";
 
 // ── PROD (운영 배포 시 활성화) ────────────────────────────────────

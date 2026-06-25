@@ -624,41 +624,48 @@ export default function TrainerMoreScreen() {
             ? Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
             : null;
           return plan === "PRO" && !trialEndDate ? (
-            <View style={{
-              borderRadius: 14,
-              borderWidth: 1.5,
-              borderColor: Colors.green + "66",
-              backgroundColor: Colors.greenLight,
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              marginBottom: 12,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.green }}>PRO 플랜</Text>
-                <View style={{ backgroundColor: Colors.green, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>구독 중</Text>
+            <>
+              <View style={{
+                borderRadius: 14,
+                borderWidth: 1.5,
+                borderColor: Colors.green + "66",
+                backgroundColor: Colors.greenLight,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                marginBottom: 8,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.green }}>PRO 플랜</Text>
+                  <View style={{ backgroundColor: Colors.green, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>구독 중</Text>
+                  </View>
                 </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    Platform.OS === "android"
+                      ? Linking.openURL("https://play.google.com/store/account/subscriptions")
+                      : Linking.openURL("https://apps.apple.com/account/subscriptions")
+                  }
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ef4444" + "88",
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>구독 취소</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() =>
-                  Platform.OS === "android"
-                    ? Linking.openURL("https://play.google.com/store/account/subscriptions")
-                    : Linking.openURL("https://apps.apple.com/account/subscriptions")
-                }
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ef4444" + "88",
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>구독 취소</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 17, marginBottom: 12, paddingLeft: 12 }}>
+                {Platform.OS === "ios"
+                  ? "매월 자동 갱신, 결제일 24시간 전까지 Apple ID 설정 > 구독에서 취소 가능합니다.\n환불은 Apple 정책에 따릅니다."
+                  : "매월 자동 갱신, 결제일 24시간 전까지 Google Play에서 취소 가능합니다.\n환불은 Google Play 정책에 따릅니다."}
+              </Text>
+            </>
           ) : (
             <View style={{
               borderRadius: 14,
@@ -1278,7 +1285,7 @@ export default function TrainerMoreScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 13, color: Colors.textSub, marginBottom: 16 }}>✓ 회원 무제한</Text>
+                  <Text style={{ fontSize: 13, color: Colors.textSub, lineHeight: 20, marginBottom: 10 }}>{"✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."}</Text>
                   <TouchableOpacity
                     onPress={async () => {
                       const doPurchase = async () => {
@@ -1366,35 +1373,37 @@ export default function TrainerMoreScreen() {
                     구독 복원하기
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ marginTop: 16 }}
-                  onPress={() =>
-                    Platform.OS === "android"
-                      ? Linking.openURL("https://play.google.com/store/account/subscriptions")
-                      : Linking.openURL("https://apps.apple.com/account/subscriptions")
-                  }
-                >
-                  <Text
-                    style={{
-                      textAlign: "center",
-                      fontSize: 13,
-                      color: "#ef4444",
-                      marginBottom: 4,
-                    }}
+                {plan === "PRO" && (
+                  <TouchableOpacity
+                    style={{ marginTop: 16 }}
+                    onPress={() =>
+                      Platform.OS === "android"
+                        ? Linking.openURL("https://play.google.com/store/account/subscriptions")
+                        : Linking.openURL("https://apps.apple.com/account/subscriptions")
+                    }
                   >
-                    구독 취소하기
-                  </Text>
-                  <Text
-                    style={{
-                      textAlign: "center",
-                      fontSize: 11,
-                      color: Colors.textMuted,
-                      lineHeight: 16,
-                    }}
-                  >
-                    취소 후에도 현재 구독 기간이 끝날 때까지 PRO를 사용할 수 있어요.
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        fontSize: 13,
+                        color: "#ef4444",
+                        marginBottom: 4,
+                      }}
+                    >
+                      구독 취소하기
+                    </Text>
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        fontSize: 11,
+                        color: Colors.textMuted,
+                        lineHeight: 16,
+                      }}
+                    >
+                      취소 후에도 현재 구독 기간이 끝날 때까지 PRO를 사용할 수 있어요.
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 <Text style={{ textAlign: "center", fontSize: 11, color: Colors.textMuted, lineHeight: 17, marginTop: 20, marginBottom: 4 }}>
                   {Platform.OS === "ios"

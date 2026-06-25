@@ -16,7 +16,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "4",
+      "buildNumber": "5",
       "bundleIdentifier": "com.anonymous.FitLogApp",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
@@ -166,7 +166,8 @@
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

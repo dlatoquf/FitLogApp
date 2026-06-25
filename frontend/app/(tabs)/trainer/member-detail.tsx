@@ -7204,23 +7204,11 @@ export default function MemberDetailScreen() {
                   fontSize: 20,
                   fontWeight: "800",
                   color: Colors.text,
-                  marginBottom: 4,
+                  marginBottom: 20,
                 }}
               >
                 PRO 플랜으로 업그레이드
               </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textMuted,
-                  marginBottom: 20,
-                  lineHeight: 20,
-                }}
-              >
-                무료 플랜은 회원을 최대 5명까지 등록할 수 있어요.{"\n"}PRO로
-                업그레이드하면 회원 수 제한이 없어져요.
-              </Text>
-
               <View
                 style={{
                   borderRadius: 16,
@@ -7283,7 +7271,7 @@ export default function MemberDetailScreen() {
                     lineHeight: 22,
                   }}
                 >
-                  ✓ 회원 무제한{"\n"}(무료 플랜: 최대 5명)
+                  {"✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."}
                 </Text>
               </View>
 
