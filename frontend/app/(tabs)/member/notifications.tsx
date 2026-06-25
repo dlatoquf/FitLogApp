@@ -32,6 +32,7 @@ const NOTI_ICON: Record<string, string> = {
     SCHEDULE_CANCEL:   "❌",
     SCHEDULE_REMINDER: "⏰",
     SCHEDULE_OPEN:     "📆",
+    SCHEDULE_CHANGE:   "🔄",
     PT_ADD:            "➕",
     PT_EXPIRY:         "⏰",
     BODY_LOG:          "📊",
@@ -49,7 +50,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const TAB_TYPES: Record<TabKey, string[]> = {
     전체:       [],
-    수업:       ["SCHEDULE_CONFIRM", "SCHEDULE_CANCEL", "SCHEDULE_REMINDER", "SCHEDULE_OPEN"],
+    수업:       ["SCHEDULE_CONFIRM", "SCHEDULE_CANCEL", "SCHEDULE_REMINDER", "SCHEDULE_OPEN", "SCHEDULE_CHANGE"],
     "기록/피드백": ["WORKOUT_LOG", "FEEDBACK", "DIET_FEEDBACK", "BODY_LOG"],
     "결제/공지":  ["PT_ADD", "PT_EXPIRY", "GENERAL"],
 };
@@ -126,7 +127,7 @@ export default function MemberNotificationsScreen() {
             router.push(date ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any) : "/(tabs)/member/diet");
             return;
         }
-        if (n.type === "SCHEDULE_CONFIRM" || n.type === "SCHEDULE_CANCEL" || n.type === "SCHEDULE_REMINDER") {
+        if (n.type === "SCHEDULE_CONFIRM" || n.type === "SCHEDULE_CANCEL" || n.type === "SCHEDULE_REMINDER" || n.type === "SCHEDULE_CHANGE") {
             router.push("/(tabs)/member/home"); return;
         }
         if (n.type === "SCHEDULE_OPEN" || n.targetType === "SCHEDULE_OPEN") {

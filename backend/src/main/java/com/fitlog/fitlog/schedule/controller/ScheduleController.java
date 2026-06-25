@@ -208,6 +208,14 @@ public class ScheduleController {
         schedule.setStartTime(newStart);
         schedule.setEndTime(newEnd);
         scheduleRepository.save(schedule);
+
+        // 연동 회원에게 일정 변경 알림
+        String dateLabel = newDate.getMonthValue() + "월 " + newDate.getDayOfMonth() + "일";
+        String timeLabel = newStart.toString().substring(0, 5);
+        String msg = "수업 일정이 " + dateLabel + " " + timeLabel + "로 변경됐어요.";
+        if (schedule.getMember() != null && schedule.getMember().getNotifSchedule()) {
+            notificationService.sendNotification(schedule.getMember().getUser(), "SCHEDULE_CHANGE", msg, "HOME", null);
+        }
         return ResponseEntity.ok().build();
     }
 

@@ -3214,7 +3214,8 @@ export default function TrainerScheduleScreen() {
           activeOpacity={1}
           onPress={() => setSlotActionModal(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%" }}>
+          <TouchableOpacity activeOpacity={1} style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "85%", maxHeight: "85%" }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
             <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
               <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, flex: 1 }}>
                 {isPersonalType(slotActionTarget?.sessionType ?? "")
@@ -3447,6 +3448,7 @@ export default function TrainerScheduleScreen() {
                 <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소</Text>
               </TouchableOpacity>
             )}
+            </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
