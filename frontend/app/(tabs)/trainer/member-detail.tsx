@@ -7333,7 +7333,12 @@ export default function MemberDetailScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => setPaymentVisible(false)}>
+              <Text style={{ textAlign: "center", fontSize: 11, color: Colors.textMuted, lineHeight: 17, marginTop: 20, marginBottom: 4 }}>
+                {Platform.OS === "ios"
+                  ? "구독은 매월 자동 갱신되며, 다음 결제일 24시간 전까지\nApple ID 설정 > 구독에서 취소할 수 있습니다.\n환불은 Apple 정책에 따릅니다."
+                  : "구독은 매월 자동 갱신되며, 다음 결제일 24시간 전까지\nGoogle Play에서 취소할 수 있습니다.\n환불은 Google Play 정책에 따릅니다."}
+              </Text>
+              <TouchableOpacity style={{ marginTop: 8 }} onPress={() => setPaymentVisible(false)}>
                 <Text
                   style={{
                     textAlign: "center",
