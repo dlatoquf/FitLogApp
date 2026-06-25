@@ -1951,7 +1951,7 @@ export default function TrainerHomeScreen() {
                     {item.completed ? (
                       <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.blue }}>완료</Text>
                     ) : item.isNoShow ? (
-                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.textMuted }}>노쇼 ›</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.textMuted }}>노쇼</Text>
                     ) : (
                       <Text style={{ fontSize: 12, fontWeight: "800", color: isOt ? "#F97316" : Colors.green }}>확정 ›</Text>
                     )}
