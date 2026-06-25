@@ -1869,171 +1869,94 @@ export default function TrainerHomeScreen() {
               const borderColor = isCompleted ? Colors.blue + "55" : isActualNoShow ? "#D1D5DB" : isOt ? "#F9731644" : Colors.border;
 
               return (
-                <TouchableOpacity
+                <View
                   key={`${item.isManual ? "manual" : "linked"}-${item.memberId}-${item.time}`}
-                  onPress={() => {
-                    console.log("[홈 일정 클릭]", {
-                      name: item.memberName,
-                      memberId: item.memberId,
-                      isManual: item.isManual,
-                      isOt,
-                      sessionType: item.sessionType,
-                    });
-                    if (isOt) {
-                      router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`,
-                      );
-                    } else if (item.isManual) {
-                      router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`,
-                      );
-                    } else {
-                      router.push(
-                        `/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=0`,
-                      );
-                    }
-                  }}
-                  activeOpacity={0.7}
                   style={{
                     flexDirection: "row",
-                    alignItems: "center",
+                    alignItems: "stretch",
                     backgroundColor: bgColor,
                     borderRadius: 10,
-                    paddingVertical: 8,
-                    paddingHorizontal: 12,
                     marginBottom: 6,
                     borderWidth: 1,
                     borderColor: borderColor,
+                    overflow: "hidden",
                     opacity: item.completed || isActualNoShow ? 0.65 : 1,
                   }}
                 >
-                  {/* 성 이니셜 아바타 */}
-                  <View
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      backgroundColor: avatarColor,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginRight: 10,
+                  {/* 왼쪽 메인 영역 (탭하면 회원 상세) */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (isOt) {
+                        router.push(`/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`);
+                      } else if (item.isManual) {
+                        router.push(`/(tabs)/trainer/member-detail?id=${item.memberId}&type=manual&initialTab=0`);
+                      } else {
+                        router.push(`/(tabs)/trainer/member-detail?id=${item.memberId}&initialTab=0`);
+                      }
                     }}
+                    activeOpacity={0.7}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12 }}
                   >
-                    <Text
-                      style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}
-                    >
-                      {item.memberName[0]}
-                    </Text>
-                  </View>
-
-                  {/* 이름 + 구분 */}
-                  <View style={{ flex: 1 }}>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight: "700",
-                          color: Colors.text,
-                        }}
-                      >
-                        {item.memberName}
-                      </Text>
-                      {isOt && (
-                        <View
-                          style={{
-                            backgroundColor: "#F9731622",
-                            borderRadius: 4,
-                            paddingHorizontal: 5,
-                            paddingVertical: 1,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 9,
-                              fontWeight: "800",
-                              color: "#F97316",
-                            }}
-                          >
-                            {`OT ${item.otSessionCount ?? 1}회차`}
-                          </Text>
-                        </View>
-                      )}
+                    {/* 성 이니셜 아바타 */}
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: avatarColor, justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{item.memberName[0]}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                      {isOt
-                        ? `체험 수업`
-                        : item.note
-                          ? `잔여 ${item.ptRemaining}회 | ${item.note}`
-                          : `잔여 ${item.ptRemaining}회`}
-                    </Text>
-                  </View>
 
-                  {/* 시간 + 상태 */}
-                  <View style={{ alignItems: "flex-end", gap: 4 }}>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: Colors.textSub,
-                      }}
-                    >
-                      {item.time}
-                    </Text>
-                    {item.completed ? (
-                      <View style={{ backgroundColor: Colors.blueBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: Colors.blue + "44" }}>
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.blue }}>완료</Text>
+                    {/* 이름 + 정보 */}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.text }}>{item.memberName}</Text>
+                        {isOt && (
+                          <View style={{ backgroundColor: "#F9731622", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 9, fontWeight: "800", color: "#F97316" }}>{`OT ${item.otSessionCount ?? 1}회차`}</Text>
+                          </View>
+                        )}
                       </View>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                        {isOt ? `체험 수업` : item.note ? `잔여 ${item.ptRemaining}회 | ${item.note}` : `잔여 ${item.ptRemaining}회`}
+                      </Text>
+                    </View>
+
+                    {/* 시간 */}
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub, marginLeft: 8 }}>{item.time}</Text>
+                  </TouchableOpacity>
+
+                  {/* 구분선 */}
+                  <View style={{ width: 1, backgroundColor: borderColor }} />
+
+                  {/* 오른쪽 상태 버튼 */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (item.completed) return;
+                      if (item.isNoShow) {
+                        Alert.alert(
+                          `${item.memberName}님 ${item.time} 수업`,
+                          "수업을 취소하면 PT 잔여 횟수가 복구돼요.",
+                          [
+                            { text: "수업 취소", style: "destructive", onPress: async () => {
+                              const jwt = await AsyncStorage.getItem("jwt");
+                              await fetch(`${API_URL}/api/schedule/confirm/${item.scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${jwt}` } });
+                              fetchHome();
+                            }},
+                            { text: "닫기", style: "cancel" },
+                          ],
+                        );
+                      } else {
+                        if (!item.scheduleId) return;
+                        setActionModal({ visible: true, item });
+                      }
+                    }}
+                    style={{ width: 56, justifyContent: "center", alignItems: "center" }}
+                  >
+                    {item.completed ? (
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.blue }}>완료</Text>
                     ) : item.isNoShow ? (
-                      // 노쇼 — 명시적 노쇼만 취소 가능
-                      <TouchableOpacity
-                        disabled={!item.isNoShow || !item.scheduleId}
-                        onPress={() => {
-                          Alert.alert(
-                            `${item.memberName}님 ${item.time} 수업`,
-                            "수업을 취소하면 PT 잔여 횟수가 복구돼요.",
-                            [
-                              {
-                                text: "수업 취소",
-                                style: "destructive",
-                                onPress: async () => {
-                                  const jwt = await AsyncStorage.getItem("jwt");
-                                  await fetch(`${API_URL}/api/schedule/confirm/${item.scheduleId}`, {
-                                    method: "DELETE",
-                                    headers: { Authorization: `Bearer ${jwt}` },
-                                  });
-                                  fetchHome();
-                                },
-                              },
-                              { text: "닫기", style: "cancel" },
-                            ],
-                          );
-                        }}
-                        style={{ backgroundColor: Colors.textMuted + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.textMuted }}>
-                          {item.isNoShow ? "노쇼 ›" : "노쇼"}
-                        </Text>
-                      </TouchableOpacity>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.textMuted }}>노쇼</Text>
                     ) : (
-                      // 확정 → 탭해서 바텀시트 모달 오픈
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (!item.scheduleId) return;
-                          setActionModal({ visible: true, item });
-                        }}
-                        style={{ backgroundColor: isOt ? "#F9731618" : Colors.green + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: "800", color: isOt ? "#F97316" : Colors.green }}>확정 ›</Text>
-                      </TouchableOpacity>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: isOt ? "#F97316" : Colors.green }}>확정</Text>
                     )}
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
               );
             })
         ) : (
