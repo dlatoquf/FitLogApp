@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import messaging from "@react-native-firebase/messaging";
+import Purchases, { LOG_LEVEL } from "react-native-purchases";
+import { Platform } from "react-native";
 import * as Linking from "expo-linking";
 import { router, Stack, useRootNavigationState } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +13,25 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
 import { API_URL, APP_STORE_URL } from "../constants/api";
 
+
+async function initRevenueCat() {
+  try {
+    const apiKey =
+      Platform.OS === "ios"
+        ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
+        : "goog_basbVZDtouCQZzqQwYIsKIlwCdx";
+    Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+    await Purchases.configure({ apiKey });
+    const jwt = await AsyncStorage.getItem("jwt");
+    if (jwt) {
+      const payload = JSON.parse(atob(jwt.split(".")[1]));
+      const userId = String(payload.sub ?? payload.userId ?? payload.id);
+      await Purchases.logIn(userId);
+    }
+  } catch (e) {
+    console.log("RevenueCat 초기화 실패:", e);
+  }
+}
 
 async function initFCM() {
   try {
@@ -212,6 +233,8 @@ export default function RootLayout() {
     initializeKakaoSDK("e889ccffb6096521a6b49b9774f4d9ab");
     console.log("[Init] FCM 초기화 시작");
     initFCM();
+    console.log("[Init] RevenueCat 초기화 시작");
+    initRevenueCat();
 
     const markAllNotificationsRead = async () => {
       try {

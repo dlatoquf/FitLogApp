@@ -1297,15 +1297,26 @@ export default function TrainerMoreScreen() {
                             Alert.alert("오류", "결제 모듈을 불러오지 못했어요.");
                             return;
                           }
-                          const offerings = await Purchases.getOfferings();
+
+                          // offerings 최대 3회 재시도
+                          let offerings: any = null;
+                          for (let attempt = 0; attempt < 3; attempt++) {
+                            try {
+                              offerings = await Purchases.getOfferings();
+                              if (offerings?.current) break;
+                            } catch {
+                              if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+                            }
+                          }
+
                           const pkg = isAffiliated
-                            ? offerings.current?.availablePackages.find(
+                            ? offerings?.current?.availablePackages.find(
                                 (p: any) => p.identifier === "pro_monthly_affiliate",
-                              ) ?? offerings.current?.monthly
-                            : offerings.current?.monthly ??
-                              offerings.current?.availablePackages[0];
+                              ) ?? offerings?.current?.monthly
+                            : offerings?.current?.monthly ??
+                              offerings?.current?.availablePackages[0];
                           if (!pkg) {
-                            Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
+                            Alert.alert("오류", "구독 상품을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
                             return;
                           }
                           await Purchases.purchasePackage(pkg);

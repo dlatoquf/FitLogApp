@@ -584,23 +584,16 @@ export default function TrainerHomeScreen() {
         }
       } catch {}
 
-      // RevenueCat 초기화 + 트레이너 userId 연결
+      // RevenueCat userId 연결 (초기화는 _layout.tsx에서 앱 시작 시 완료됨)
       try {
-        if (Purchases && typeof Purchases.configure === "function") {
-          const revenueCatKey =
-            Platform.OS === "ios"
-              ? "appl_vMgKlaKdscTldAQsfRPuZuXlXLT"
-              : "goog_basbVZDtouCQZzqQwYIsKIlwCdx";
-          await Purchases.configure({ apiKey: revenueCatKey });
-          const jwt = await AsyncStorage.getItem("jwt");
-          if (jwt) {
-            const payload = JSON.parse(atob(jwt.split(".")[1]));
-            const userId = String(payload.sub ?? payload.userId ?? payload.id);
-            await Purchases.logIn(userId);
-          }
+        const jwt = await AsyncStorage.getItem("jwt");
+        if (jwt) {
+          const payload = JSON.parse(atob(jwt.split(".")[1]));
+          const userId = String(payload.sub ?? payload.userId ?? payload.id);
+          await Purchases.logIn(userId);
         }
       } catch (e) {
-        console.log("RevenueCat 초기화 실패:", e);
+        console.log("RevenueCat logIn 실패:", e);
       }
 
       if (notiRes.ok) setNotifications((await notiRes.json()).slice(0, 10));

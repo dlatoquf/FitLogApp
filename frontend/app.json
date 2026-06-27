@@ -157,7 +157,8 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "expo-notifications",
-      "expo-font"
+      "expo-font",
+      "./plugins/removeMediaPermissions"
     ],
     "experiments": {
       "typedRoutes": true,
