@@ -107,15 +107,7 @@ export default function TrainerMoreScreen() {
         });
         if (homeRes.ok) {
           const homeData = await homeRes.json();
-          // RC 엔타이틀먼트 확인 - 활성 구독이 있으면 PRO 유지
-          let rcActivePlan = false;
-          try {
-            const ci = await Purchases.getCustomerInfo();
-            rcActivePlan = Object.keys(ci.entitlements.active).length > 0;
-          } catch {}
-          if (rcActivePlan) {
-            setPlan("PRO");
-          } else if (homeData.trialEndDate) {
+          if (homeData.trialEndDate) {
             setTrialEndDate(homeData.trialEndDate);
             setPlan("FREE");
           } else {
@@ -1330,7 +1322,6 @@ export default function TrainerMoreScreen() {
                           if (isActive) setPlan("PRO");
                           setPaymentVisible(false);
                           Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
-                          setTimeout(() => fetchProfile(), 8000);
                         } catch (e: any) {
                           if (!e.userCancelled)
                             Alert.alert(
@@ -1372,7 +1363,6 @@ export default function TrainerMoreScreen() {
                         setPlan("PRO");
                         setPaymentVisible(false);
                         Alert.alert("복원 완료", "구독이 복원됐어요.");
-                        setTimeout(() => fetchProfile(), 2000);
                       } else {
                         Alert.alert("복원 없음", "복원할 구독이 없어요.");
                       }

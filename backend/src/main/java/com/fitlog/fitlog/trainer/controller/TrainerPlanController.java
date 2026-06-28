@@ -38,6 +38,8 @@ public class TrainerPlanController {
             String eventType  = (String) event.get("type");
             String appUserId  = (String) event.get("app_user_id"); // 우리가 설정할 userId
 
+            System.out.println("[RC Webhook] type=" + eventType + " app_user_id=" + appUserId);
+
             if (eventType == null || appUserId == null)
                 return ResponseEntity.badRequest().body(Map.of("message", "필수값 없음"));
 

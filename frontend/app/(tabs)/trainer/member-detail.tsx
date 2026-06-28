@@ -2187,9 +2187,15 @@ export default function MemberDetailScreen() {
         // 화면 복귀 시 기본 탭으로 초기화: 미연동=운동로그(1), 연동=식단로그(0)
         setTab(isManual ? 1 : 0);
       }
-      // 화면 복귀 시 운동로그 캘린더 날짜를 오늘로 리셋
-      setSelectedDate(new Date());
-      setWeekOffset(0);
+      // 알림에서 진입 시 해당 날짜로, 그 외엔 오늘로 리셋
+      if (notifDate) {
+        const d = parseDateStr(notifDate);
+        setSelectedDate(d);
+        setWeekOffset(calcWeekOffset(d));
+      } else {
+        setSelectedDate(new Date());
+        setWeekOffset(0);
+      }
       // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
       fetchMember();
       fetchFitLogs(true);

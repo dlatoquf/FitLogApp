@@ -72,10 +72,28 @@ public class NotificationController {
                             dietDayFeedbackRepository.findById(n.getTargetId())
                                 .ifPresent(f -> map.put("targetDate", f.getDate().toString()));
                         } else if ("WORKOUT_LOG".equals(n.getTargetType())) {
-                            workoutLogRepository.findById(n.getTargetId()).ifPresent(l -> {
-                                if (l.getLogDate() != null) map.put("targetDate", l.getLogDate().toString());
-                                if (l.getMember() != null) map.put("memberId", l.getMember().getId());
-                            });
+                            // content에서 날짜 추출 (공통)
+                            String contentDate = null;
+                            if (n.getContent() != null) {
+                                java.util.regex.Matcher m = java.util.regex.Pattern
+                                    .compile("(\\d{4}-\\d{2}-\\d{2})").matcher(n.getContent());
+                                if (m.find()) contentDate = m.group(1);
+                            }
+                            var logOpt = workoutLogRepository.findById(n.getTargetId());
+                            boolean isNewFormat = logOpt.isPresent() && logOpt.get().getLogDate() != null
+                                && contentDate != null
+                                && logOpt.get().getLogDate().toString().equals(contentDate)
+                                && logOpt.get().getMember() != null;
+                            if (isNewFormat) {
+                                // 새 형식: targetId = workoutLogId
+                                var l = logOpt.get();
+                                map.put("targetDate", l.getLogDate().toString());
+                                map.put("memberId", l.getMember().getId());
+                            } else {
+                                // 구 형식: targetId = memberId
+                                map.put("memberId", n.getTargetId());
+                                if (contentDate != null) map.put("targetDate", contentDate);
+                            }
                         } else if ("MISSION".equals(n.getTargetType())) {
                             // targetId가 missionId인 경우 mission 조회해서 실제 memberId 추출
                             missionRepository.findById(n.getTargetId()).ifPresentOrElse(
