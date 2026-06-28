@@ -1298,23 +1298,14 @@ export default function TrainerMoreScreen() {
                             return;
                           }
 
-                          // offerings 최대 3회 재시도
-                          let offerings: any = null;
-                          for (let attempt = 0; attempt < 3; attempt++) {
-                            try {
-                              offerings = await Purchases.getOfferings();
-                              if (offerings?.current) break;
-                            } catch {
-                              if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
-                            }
-                          }
-
-                          const pkg = isAffiliated
-                            ? offerings?.current?.availablePackages.find(
-                                (p: any) => p.identifier === "pro_monthly_affiliate",
-                              ) ?? offerings?.current?.monthly
-                            : offerings?.current?.monthly ??
-                              offerings?.current?.availablePackages[0];
+                          const offerings = await Purchases.getOfferings();
+                          const current = offerings?.current;
+                          const pkg =
+                            current?.monthly ??
+                            current?.availablePackages?.find(
+                              (p: any) => p.identifier === "$rc_monthly",
+                            ) ??
+                            current?.availablePackages?.[0];
                           if (!pkg) {
                             Alert.alert("오류", "구독 상품을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
                             return;

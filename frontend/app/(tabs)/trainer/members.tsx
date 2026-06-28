@@ -1672,9 +1672,11 @@ export default function TrainerMembersScreen() {
                         return;
                       }
                       const offerings = await Purchases.getOfferings();
+                      const current = offerings?.current;
                       const pkg =
-                        offerings.current?.monthly ??
-                        offerings.current?.availablePackages[0];
+                        current?.monthly ??
+                        current?.availablePackages?.find((p: any) => p.identifier === "$rc_monthly") ??
+                        current?.availablePackages?.[0];
                       if (!pkg) {
                         Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
                         return;

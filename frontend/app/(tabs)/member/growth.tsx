@@ -22,6 +22,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Modal,
   RefreshControl,
   ScrollView,
   Text,
@@ -36,6 +37,7 @@ const SCREEN_W   = Dimensions.get("window").width - 72;
 const TOTAL_SLOTS = 8;
 
 interface BodyLog {
+  id?: number;
   date: string;
   weight?: number;
   bodyFatMass?: number;
@@ -52,6 +54,9 @@ export default function MemberGrowthScreen() {
   const [bodyFatMass, setBodyFatMass] = useState("");
   const [muscleMass, setMuscleMass]   = useState("");
   const [saving, setSaving]           = useState(false);
+
+  const [editingLog, setEditingLog] = useState<{ id: number; date: string; weight: string; bodyFatMass: string; muscleMass: string } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const autoBodyFat = (() => {
     const w = parseFloat(weight);
@@ -71,6 +76,7 @@ export default function MemberGrowthScreen() {
       if (!res.ok) throw new Error();
       const raw = await res.json();
       setBodyLogs(raw.map((l: any) => ({
+        id: l.id,
         date: l.createdAt || l.date || l.logDate,
         weight: l.weight,
         bodyFatMass: l.bodyFatMass,
@@ -107,6 +113,7 @@ export default function MemberGrowthScreen() {
       // 재조회 없이 응답에서 바로 목록 업데이트
       if (data.logs) {
         setBodyLogs(data.logs.map((l: any) => ({
+          id: l.id,
           date: l.createdAt || l.date || l.logDate,
           weight: l.weight,
           bodyFatMass: l.bodyFatMass,
@@ -120,6 +127,57 @@ export default function MemberGrowthScreen() {
       Alert.alert("완료", "바디로그가 저장됐어요!");
     } catch (e: any) { Alert.alert("오류", e.message); }
     finally { setSaving(false); }
+  };
+
+  const deleteLog = async (id: number) => {
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const res = await fetch(`${API_URL}/api/bodylog/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (!res.ok) throw new Error("삭제 실패");
+      const data = await res.json();
+      if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
+        id: l.id, date: l.createdAt || l.date || l.logDate,
+        weight: l.weight, bodyFatMass: l.bodyFatMass,
+        bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
+        muscleMass: l.muscleMass,
+      })));
+    } catch { Alert.alert("오류", "삭제에 실패했어요."); }
+  };
+
+  const saveEditLog = async () => {
+    if (!editingLog) return;
+    if (!editingLog.weight) { Alert.alert("오류", "체중을 입력해주세요."); return; }
+    setEditSaving(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const w = parseFloat(editingLog.weight);
+      const f = editingLog.bodyFatMass ? parseFloat(editingLog.bodyFatMass) : null;
+      const res = await fetch(`${API_URL}/api/bodylog/${editingLog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({
+          date: editingLog.date,
+          weight: w,
+          bodyFatMass: f,
+          bodyFat: w > 0 && f && f > 0 ? Math.round((f / w) * 1000) / 10 : null,
+          muscleMass: editingLog.muscleMass ? parseFloat(editingLog.muscleMass) : null,
+        }),
+      });
+      if (!res.ok) throw new Error("수정 실패");
+      const data = await res.json();
+      if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
+        id: l.id, date: l.createdAt || l.date || l.logDate,
+        weight: l.weight, bodyFatMass: l.bodyFatMass,
+        bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
+        muscleMass: l.muscleMass,
+      })));
+      setEditingLog(null);
+      Alert.alert("완료", "바디로그가 수정됐어요!");
+    } catch (e: any) { Alert.alert("오류", e.message); }
+    finally { setEditSaving(false); }
   };
 
   useFocusEffect(useCallback(() => { fetchBodyLogs(); }, []));
@@ -328,6 +386,7 @@ export default function MemberGrowthScreen() {
   }
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: "#fff" }}
       contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 40 }}
@@ -461,15 +520,28 @@ export default function MemberGrowthScreen() {
                   borderColor: Colors.border,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.textMuted,
-                    marginBottom: 8,
-                  }}
-                >
-                  {formatDateTime(log.date)}
-                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted }}>{formatDateTime(log.date)}</Text>
+                  {log.id && (
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setEditingLog({ id: log.id!, date: String(log.date ?? "").slice(0, 10), weight: String(log.weight ?? ""), bodyFatMass: String(log.bodyFatMass ?? ""), muscleMass: String(log.muscleMass ?? "") })}
+                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: Colors.bgSub, borderRadius: 6, borderWidth: 1, borderColor: Colors.border }}
+                      >
+                        <Text style={{ fontSize: 12, color: Colors.text, fontWeight: "600" }}>수정</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => Alert.alert("삭제", "이 기록을 삭제할까요?", [
+                          { text: "취소", style: "cancel" },
+                          { text: "삭제", style: "destructive", onPress: () => deleteLog(log.id!) },
+                        ])}
+                        style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: "#fff0f0", borderRadius: 6, borderWidth: 1, borderColor: "#ffcccc" }}
+                      >
+                        <Text style={{ fontSize: 12, color: "#e03030", fontWeight: "600" }}>삭제</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
 
                 <View
                   style={{
@@ -551,5 +623,53 @@ export default function MemberGrowthScreen() {
           })
       )}
     </ScrollView>
+
+    {/* 바디로그 수정 모달 */}
+    <Modal visible={!!editingLog} transparent animationType="fade" onRequestClose={() => setEditingLog(null)}>
+      <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }} activeOpacity={1} onPress={() => setEditingLog(null)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={{ backgroundColor: Colors.bg, borderRadius: 16, padding: 24, width: "88%", gap: 14 }}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>바디로그 수정</Text>
+
+          <View>
+            <Text style={{ fontSize: 12, color: Colors.textSub, marginBottom: 6 }}>날짜 (YYYY-MM-DD)</Text>
+            <TextInput
+              value={editingLog?.date ?? ""}
+              onChangeText={(v) => setEditingLog((p) => p ? { ...p, date: v } : p)}
+              placeholder="2025-01-01"
+              placeholderTextColor={Colors.textMuted}
+              style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 10, color: Colors.text, fontSize: 14 }}
+            />
+          </View>
+
+          {[
+            { label: "체중 (kg)", key: "weight" as const },
+            { label: "체지방량 (kg)", key: "bodyFatMass" as const },
+            { label: "근육량 (kg)", key: "muscleMass" as const },
+          ].map(({ label, key }) => (
+            <View key={key}>
+              <Text style={{ fontSize: 12, color: Colors.textSub, marginBottom: 6 }}>{label}</Text>
+              <TextInput
+                value={editingLog?.[key] ?? ""}
+                onChangeText={(v) => setEditingLog((p) => p ? { ...p, [key]: v } : p)}
+                placeholder="0.0"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="decimal-pad"
+                style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 10, color: Colors.text, fontSize: 14 }}
+              />
+            </View>
+          ))}
+
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+            <TouchableOpacity onPress={() => setEditingLog(null)} style={{ flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}>
+              <Text style={{ fontSize: 14, color: Colors.textSub }}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={saveEditLog} disabled={editSaving} style={{ flex: 1, padding: 12, borderRadius: 10, backgroundColor: Colors.green, alignItems: "center" }}>
+              <Text style={{ fontSize: 14, color: "#fff", fontWeight: "700" }}>{editSaving ? "저장 중..." : "저장"}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+    </>
   );
 }
