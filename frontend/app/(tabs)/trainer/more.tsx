@@ -1318,10 +1318,12 @@ export default function TrainerMoreScreen() {
                             return;
                           }
                           await Purchases.purchasePackage(pkg);
-                          setPlan("PRO");
+                          const customerInfo = await Purchases.getCustomerInfo();
+                          const isActive = Object.keys(customerInfo.entitlements.active).length > 0;
+                          if (isActive) setPlan("PRO");
                           setPaymentVisible(false);
                           Alert.alert("구독 완료!", "PRO 플랜이 활성화됐어요.");
-                          setTimeout(() => fetchProfile(), 3000);
+                          setTimeout(() => fetchProfile(), 8000);
                         } catch (e: any) {
                           if (!e.userCancelled)
                             Alert.alert(
