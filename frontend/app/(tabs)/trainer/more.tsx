@@ -1301,20 +1301,12 @@ export default function TrainerMoreScreen() {
                           let offerings: any = null;
                           try {
                             offerings = await Purchases.getOfferings();
-                          } catch (offeringsErr: any) {
-                            console.log("[RC] getOfferings 에러:", offeringsErr);
-                            Alert.alert(
-                              "[RC] getOfferings 실패",
-                              `message: ${offeringsErr?.message ?? "없음"}\ncode: ${offeringsErr?.code ?? "없음"}\nuserInfo: ${JSON.stringify(offeringsErr?.userInfo ?? {})}`,
-                            );
+                          } catch {
+                            Alert.alert("오류", "구독 상품을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
                             return;
                           }
 
                           const current = offerings?.current;
-                          console.log("[RC] current:", current?.identifier ?? "null");
-                          console.log("[RC] monthly:", current?.monthly?.identifier ?? "null");
-                          console.log("[RC] packages:", JSON.stringify(current?.availablePackages?.map((p: any) => p.identifier) ?? []));
-
                           const pkg =
                             current?.monthly ??
                             current?.availablePackages?.find(
@@ -1322,8 +1314,7 @@ export default function TrainerMoreScreen() {
                             ) ??
                             current?.availablePackages?.[0];
                           if (!pkg) {
-                            const debugInfo = `current: ${current?.identifier ?? "null"}\npackages: ${JSON.stringify(current?.availablePackages?.map((p: any) => p.identifier) ?? [])}`;
-                            Alert.alert("구독 상품 오류", `상품을 불러오지 못했어요.\n\n[디버그]\n${debugInfo}`);
+                            Alert.alert("오류", "구독 상품을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
                             return;
                           }
                           await Purchases.purchasePackage(pkg);
