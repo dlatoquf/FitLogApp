@@ -1300,6 +1300,12 @@ export default function TrainerMoreScreen() {
 
                           const offerings = await Purchases.getOfferings();
                           const current = offerings?.current;
+
+                          // 디버그: offerings 상태 로그
+                          console.log("[RC] current offering id:", current?.identifier);
+                          console.log("[RC] monthly pkg:", current?.monthly?.identifier);
+                          console.log("[RC] availablePackages:", current?.availablePackages?.map((p: any) => p.identifier));
+
                           const pkg =
                             current?.monthly ??
                             current?.availablePackages?.find(
@@ -1307,7 +1313,8 @@ export default function TrainerMoreScreen() {
                             ) ??
                             current?.availablePackages?.[0];
                           if (!pkg) {
-                            Alert.alert("오류", "구독 상품을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+                            const debugInfo = `current: ${current?.identifier ?? "null"}\npackages: ${JSON.stringify(current?.availablePackages?.map((p: any) => p.identifier) ?? [])}`;
+                            Alert.alert("구독 상품 오류", `상품을 불러오지 못했어요.\n\n[디버그]\n${debugInfo}`);
                             return;
                           }
                           await Purchases.purchasePackage(pkg);
