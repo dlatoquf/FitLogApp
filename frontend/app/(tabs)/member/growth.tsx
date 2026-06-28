@@ -79,7 +79,7 @@ export default function MemberGrowthScreen() {
       const raw = await res.json();
       setBodyLogs(raw.map((l: any) => ({
         id: l.id,
-        date: l.createdAt || l.date || l.logDate,
+        date: l.logDate || l.date || l.createdAt,
         weight: l.weight,
         bodyFatMass: l.bodyFatMass,
         bodyFat: l.bodyFatMass && l.weight
@@ -116,7 +116,7 @@ export default function MemberGrowthScreen() {
       if (data.logs) {
         setBodyLogs(data.logs.map((l: any) => ({
           id: l.id,
-          date: l.createdAt || l.date || l.logDate,
+          date: l.logDate || l.date || l.createdAt,
           weight: l.weight,
           bodyFatMass: l.bodyFatMass,
           bodyFat: l.bodyFatMass && l.weight
@@ -141,7 +141,7 @@ export default function MemberGrowthScreen() {
       if (!res.ok) throw new Error("삭제 실패");
       const data = await res.json();
       if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
-        id: l.id, date: l.createdAt || l.date || l.logDate,
+        id: l.id, date: l.logDate || l.date || l.createdAt,
         weight: l.weight, bodyFatMass: l.bodyFatMass,
         bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
         muscleMass: l.muscleMass,
@@ -171,7 +171,7 @@ export default function MemberGrowthScreen() {
       if (!res.ok) throw new Error("수정 실패");
       const data = await res.json();
       if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
-        id: l.id, date: l.createdAt || l.date || l.logDate,
+        id: l.id, date: l.logDate || l.date || l.createdAt,
         weight: l.weight, bodyFatMass: l.bodyFatMass,
         bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
         muscleMass: l.muscleMass,
