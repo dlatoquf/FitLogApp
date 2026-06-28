@@ -107,8 +107,15 @@ export default function TrainerMoreScreen() {
         });
         if (homeRes.ok) {
           const homeData = await homeRes.json();
-          // trialEndDate가 있으면 무료체험 중 → FREE로 표시
-          if (homeData.trialEndDate) {
+          // RC 엔타이틀먼트 확인 - 활성 구독이 있으면 PRO 유지
+          let rcActivePlan = false;
+          try {
+            const ci = await Purchases.getCustomerInfo();
+            rcActivePlan = Object.keys(ci.entitlements.active).length > 0;
+          } catch {}
+          if (rcActivePlan) {
+            setPlan("PRO");
+          } else if (homeData.trialEndDate) {
             setTrialEndDate(homeData.trialEndDate);
             setPlan("FREE");
           } else {
