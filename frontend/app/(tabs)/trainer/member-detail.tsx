@@ -2198,7 +2198,8 @@ export default function MemberDetailScreen() {
       }
       // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
       fetchMember();
-      fetchFitLogs(true);
+      // notifDate 있으면 weekOffset 변경 → useEffect([weekOffset])이 fetchFitLogs 담당
+      if (!notifDate) fetchFitLogs(true);
       fetchFitLogHistory(true);
     }, [initialTab, isManual, memberId]),
   );
