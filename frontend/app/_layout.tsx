@@ -11,7 +11,7 @@ import * as Notifications from "expo-notifications";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { saveFcmToken } from "../utils/fcm";
-import { API_URL, APP_STORE_URL } from "../constants/api";
+import { API_URL, APP_STORE_URL, PLAY_STORE_URL } from "../constants/api";
 
 
 async function initRevenueCat() {
@@ -303,7 +303,7 @@ export default function RootLayout() {
                 },
               } as any);
             } else {
-              Linking.openURL(APP_STORE_URL);
+              Linking.openURL(Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL);
             }
           } else if (code) {
             // 회원초대 링크

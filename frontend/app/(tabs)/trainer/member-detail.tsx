@@ -2744,7 +2744,7 @@ export default function MemberDetailScreen() {
     // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함
     const inviteUrl = isOt
       ? "https://fitlog.app"
-      : "https://apps.apple.com/app/fitlog/id6769366090";
+      : (Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL);
     const executionParams = {
       memberId: String(memberId),
       ...(isManual ? { memberType: "manual" } : {}),
@@ -2793,7 +2793,7 @@ export default function MemberDetailScreen() {
     const code = trainerInviteCode ?? "";
     const trainerName = member?.user?.name ?? "트레이너";
     const safeText = String(`안녕하세요! FitLog 앱에서 아래 트레이너 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
-    const safeUrl = String(APP_STORE_URL ?? "https://fitlog.app");
+    const safeUrl = String((Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL) ?? "https://fitlog.app");
     try {
       await KakaoShare.shareTextTemplate({
         template: {

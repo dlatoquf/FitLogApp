@@ -913,7 +913,7 @@ export default function TrainerHomeScreen() {
               `새 버전(${latest})이 출시됐어요!\n업데이트 후 이용해주세요.`,
               [
                 { text: "나중에" },
-                { text: "업데이트", onPress: () => Linking.openURL(APP_STORE_URL) },
+                { text: "업데이트", onPress: () => Linking.openURL(Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL) },
               ],
             );
           }
@@ -943,7 +943,7 @@ export default function TrainerHomeScreen() {
         template: {
           text: safeText,
           link: {
-            mobileWebUrl: APP_STORE_URL,
+            mobileWebUrl: Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL,
             webUrl: APP_STORE_URL,
             androidExecutionParams: { code },
             iosExecutionParams: { code },
