@@ -2198,10 +2198,10 @@ export default function MemberDetailScreen() {
       }
       // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
       fetchMember();
-      // notifDate 있으면 weekOffset 변경 → useEffect([weekOffset])이 fetchFitLogs 담당
-      if (!notifDate) fetchFitLogs(true);
+      // 항상 현재 주차 데이터 새로고침 (weekOffset 변경 없어도 stale 캐시 방지)
+      fetchFitLogs(true);
       fetchFitLogHistory(true);
-    }, [initialTab, isManual, memberId]),
+    }, [initialTab, isManual, memberId, notifDate]),
   );
 
   // PT 미등록 뱃지에서 진입 시 PT 추가 모달 자동 오픈
