@@ -1425,6 +1425,8 @@ export default function TrainerHomeScreen() {
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 6,
                       marginBottom: 10,
                     }}
                   >
@@ -1485,7 +1487,8 @@ export default function TrainerHomeScreen() {
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 6,
+                        flexWrap: "wrap",
+                        gap: 5,
                       }}
                     >
                       {/* 목표 매출 수정 (이번 달만) */}
@@ -1504,13 +1507,13 @@ export default function TrainerHomeScreen() {
                             borderWidth: 1,
                             borderColor: Colors.border,
                             borderRadius: 8,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
                             backgroundColor: "#fff",
                           }}
                         >
-                          <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                            목표 매출 수정
+                          <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                            목표 수정
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1520,13 +1523,13 @@ export default function TrainerHomeScreen() {
                         style={{
                           backgroundColor: "#fff",
                           borderRadius: 8,
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
                           borderWidth: 1,
                           borderColor: Colors.border,
                         }}
                       >
-                        <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.textMuted }}>
                           📄 PDF
                         </Text>
                       </TouchableOpacity>
@@ -1536,14 +1539,14 @@ export default function TrainerHomeScreen() {
                           onPress={handlePayButtonPress}
                           style={{
                             backgroundColor: Colors.green,
-                            paddingHorizontal: 12,
-                            paddingVertical: 5,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
                             borderRadius: 8,
                             borderWidth: 1,
                             borderColor: Colors.green,
                           }}
                         >
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>
                             + 결제 추가
                           </Text>
                         </TouchableOpacity>

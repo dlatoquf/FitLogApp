@@ -210,6 +210,8 @@ public class WorkoutLogController {
         log.setWorkoutType(workoutType);
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());
+        if (body.containsKey("memo"))
+            log.setMemo((String) body.get("memo"));
         if (body.containsKey("painPoints"))
             log.setPainPoints((String) body.get("painPoints"));
         if (body.containsKey("feedback"))
@@ -509,6 +511,8 @@ public class WorkoutLogController {
         }
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());
+        if (body.containsKey("memo"))
+            log.setMemo((String) body.get("memo"));
         if (body.containsKey("painPoints"))
             log.setPainPoints((String) body.get("painPoints"));
         if (body.containsKey("feedback"))
@@ -588,6 +592,8 @@ public class WorkoutLogController {
         }
         if (body.containsKey("conditionScore") && body.get("conditionScore") != null)
             log.setConditionScore(((Number) body.get("conditionScore")).intValue());
+        if (body.containsKey("memo"))
+            log.setMemo((String) body.get("memo"));
         if (body.containsKey("painPoints"))
             log.setPainPoints((String) body.get("painPoints"));
         if (body.containsKey("feedback"))
@@ -682,6 +688,7 @@ public class WorkoutLogController {
                     map.put("date", log.getLogDate().toString());
                     map.put("workoutType", log.getWorkoutType());
                     map.put("conditionScore", log.getConditionScore());
+                    map.put("memo", log.getMemo());
                     map.put("painPoints", log.getPainPoints());
                     map.put("feedback", log.getFeedback());
                     try {

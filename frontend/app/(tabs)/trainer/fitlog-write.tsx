@@ -368,12 +368,12 @@ export default function FitLogWriteScreen() {
           <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.green }}>운동 추가</Text>
         </TouchableOpacity>
 
-        {/* 메모 */}
-        <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.textSub, marginBottom: 8 }}>메모 (선택)</Text>
+        {/* 특이사항 */}
+        <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.textSub, marginBottom: 8 }}>특이사항 (선택)</Text>
         <TextInput
           value={memo}
           onChangeText={setMemo}
-          placeholder="오늘 수업 특이사항, 컨디션 등을 기록하세요"
+          placeholder="부상, 통증, 특이 사항 등을 기록하세요"
           placeholderTextColor={Colors.textPlaceholder}
           multiline
           numberOfLines={3}

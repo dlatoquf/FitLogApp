@@ -36,6 +36,9 @@ public class WorkoutLog {
     @Column(name = "condition_score")
     private Integer conditionScore;
 
+    @Column(name = "memo", columnDefinition = "TEXT")
+    private String memo;
+
     @Column(name = "pain_points")
     private String painPoints;
 
@@ -69,6 +72,8 @@ public class WorkoutLog {
     public void setLogDate(LocalDate logDate) { this.logDate = logDate; }
     public Integer getConditionScore() { return conditionScore; }
     public void setConditionScore(Integer conditionScore) { this.conditionScore = conditionScore; }
+    public String getMemo() { return memo; }
+    public void setMemo(String memo) { this.memo = memo; }
     public String getPainPoints() { return painPoints; }
     public void setPainPoints(String painPoints) { this.painPoints = painPoints; }
     public String getWorkoutType() { return workoutType; }

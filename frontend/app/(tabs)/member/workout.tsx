@@ -57,6 +57,7 @@ interface WorkoutLog {
   date: string;
   workoutType: string;
   conditionScore?: number;
+  memo?: string;
   painPoints?: string;
   feedback?: string;
   exercises: {
@@ -212,6 +213,7 @@ export default function WorkoutScreen() {
     date: String(l.date ?? l.logDate ?? l.log_date ?? "").slice(0, 10),
     workoutType: l.workoutType ?? l.workout_type ?? "PERSONAL",
     conditionScore: l.conditionScore ?? l.condition_score ?? null,
+    memo: l.memo ?? null,
     painPoints: l.painPoints ?? l.pain_points ?? null,
     feedback: l.feedback ?? null,
     exercises: l.exercises ?? l.sets ?? l.workoutSets ?? [],
@@ -801,6 +803,13 @@ export default function WorkoutScreen() {
           </View>
         )}
 
+        {anyLog.memo ? (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 3 }}>특이사항</Text>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>{anyLog.memo}</Text>
+          </View>
+        ) : null}
+
         {exercises.map((exercise: any, exIdx: number) => {
           const sets = exercise.sets ?? [];
           const mediaList = getExerciseMediaList(exercise);
@@ -1192,8 +1201,9 @@ export default function WorkoutScreen() {
           style={{
             backgroundColor: Colors.bgSub,
             borderRadius: 14,
-            padding: 16,
-            marginBottom: 20,
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+            marginBottom: 14,
             borderWidth: 1,
             borderColor: Colors.border,
           }}
@@ -1203,7 +1213,7 @@ export default function WorkoutScreen() {
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 12,
+              marginBottom: 6,
             }}
           >
             <TouchableOpacity
@@ -1261,9 +1271,9 @@ export default function WorkoutScreen() {
                   </Text>
                   <View
                     style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
                       backgroundColor: isSelected
                         ? Colors.green
                         : isTodayD
@@ -1326,11 +1336,11 @@ export default function WorkoutScreen() {
             style={{
               height: 1,
               backgroundColor: Colors.border,
-              marginTop: 12,
-              marginBottom: 12,
+              marginTop: 6,
+              marginBottom: 6,
             }}
           />
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 0 }}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
             >

@@ -1349,6 +1349,7 @@ export default function MemberDetailScreen() {
   ]);
   const [ptBodyParts, setPtBodyParts] = useState<string[]>([]);
   const [ptCondition, setPtCondition] = useState<number | null>(null);
+  const [ptLogMemo, setPtLogMemo] = useState("");
   const [ptWorkoutFeedback, setPtWorkoutFeedback] = useState("");
   const [ptMissions, setPtMissions] = useState<string[]>([""]);
   const [lastSessionMissions, setLastSessionMissions] = useState<
@@ -2332,6 +2333,7 @@ export default function MemberDetailScreen() {
     ]);
     setPtBodyParts([]);
     setPtCondition(null);
+    setPtLogMemo("");
     setPtWorkoutFeedback("");
     setPtMissions([""]);
     setEditingFitLogId(null);
@@ -2371,6 +2373,7 @@ export default function MemberDetailScreen() {
         : [],
     );
     setPtCondition(log.conditionScore ?? null);
+    setPtLogMemo(log.memo ?? "");
     setPtWorkoutFeedback(log.feedback ?? "");
     setShowFitLogForm(true);
   };
@@ -2588,6 +2591,7 @@ export default function MemberDetailScreen() {
       const body: any = {
         date: toDateKey(selectedDate),
         conditionScore: ptCondition ?? undefined,
+        memo: ptLogMemo.trim() || undefined,
         painPoints: ptBodyParts.length > 0 ? ptBodyParts.join(", ") : undefined,
         feedback: ptWorkoutFeedback.trim() || undefined,
         missions: ptMissions.filter((m) => m.trim().length > 0),
@@ -2826,6 +2830,7 @@ export default function MemberDetailScreen() {
     const workoutType = log.workoutType === "PT" ? "PT 수업" : "개인 운동";
     const condition = getWorkoutConditionText(log.conditionScore);
     const painPoints = log.painPoints ? `\n운동 부위: ${log.painPoints}` : "";
+    const logMemo = log.memo ? `\n특이사항: ${log.memo}` : "";
     const feedback = log.feedback ? `\n\n피드백\n${log.feedback}` : "";
 
     const exerciseText = (log.exercises ?? [])
@@ -2843,7 +2848,7 @@ export default function MemberDetailScreen() {
       })
       .join("\n\n");
 
-    return `[FitLog 운동 기록]\n${member?.user?.name ?? "회원"}님\n날짜: ${logDate}\n구분: ${workoutType}${painPoints}${condition ? `\n컨디션: ${condition}` : ""}\n\n${exerciseText || "운동 기록 없음"}${feedback}`;
+    return `[FitLog 운동 기록]\n${member?.user?.name ?? "회원"}님\n날짜: ${logDate}\n구분: ${workoutType}${painPoints}${condition ? `\n컨디션: ${condition}` : ""}${logMemo}\n\n${exerciseText || "운동 기록 없음"}${feedback}`;
   };
 
   const copyWorkoutLogText = async (log: any) => {
@@ -3001,7 +3006,8 @@ export default function MemberDetailScreen() {
       style={{
         backgroundColor: Colors.bgSub,
         borderRadius: 14,
-        padding: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         marginBottom: 16,
         borderWidth: 1,
         borderColor: Colors.border,
@@ -3012,7 +3018,7 @@ export default function MemberDetailScreen() {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 10,
+          marginBottom: 6,
         }}
       >
         <TouchableOpacity
@@ -3087,9 +3093,9 @@ export default function MemberDetailScreen() {
 
               <View
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 10,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
                   backgroundColor: isSelected
                     ? Colors.green
                     : isToday
@@ -3628,6 +3634,13 @@ export default function MemberDetailScreen() {
             )}
           </View>
         )}
+
+        {log.memo ? (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 3 }}>특이사항</Text>
+            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>{log.memo}</Text>
+          </View>
+        ) : null}
 
         {exercises.map((exercise: any, exIdx: number) => {
           const sets = exercise.sets ?? [];
@@ -5004,13 +5017,14 @@ export default function MemberDetailScreen() {
                 disabled={blSaving}
                 style={{
                   backgroundColor: Colors.green,
-                  borderRadius: 12,
-                  padding: 14,
+                  borderRadius: 10,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
                   alignItems: "center",
                 }}
               >
                 <Text
-                  style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}
+                  style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}
                 >
                   {blSaving ? "저장 중..." : "기록 저장"}
                 </Text>
@@ -5527,6 +5541,32 @@ export default function MemberDetailScreen() {
                     );
                   })}
                 </View>
+              </View>
+
+              {/* 특이사항 */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 6 }}>
+                  특이사항 (선택)
+                </Text>
+                <TextInput
+                  value={ptLogMemo}
+                  onChangeText={setPtLogMemo}
+                  placeholder="부상, 통증, 특이 사항 등을 기록하세요"
+                  placeholderTextColor={Colors.textPlaceholder}
+                  multiline
+                  numberOfLines={2}
+                  style={{
+                    backgroundColor: "#fff",
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 10,
+                    padding: 10,
+                    fontSize: 13,
+                    color: Colors.text,
+                    textAlignVertical: "top",
+                    minHeight: 60,
+                  }}
+                />
               </View>
 
               {/* 운동 목록 */}
