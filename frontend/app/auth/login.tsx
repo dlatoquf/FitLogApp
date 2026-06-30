@@ -94,7 +94,7 @@ export default function LoginScreen() {
     if (!role) {
       router.replace("/auth/signup");
     } else if (role === "TRAINER") {
-      router.replace("/(tabs)/trainer/home");
+      router.replace("/onboarding/trainer");
     } else if (role === "MEMBER") {
       router.replace("/(tabs)/member/home");
     }

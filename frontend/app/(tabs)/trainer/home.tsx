@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
+  Dimensions,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -322,6 +324,8 @@ export default function TrainerHomeScreen() {
   const [payNewPhone, setPayNewPhone] = useState("");
 
   // 월별 매출 네비게이션
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [onboardingIndex, setOnboardingIndex] = useState(0);
   const [revenueMonthOffset, setRevenueMonthOffset] = useState(0); // 0 = 이번 달
   const [selectedMonthRevenue, setSelectedMonthRevenue] = useState<{
     monthRevenue: number;
@@ -602,6 +606,14 @@ export default function TrainerHomeScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      if (!isRefresh) {
+        const shown = await AsyncStorage.getItem("onboardingShown");
+        if (!shown) {
+          await AsyncStorage.setItem("onboardingShown", "true");
+          setOnboardingIndex(0);
+          setOnboardingVisible(true);
+        }
+      }
     }
   };
 
@@ -883,6 +895,7 @@ export default function TrainerHomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setOnboardingIndex(0);
       fetchHome();
     }, []),
   );
@@ -1187,15 +1200,16 @@ export default function TrainerHomeScreen() {
           <View
             style={{
               flex: 1,
-              backgroundColor: Colors.bgSub,
-              borderRadius: 12,
-              padding: 14,
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              paddingVertical: 8,
+              paddingHorizontal: 20,
               borderWidth: 1,
               borderColor: Colors.border,
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: Colors.green }}>
               {data?.totalMembers ?? 0}
             </Text>
             <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
@@ -1205,18 +1219,19 @@ export default function TrainerHomeScreen() {
           <View
             style={{
               flex: 1,
-              backgroundColor: Colors.bgSub,
-              borderRadius: 12,
-              padding: 14,
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              paddingVertical: 8,
+              paddingHorizontal: 20,
               borderWidth: 1,
               borderColor: Colors.border,
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.green }}>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: Colors.green }}>
               {data?.todayPtList?.filter(item => item.sessionType === "PT").length ?? 0}
             </Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4 }}>
               오늘 수업
             </Text>
           </View>
@@ -1288,11 +1303,12 @@ export default function TrainerHomeScreen() {
             {data?.goalSessions != null && (
               <View
                 style={{
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 14,
+                  backgroundColor: "#fff",
+                  borderRadius: 16,
                   borderWidth: 1,
                   borderColor: Colors.border,
-                  padding: 16,
+                  paddingVertical: 10,
+                  paddingHorizontal: 20,
                   marginBottom: 12,
                 }}
               >
@@ -1301,7 +1317,7 @@ export default function TrainerHomeScreen() {
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 10,
+                    marginBottom: 8,
                   }}
                 >
                   <Text
@@ -1322,9 +1338,10 @@ export default function TrainerHomeScreen() {
                     style={{
                       borderWidth: 1,
                       borderColor: Colors.border,
-                      borderRadius: 6,
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      backgroundColor: "#fff",
                     }}
                   >
                     <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -1393,11 +1410,12 @@ export default function TrainerHomeScreen() {
               return (
                 <View
                   style={{
-                    backgroundColor: Colors.bgSub,
-                    borderRadius: 14,
+                    backgroundColor: "#fff",
+                    borderRadius: 16,
                     borderWidth: 1,
                     borderColor: Colors.border,
-                    padding: 16,
+                    paddingVertical: 10,
+                    paddingHorizontal: 20,
                     marginBottom: 12,
                   }}
                 >
@@ -1485,9 +1503,10 @@ export default function TrainerHomeScreen() {
                           style={{
                             borderWidth: 1,
                             borderColor: Colors.border,
-                            borderRadius: 6,
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
+                            borderRadius: 8,
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            backgroundColor: "#fff",
                           }}
                         >
                           <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -1499,15 +1518,15 @@ export default function TrainerHomeScreen() {
                       <TouchableOpacity
                         onPress={generatePdf}
                         style={{
-                          backgroundColor: "#EEF2FF",
+                          backgroundColor: "#fff",
                           borderRadius: 8,
                           paddingHorizontal: 10,
                           paddingVertical: 5,
                           borderWidth: 1,
-                          borderColor: "#C7D2FE",
+                          borderColor: Colors.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#4338CA" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textMuted }}>
                           📄 PDF
                         </Text>
                       </TouchableOpacity>
@@ -1520,6 +1539,8 @@ export default function TrainerHomeScreen() {
                             paddingHorizontal: 12,
                             paddingVertical: 5,
                             borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: Colors.green,
                           }}
                         >
                           <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>
@@ -1660,8 +1681,10 @@ export default function TrainerHomeScreen() {
                                         borderColor: d.memo
                                           ? Colors.border
                                           : Colors.border + "66",
-                                        paddingHorizontal: 7,
-                                        paddingVertical: 3,
+                                        paddingHorizontal: 5,
+                                        paddingVertical: 2,
+                                        minWidth: 36,
+                                        alignItems: "center",
                                       }}
                                     >
                                       <Text
@@ -3120,144 +3143,133 @@ export default function TrainerHomeScreen() {
       <Modal
         visible={actionModal.visible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setActionModal({ visible: false, item: null })}
       >
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", paddingHorizontal: 24 }}
           activeOpacity={1}
           onPress={() => setActionModal({ visible: false, item: null })}
         >
-          <TouchableOpacity activeOpacity={1}>
+          <TouchableOpacity activeOpacity={1} style={{ width: "100%" }}>
             <View
               style={{
                 backgroundColor: "#fff",
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: 28,
-                paddingBottom: Math.max(insets.bottom, 28),
+                borderRadius: 20,
+                padding: 24,
               }}
             >
-              {/* 드래그 핸들 */}
-              <TouchableOpacity
-                onPress={() => setActionModal({ visible: false, item: null })}
-                activeOpacity={0.8}
-                style={{ alignItems: "center", paddingBottom: 12, marginTop: -8 }}
-              >
-                <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99 }} />
-              </TouchableOpacity>
-
               {/* 헤더 */}
-              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text, marginBottom: 2 }}>
                 {actionModal.item?.memberName}님 수업
               </Text>
-              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
+              <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 20 }}>
                 {actionModal.item?.time}
               </Text>
 
-              {/* 완료 처리 */}
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert("수업 완료", `${actionModal.item?.memberName}님 수업을 완료 처리할까요?`, [
-                    { text: "아니요", style: "cancel" },
-                    { text: "완료", onPress: async () => {
-                      const jwt = await AsyncStorage.getItem("jwt");
-                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/complete`, {
-                        method: "PATCH",
-                        headers: { Authorization: `Bearer ${jwt}` },
-                      });
-                      setActionModal({ visible: false, item: null });
-                      fetchHome();
-                      Alert.alert("완료", "수업이 완료 처리됐어요.");
-                    }},
-                  ]);
-                }}
-                style={{
-                  backgroundColor: Colors.blueBg,
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  marginBottom: 10,
-                  borderWidth: 1,
-                  borderColor: Colors.blue + "55",
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.blue }}>완료 처리</Text>
-              </TouchableOpacity>
+              {/* 완료/노쇼/취소 버튼 가로 배치 */}
+              <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert("수업 완료", `${actionModal.item?.memberName}님 수업을 완료 처리할까요?`, [
+                      { text: "아니요", style: "cancel" },
+                      { text: "완료", onPress: async () => {
+                        const jwt = await AsyncStorage.getItem("jwt");
+                        await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/complete`, {
+                          method: "PATCH",
+                          headers: { Authorization: `Bearer ${jwt}` },
+                        });
+                        setActionModal({ visible: false, item: null });
+                        fetchHome();
+                        Alert.alert("완료", "수업이 완료 처리됐어요.");
+                      }},
+                    ]);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: Colors.blueBg,
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: Colors.blue + "55",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.blue }}>완료</Text>
+                </TouchableOpacity>
 
-              {/* 노쇼 처리 */}
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert("노쇼 처리", `${actionModal.item?.memberName}님을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`, [
-                    { text: "아니요", style: "cancel" },
-                    { text: "노쇼", style: "destructive", onPress: async () => {
-                      const jwt = await AsyncStorage.getItem("jwt");
-                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/no-show`, {
-                        method: "PATCH",
-                        headers: { Authorization: `Bearer ${jwt}` },
-                      });
-                      setActionModal({ visible: false, item: null });
-                      fetchHome();
-                      Alert.alert("완료", "노쇼 처리됐어요.");
-                    }},
-                  ]);
-                }}
-                style={{
-                  backgroundColor: "#F3F4F6",
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  borderWidth: 1,
-                  borderColor: "#D1D5DB",
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>노쇼 처리</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert("노쇼 처리", `${actionModal.item?.memberName}님을 노쇼 처리할까요?\nPT 횟수가 차감돼요.`, [
+                      { text: "아니요", style: "cancel" },
+                      { text: "노쇼", style: "destructive", onPress: async () => {
+                        const jwt = await AsyncStorage.getItem("jwt");
+                        await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}/no-show`, {
+                          method: "PATCH",
+                          headers: { Authorization: `Bearer ${jwt}` },
+                        });
+                        setActionModal({ visible: false, item: null });
+                        fetchHome();
+                        Alert.alert("완료", "노쇼 처리됐어요.");
+                      }},
+                    ]);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#F3F4F6",
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#D1D5DB",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280" }}>노쇼</Text>
+                </TouchableOpacity>
 
-              {/* 취소 처리 */}
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert("수업 취소", `${actionModal.item?.memberName}님 수업을 취소할까요?`, [
-                    { text: "아니요", style: "cancel" },
-                    { text: "취소", style: "destructive", onPress: async () => {
-                      const jwt = await AsyncStorage.getItem("jwt");
-                      await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}`, {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${jwt}` },
-                      });
-                      setActionModal({ visible: false, item: null });
-                      fetchHome();
-                      Alert.alert("완료", "수업이 취소됐어요.");
-                    }},
-                  ]);
-                }}
-                style={{
-                  backgroundColor: Colors.redBg,
-                  borderRadius: 12,
-                  paddingVertical: 14,
-                  alignItems: "center",
-                  borderWidth: 1,
-                  borderColor: Colors.red + "44",
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.red }}>취소 처리</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert("수업 취소", `${actionModal.item?.memberName}님 수업을 취소할까요?`, [
+                      { text: "아니요", style: "cancel" },
+                      { text: "취소", style: "destructive", onPress: async () => {
+                        const jwt = await AsyncStorage.getItem("jwt");
+                        await fetch(`${API_URL}/api/schedule/${actionModal.item?.scheduleId}`, {
+                          method: "DELETE",
+                          headers: { Authorization: `Bearer ${jwt}` },
+                        });
+                        setActionModal({ visible: false, item: null });
+                        fetchHome();
+                        Alert.alert("완료", "수업이 취소됐어요.");
+                      }},
+                    ]);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: Colors.redBg,
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: Colors.red + "44",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.red }}>취소</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* 닫기 */}
               <TouchableOpacity
                 onPress={() => setActionModal({ visible: false, item: null })}
                 style={{
                   backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  paddingVertical: 14,
+                  borderRadius: 10,
+                  paddingVertical: 10,
                   alignItems: "center",
                   borderWidth: 1,
                   borderColor: Colors.border,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "600", color: Colors.textMuted }}>닫기</Text>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.textMuted }}>닫기</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -3712,6 +3724,95 @@ export default function TrainerHomeScreen() {
             </View>
           </GestureDetector>
         </TouchableOpacity>
+      </Modal>
+
+      {/* 온보딩 팝업 */}
+      <Modal visible={onboardingVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+          {(() => {
+            const OB_SLIDES = [
+              { type: "hook" },
+              { num: "01", accent: "#2e7d52", bg: "#e8f5ee", title: "목표 수업수 & 매출 설정", sub: "홈 화면 '목표 수정' 버튼으로\n이번 달 목표를 바로 입력해요.", chips: [{ icon: "🏠", t: "홈 → 목표 수정", d: "수업 횟수 & 매출 금액 입력" }, { icon: "📊", t: "실시간 달성률 확인", d: "완료 시 자동 업데이트" }] },
+              { num: "02", accent: "#1a5fa8", bg: "#e6f0fb", title: "회원 추가", sub: "앱 설치 여부와 상관없이\n모든 회원을 관리할 수 있어요.", chips: [{ icon: "👥", t: "기존 회원 추가", d: "회원 탭 → 기존 회원 추가 버튼" }, { icon: "📲", t: "앱 없어도 OK", d: "미연동 회원도 등록해서 관리 가능" }, { icon: "💬", t: "카카오톡으로 공유", d: "운동일지를 카카오톡으로 바로 전송" }] },
+              { num: "03", accent: "#b45309", bg: "#fff8e1", title: "PT 일정 등록", sub: "일정 탭에서 회원별 수업 시간을\n등록하면 홈에서 바로 확인돼요.", chips: [{ icon: "📅", t: "일정 탭 → 수업 등록", d: "회원 선택 후 날짜/시간 입력" }, { icon: "🗓", t: "월간 / 주간 뷰 지원", d: "전체 일정 한눈에 파악 가능" }] },
+              { num: "04", accent: "#7fd4a8", bg: "#2d5940", title: "운동일지 & 피드백 작성", sub: "수업 완료 후 기록을 남기면\n회원에게 자동으로 공유돼요.", chips: [{ icon: "✍️", t: "홈 → 확정 → 운동일지 작성", d: "세트 / 무게 / 횟수 + 피드백" }, { icon: "📲", t: "회원 앱에 자동 공유", d: "연동 회원 실시간 확인 가능" }] },
+              { type: "logo" },
+            ] as any[];
+            const s = OB_SLIDES[onboardingIndex];
+            const isDk = onboardingIndex === 0 || onboardingIndex === 4;
+            const isLogo = onboardingIndex === 5;
+            return (
+              <View style={{ width: "100%", borderRadius: 20, overflow: "hidden", backgroundColor: isDk ? "#1a3628" : "#fff" }}>
+                {/* 콘텐츠 */}
+                <View style={isLogo ? {} : { padding: 28, paddingBottom: 20 }}>
+                  {isLogo ? (
+                    <View style={{ alignItems: "center" }}>
+                      <View style={{ width: "100%", height: 115, overflow: "hidden" }}>
+                        <Image source={require("../../../assets/images/onboarding5.png")} style={{ width: "100%", height: 500, marginTop: -178 }} resizeMode="contain" />
+                      </View>
+                      <View style={{ paddingHorizontal: 24, paddingBottom: 28, width: "100%" }}>
+                        <TouchableOpacity
+                          onPress={() => { setOnboardingVisible(false); setOnboardingIndex(0); }}
+                          style={{ marginTop: 16, backgroundColor: Colors.green, paddingVertical: 14, borderRadius: 12, alignItems: "center" }}
+                        >
+                          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>시작하기</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : s.type === "hook" ? (
+                    <>
+                      <View style={{ backgroundColor: "#2d5940", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start", marginBottom: 16 }}>
+                        <Text style={{ color: "#7fd4a8", fontSize: 11, fontWeight: "600" }}>PT 트레이너 필독</Text>
+                      </View>
+                      <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800", lineHeight: 33, marginBottom: 10 }}>{"PT 관리를\n아직도 엑셀로\n하세요?"}</Text>
+                      <Text style={{ color: "#9dcfb8", fontSize: 13, lineHeight: 20 }}>{"회원 수업 횟수, 매출, 일정까지\nFitLog 하나로 다 됩니다."}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: s.bg, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <Text style={{ color: s.accent, fontSize: 13, fontWeight: "700" }}>{s.num}</Text>
+                      </View>
+                      <Text style={{ fontSize: 20, fontWeight: "800", color: isDk ? "#fff" : "#111", lineHeight: 27, marginBottom: 6 }}>{s.title}</Text>
+                      <Text style={{ fontSize: 12, color: isDk ? "#9dcfb8" : "#666", lineHeight: 18, marginBottom: 14 }}>{s.sub}</Text>
+                      {s.chips.map((c: any, ci: number) => (
+                        <View key={ci} style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDk ? "rgba(255,255,255,0.08)" : "#f5f5f5", borderRadius: 10, padding: 10, marginBottom: 6 }}>
+                          <View style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: s.bg, alignItems: "center", justifyContent: "center" }}>
+                            <Text style={{ fontSize: 13 }}>{c.icon}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 12, fontWeight: "600", color: isDk ? "#fff" : "#111" }}>{c.t}</Text>
+                            <Text style={{ fontSize: 11, color: isDk ? "#9dcfb8" : "#888", marginTop: 1 }}>{c.d}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </View>
+
+                {/* 하단 */}
+                {!isLogo && (
+                  <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 20, paddingTop: 4, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 4 }}>
+                      {OB_SLIDES.map((_: any, i: number) => (
+                        <View key={i} style={{ width: i === onboardingIndex ? 14 : 4, height: 4, borderRadius: 2, backgroundColor: i === onboardingIndex ? "#3cb877" : (isDk ? "#2d5940" : "#E5E7EB") }} />
+                      ))}
+                    </View>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity onPress={() => { setOnboardingVisible(false); setOnboardingIndex(0); }}>
+                      <Text style={{ fontSize: 12, color: isDk ? "#9dcfb8" : "#aaa", fontWeight: "600", marginRight: 12 }}>건너뛰기</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setOnboardingIndex(onboardingIndex + 1)}
+                      style={{ paddingVertical: 9, paddingHorizontal: 20, borderRadius: 10, backgroundColor: Colors.green }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>다음</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })()}
+        </View>
       </Modal>
     </>
   );
