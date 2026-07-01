@@ -100,7 +100,7 @@ public class AuthService {
 
     // Google Play 심사용 테스트 로그인
     public KakaoLoginResponse testLogin() {
-        User user = userRepository.findByEmail("dlatoquf1234@gmail.com")
+        User user = userRepository.findById(4L)
                 .orElseThrow(() -> new RuntimeException("테스트 계정 없음"));
         String jwt = jwtService.generateToken(user.getId(), user.getEmail());
         String role = user.getRole() != null ? user.getRole().name() : null;
