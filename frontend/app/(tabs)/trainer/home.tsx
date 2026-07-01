@@ -243,7 +243,6 @@ export default function TrainerHomeScreen() {
   );
   const [editSessionsInput, setEditSessionsInput] = useState("");
   const [editAmountInput, setEditAmountInput] = useState("");
-  const [editMemoInput, setEditMemoInput] = useState("");
   const [editOriginalSessions, setEditOriginalSessions] = useState(0);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -260,7 +259,6 @@ export default function TrainerHomeScreen() {
     setEditOriginalSessions(d.sessions);
     setEditSessionsInput(String(d.sessions));
     setEditAmountInput(d.amount.toLocaleString());
-    setEditMemoInput(d.memo ?? "");
     setEditModal(true);
   };
 
@@ -270,16 +268,14 @@ export default function TrainerHomeScreen() {
     const body = {
       sessions: parseInt(editSessionsInput) || editOriginalSessions,
       amount: parseInt(editAmountInput.replace(/,/g, "")),
-      memo: editMemoInput.trim() || null,
     };
     try {
       const jwt = await AsyncStorage.getItem("jwt");
       const url = editContractId
         ? `${API_URL}/api/trainer/members/contracts/${editContractId}`
         : `${API_URL}/api/trainer/manual-members/${editManualMemberId}`;
-      const method = editContractId ? "PUT" : "PUT";
       const res = await fetch(url, {
-        method,
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${jwt}`,
@@ -288,7 +284,11 @@ export default function TrainerHomeScreen() {
       });
       if (!res.ok) throw new Error("수정 실패");
       setEditModal(false);
-      fetchHome();
+      if (revenueMonthOffset === 0) {
+        fetchHome();
+      } else {
+        fetchMonthRevenue(revenueMonthOffset);
+      }
     } catch (e: any) {
       Alert.alert("오류", e.message);
     } finally {
@@ -323,9 +323,11 @@ export default function TrainerHomeScreen() {
   const [payNewName, setPayNewName] = useState("");
   const [payNewPhone, setPayNewPhone] = useState("");
 
-  // 월별 매출 네비게이션
+  // 온보딩 팝업
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [onboardingIndex, setOnboardingIndex] = useState(0);
+
+  // 월별 매출 네비게이션
   const [revenueMonthOffset, setRevenueMonthOffset] = useState(0); // 0 = 이번 달
   const [selectedMonthRevenue, setSelectedMonthRevenue] = useState<{
     monthRevenue: number;
@@ -538,11 +540,6 @@ export default function TrainerHomeScreen() {
     .onEnd((e) => {
       if (e.translationY > 60) setPayAddModal(false);
     });
-  const editDragGesture = Gesture.Pan()
-    .runOnJS(true)
-    .onEnd((e) => {
-      if (e.translationY > 60) setEditModal(false);
-    });
   const goalDragGesture = Gesture.Pan()
     .runOnJS(true)
     .onEnd((e) => {
@@ -607,12 +604,12 @@ export default function TrainerHomeScreen() {
       setLoading(false);
       setRefreshing(false);
       if (!isRefresh) {
-        const shown = await AsyncStorage.getItem("onboardingShown");
-        if (!shown) {
-          await AsyncStorage.setItem("onboardingShown", "true");
-          setOnboardingIndex(0);
-          setOnboardingVisible(true);
-        }
+        AsyncStorage.getItem("onboardingShown").then((shown) => {
+          if (!shown) {
+            setOnboardingIndex(0);
+            setOnboardingVisible(true);
+          }
+        });
       }
     }
   };
@@ -1011,7 +1008,7 @@ export default function TrainerHomeScreen() {
       <ScrollView
         style={{ flex: 1, backgroundColor: "#fff" }}
         contentContainerStyle={{
-          padding: 20,
+          paddingHorizontal: 12,
           paddingTop: 56,
           paddingBottom: 32,
         }}
@@ -1491,32 +1488,30 @@ export default function TrainerHomeScreen() {
                         gap: 5,
                       }}
                     >
-                      {/* 목표 매출 수정 (이번 달만) */}
-                      {isCurrentMonth && (
-                        <TouchableOpacity
-                          onPress={() => {
-                            setGoalRevenueInput(
-                              data?.goalRevenue != null
-                                ? data.goalRevenue.toLocaleString()
-                                : "",
-                            );
-                            setGoalModalMode("revenue");
-                            setGoalModal(true);
-                          }}
-                          style={{
-                            borderWidth: 1,
-                            borderColor: Colors.border,
-                            borderRadius: 8,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            backgroundColor: "#fff",
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                            목표 수정
-                          </Text>
-                        </TouchableOpacity>
-                      )}
+                      {/* 목표 매출 수정 */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setGoalRevenueInput(
+                            data?.goalRevenue != null
+                              ? data.goalRevenue.toLocaleString()
+                              : "",
+                          );
+                          setGoalModalMode("revenue");
+                          setGoalModal(true);
+                        }}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: Colors.border,
+                          borderRadius: 8,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          backgroundColor: "#fff",
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                          목표 수정
+                        </Text>
+                      </TouchableOpacity>
                       {/* PDF 버튼 */}
                       <TouchableOpacity
                         onPress={generatePdf}
@@ -1533,24 +1528,22 @@ export default function TrainerHomeScreen() {
                           📄 PDF
                         </Text>
                       </TouchableOpacity>
-                      {/* 결제 추가 (이번 달만) */}
-                      {isCurrentMonth && (
-                        <TouchableOpacity
-                          onPress={handlePayButtonPress}
-                          style={{
-                            backgroundColor: Colors.green,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: Colors.green,
-                          }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>
-                            + 결제 추가
-                          </Text>
-                        </TouchableOpacity>
-                      )}
+                      {/* 결제 추가 */}
+                      <TouchableOpacity
+                        onPress={handlePayButtonPress}
+                        style={{
+                          backgroundColor: Colors.green,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: Colors.green,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>
+                          + 결제 추가
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1664,8 +1657,7 @@ export default function TrainerHomeScreen() {
                                   {Number(d.amount).toLocaleString()}원
                                 </Text>
                                 {(d.contractId != null ||
-                                  d.manualMemberId != null) &&
-                                isCurrentMonth ? (
+                                  d.manualMemberId != null) ? (
                                   <>
                                     <TouchableOpacity
                                       onPress={() => {
@@ -1739,41 +1731,7 @@ export default function TrainerHomeScreen() {
                                       </TouchableOpacity>
                                     )}
                                   </>
-                                ) : (
-                                  <TouchableOpacity
-                                    onPress={() => {
-                                      setMemoPopup({
-                                        contractId: null,
-                                        memo: d.memo ?? "",
-                                      });
-                                      setMemoEditText(d.memo ?? "");
-                                    }}
-                                    style={{
-                                      backgroundColor: d.memo
-                                        ? Colors.bgSub
-                                        : "transparent",
-                                      borderRadius: 6,
-                                      borderWidth: 1,
-                                      borderColor: d.memo
-                                        ? Colors.border
-                                        : Colors.border + "66",
-                                      paddingHorizontal: 7,
-                                      paddingVertical: 3,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 10,
-                                        color: d.memo
-                                          ? Colors.textSub
-                                          : Colors.textMuted,
-                                        fontWeight: "700",
-                                      }}
-                                    >
-                                      {d.memo ? "메모" : "메모 없음"}
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
+                                ) : null}
                               </View>
                             ))}
                           </ScrollView>
@@ -1791,7 +1749,7 @@ export default function TrainerHomeScreen() {
                           )}
                         </View>
                       )}
-                      {displayDetails.length === 0 && !isCurrentMonth && (
+                      {displayDetails.length === 0 && (
                         <Text
                           style={{
                             fontSize: 13,
@@ -2110,7 +2068,11 @@ export default function TrainerHomeScreen() {
                         );
                         if (!res.ok) throw new Error("저장 실패");
                         setMemoPopup(null);
-                        fetchHome();
+                        if (revenueMonthOffset === 0) {
+                          fetchHome();
+                        } else {
+                          fetchMonthRevenue(revenueMonthOffset);
+                        }
                       } catch (e: any) {
                         Alert.alert("오류", e.message);
                       } finally {
@@ -2212,193 +2174,129 @@ export default function TrainerHomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── 결제 수정 모달 ──────────────────────────────────────────────── */}
+      {/* ── 결제 수정 팝업 ──────────────────────────────────────────────── */}
       <Modal
         visible={editModal}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setEditModal(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1, justifyContent: "flex-end" }}
+          style={{ flex: 1 }}
         >
           <TouchableOpacity
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.4)",
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.45)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 28,
             }}
             activeOpacity={1}
             onPress={() => setEditModal(false)}
-          />
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingTop: 20,
-              maxHeight: "90%",
-            }}
           >
-            <GestureDetector gesture={editDragGesture}>
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => setEditModal(false)}
-                style={{ alignItems: "center", paddingBottom: 12 }}
+            <TouchableOpacity activeOpacity={1} style={{ width: "100%" }}>
+              <View
+                style={{
+                  backgroundColor: "#fff",
+                  borderRadius: 18,
+                  padding: 22,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowRadius: 20,
+                  elevation: 10,
+                }}
               >
                 <View
                   style={{
-                    width: 40,
-                    height: 4,
-                    backgroundColor: Colors.border,
-                    borderRadius: 99,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text }}>
+                    결제 수정
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setEditModal(false)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: Colors.bgSub,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: Colors.textMuted }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 6 }}>
+                  PT 수업 수 (회)
+                </Text>
+                <TextInput
+                  value={editSessionsInput}
+                  onChangeText={setEditSessionsInput}
+                  keyboardType="number-pad"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 12,
+                    fontSize: 15,
+                    color: Colors.text,
+                    marginBottom: 14,
                   }}
                 />
-              </TouchableOpacity>
-            </GestureDetector>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 28,
-                paddingBottom: Math.max(insets.bottom, 28),
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: "800",
-                  color: Colors.text,
-                  marginBottom: 4,
-                }}
-              >
-                결제 수정
-              </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textMuted,
-                  marginBottom: 24,
-                }}
-              >
-                수업 수, 금액, 메모를 수정할 수 있어요
-              </Text>
 
-              {/* 수업 수 */}
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: Colors.textSub,
-                  marginBottom: 8,
-                }}
-              >
-                PT 수업 수 (회)
-              </Text>
-              <TextInput
-                value={editSessionsInput}
-                onChangeText={setEditSessionsInput}
-                keyboardType="number-pad"
-                placeholderTextColor={Colors.textMuted}
-                style={{
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  padding: 14,
-                  fontSize: 16,
-                  color: Colors.text,
-                  marginBottom: 16,
-                }}
-              />
-
-              {/* 금액 */}
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: Colors.textSub,
-                  marginBottom: 8,
-                }}
-              >
-                결제 금액 (원)
-              </Text>
-              <TextInput
-                value={editAmountInput}
-                onChangeText={(text) => {
-                  const digits = text.replace(/[^0-9]/g, "");
-                  setEditAmountInput(
-                    digits ? Number(digits).toLocaleString() : "",
-                  );
-                }}
-                keyboardType="number-pad"
-                placeholderTextColor={Colors.textMuted}
-                style={{
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  padding: 14,
-                  fontSize: 16,
-                  color: Colors.text,
-                  marginBottom: 16,
-                }}
-              />
-
-              {/* 메모 */}
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: Colors.textSub,
-                  marginBottom: 8,
-                }}
-              >
-                메모 (선택)
-              </Text>
-              <TextInput
-                value={editMemoInput}
-                onChangeText={setEditMemoInput}
-                placeholder="메모를 입력해주세요"
-                placeholderTextColor={Colors.textMuted}
-                multiline
-                style={{
-                  backgroundColor: Colors.bgSub,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  padding: 14,
-                  fontSize: 14,
-                  color: Colors.text,
-                  marginBottom: 24,
-                  minHeight: 66,
-                  textAlignVertical: "top",
-                }}
-              />
-
-              <TouchableOpacity
-                onPress={saveEdit}
-                disabled={savingEdit}
-                style={{
-                  backgroundColor: Colors.green,
-                  borderRadius: 12,
-                  paddingVertical: 15,
-                  alignItems: "center",
-                  opacity: savingEdit ? 0.6 : 1,
-                }}
-              >
-                <Text
-                  style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}
-                >
-                  {savingEdit ? "저장 중..." : "저장하기"}
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 6 }}>
+                  결제 금액 (원)
                 </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+                <TextInput
+                  value={editAmountInput}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/[^0-9]/g, "");
+                    setEditAmountInput(digits ? Number(digits).toLocaleString() : "");
+                  }}
+                  keyboardType="number-pad"
+                  placeholderTextColor={Colors.textMuted}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 12,
+                    fontSize: 15,
+                    color: Colors.text,
+                    marginBottom: 20,
+                  }}
+                />
+
+                <TouchableOpacity
+                  onPress={saveEdit}
+                  disabled={savingEdit}
+                  style={{
+                    backgroundColor: Colors.green,
+                    borderRadius: 12,
+                    paddingVertical: 13,
+                    alignItems: "center",
+                    opacity: savingEdit ? 0.6 : 1,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>
+                    {savingEdit ? "저장 중..." : "저장하기"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3731,95 +3629,57 @@ export default function TrainerHomeScreen() {
 
       {/* 온보딩 팝업 */}
       <Modal visible={onboardingVisible} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
-          {(() => {
-            const OB_SLIDES = [
-              { type: "hook" },
-              { num: "01", accent: "#2e7d52", bg: "#e8f5ee", title: "목표 수업수 & 매출 설정", sub: "홈 화면 '목표 수정' 버튼으로\n이번 달 목표를 바로 입력해요.", chips: [{ icon: "🏠", t: "홈 → 목표 수정", d: "수업 횟수 & 매출 금액 입력" }, { icon: "📊", t: "실시간 달성률 확인", d: "완료 시 자동 업데이트" }] },
-              { num: "02", accent: "#1a5fa8", bg: "#e6f0fb", title: "회원 추가", sub: "앱 설치 여부와 상관없이\n모든 회원을 관리할 수 있어요.", chips: [{ icon: "👥", t: "기존 회원 추가", d: "회원 탭 → 기존 회원 추가 버튼" }, { icon: "📲", t: "앱 없어도 OK", d: "미연동 회원도 등록해서 관리 가능" }, { icon: "💬", t: "카카오톡으로 공유", d: "운동일지를 카카오톡으로 바로 전송" }] },
-              { num: "03", accent: "#b45309", bg: "#fff8e1", title: "PT 일정 등록", sub: "일정 탭에서 회원별 수업 시간을\n등록하면 홈에서 바로 확인돼요.", chips: [{ icon: "📅", t: "일정 탭 → 수업 등록", d: "회원 선택 후 날짜/시간 입력" }, { icon: "🗓", t: "월간 / 주간 뷰 지원", d: "전체 일정 한눈에 파악 가능" }] },
-              { num: "04", accent: "#7fd4a8", bg: "#2d5940", title: "운동일지 & 피드백 작성", sub: "수업 완료 후 기록을 남기면\n회원에게 자동으로 공유돼요.", chips: [{ icon: "✍️", t: "홈 → 확정 → 운동일지 작성", d: "세트 / 무게 / 횟수 + 피드백" }, { icon: "📲", t: "회원 앱에 자동 공유", d: "연동 회원 실시간 확인 가능" }] },
-              { type: "logo" },
-            ] as any[];
-            const s = OB_SLIDES[onboardingIndex];
-            const isDk = onboardingIndex === 0 || onboardingIndex === 4;
-            const isLogo = onboardingIndex === 5;
-            return (
-              <View style={{ width: "100%", borderRadius: 20, overflow: "hidden", backgroundColor: isDk ? "#1a3628" : "#fff" }}>
-                {/* 콘텐츠 */}
-                <View style={isLogo ? {} : { padding: 28, paddingBottom: 20 }}>
-                  {isLogo ? (
-                    <View style={{ alignItems: "center" }}>
-                      <View style={{ width: "100%", height: 115, overflow: "hidden" }}>
-                        <Image source={require("../../../assets/images/onboarding5.png")} style={{ width: "100%", height: 500, marginTop: -178 }} resizeMode="contain" />
-                      </View>
-                      <View style={{ paddingHorizontal: 24, paddingBottom: 28, width: "100%" }}>
-                        <TouchableOpacity
-                          onPress={() => { setOnboardingVisible(false); setOnboardingIndex(0); }}
-                          style={{ marginTop: 16, backgroundColor: Colors.green, paddingVertical: 14, borderRadius: 12, alignItems: "center" }}
-                        >
-                          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>시작하기</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ) : s.type === "hook" ? (
-                    <>
-                      <View style={{ backgroundColor: "#2d5940", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start", marginBottom: 16 }}>
-                        <Text style={{ color: "#7fd4a8", fontSize: 11, fontWeight: "600" }}>PT 트레이너 필독</Text>
-                      </View>
-                      <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800", lineHeight: 33, marginBottom: 10 }}>{"PT 관리를\n아직도 엑셀로\n하세요?"}</Text>
-                      <Text style={{ color: "#9dcfb8", fontSize: 13, lineHeight: 20 }}>{"회원 수업 횟수, 매출, 일정까지\nFitLog 하나로 다 됩니다."}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: s.bg, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                        <Text style={{ color: s.accent, fontSize: 13, fontWeight: "700" }}>{s.num}</Text>
-                      </View>
-                      <Text style={{ fontSize: 20, fontWeight: "800", color: isDk ? "#fff" : "#111", lineHeight: 27, marginBottom: 6 }}>{s.title}</Text>
-                      <Text style={{ fontSize: 12, color: isDk ? "#9dcfb8" : "#666", lineHeight: 18, marginBottom: 14 }}>{s.sub}</Text>
-                      {s.chips.map((c: any, ci: number) => (
-                        <View key={ci} style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isDk ? "rgba(255,255,255,0.08)" : "#f5f5f5", borderRadius: 10, padding: 10, marginBottom: 6 }}>
-                          <View style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: s.bg, alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ fontSize: 13 }}>{c.icon}</Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 12, fontWeight: "600", color: isDk ? "#fff" : "#111" }}>{c.t}</Text>
-                            <Text style={{ fontSize: 11, color: isDk ? "#9dcfb8" : "#888", marginTop: 1 }}>{c.d}</Text>
-                          </View>
-                        </View>
-                      ))}
-                    </>
-                  )}
-                </View>
-
-                {/* 하단 */}
-                {!isLogo && (
-                  <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 20, paddingTop: 4, gap: 8 }}>
-                    <View style={{ flexDirection: "row", gap: 4 }}>
-                      {OB_SLIDES.map((_: any, i: number) => (
-                        <View key={i} style={{ width: i === onboardingIndex ? 14 : 4, height: 4, borderRadius: 2, backgroundColor: i === onboardingIndex ? "#3cb877" : (isDk ? "#2d5940" : "#E5E7EB") }} />
-                      ))}
-                    </View>
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => { setOnboardingVisible(false); setOnboardingIndex(0); }}>
-                      <Text style={{ fontSize: 12, color: isDk ? "#9dcfb8" : "#aaa", fontWeight: "600", marginRight: 12 }}>건너뛰기</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setOnboardingIndex(onboardingIndex + 1)}
-                      style={{ paddingVertical: 9, paddingHorizontal: 20, borderRadius: 10, backgroundColor: Colors.green }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>다음</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", paddingHorizontal: 16 }}>
+          <View style={{ width: "100%", borderRadius: 20, overflow: "hidden", backgroundColor: "#fff" }}>
+            <Image
+              source={OB_IMAGES[onboardingIndex]}
+              style={{ width: "100%", height: Math.min(Dimensions.get("window").width * (1350 / 1080), Dimensions.get("window").height * 0.58) }}
+              resizeMode="cover"
+            />
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: 5 }}>
+                {OB_IMAGES.map((_, i) => (
+                  <View key={i} style={{ width: i === onboardingIndex ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: i === onboardingIndex ? Colors.green : "#D1D5DB" }} />
+                ))}
               </View>
-            );
-          })()}
+              <View style={{ flex: 1 }} />
+              {onboardingIndex < OB_IMAGES.length - 1 ? (
+                <>
+                  <TouchableOpacity onPress={() => { AsyncStorage.setItem("onboardingShown", "1"); setOnboardingVisible(false); setOnboardingIndex(0); }} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                    <Text style={{ fontSize: 13, color: "#aaa", fontWeight: "600" }}>건너뛰기</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setOnboardingIndex(onboardingIndex + 1)}
+                    style={{ paddingVertical: 9, paddingHorizontal: 22, borderRadius: 20, backgroundColor: Colors.green }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>다음</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => { AsyncStorage.setItem("onboardingShown", "1"); setOnboardingVisible(false); setOnboardingIndex(0); }}
+                  style={{ flex: 1, paddingVertical: 10, borderRadius: 20, backgroundColor: Colors.green, alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>시작하기</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
       </Modal>
+
     </>
   );
 }
+
+const OB_IMAGES = [
+  require("../../../assets/images/onboarding1.png"),
+  require("../../../assets/images/onboarding2.png"),
+  require("../../../assets/images/onboarding3.png"),
+  require("../../../assets/images/onboarding4.png"),
+  require("../../../assets/images/onboarding5.png"),
+  require("../../../assets/images/onboarding6.png"),
+];
 
 function SummaryCard({
   value,

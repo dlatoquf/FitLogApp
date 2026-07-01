@@ -22,7 +22,7 @@ public interface TrainerNoticeRepository extends JpaRepository<TrainerNotice, Lo
     List<TrainerNotice> findByTrainerIdAndBroadcastTrueOrderByCreatedAtDesc(@Param("trainerId") Long trainerId);
 
     // broadcastGroupId로 전체 삭제
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("DELETE FROM TrainerNotice n WHERE n.broadcastGroupId = :groupId")
     void deleteByBroadcastGroupId(@Param("groupId") Long groupId);
 

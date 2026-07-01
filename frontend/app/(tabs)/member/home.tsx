@@ -286,6 +286,7 @@ export default function MemberHomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setActiveTab("공지");
       fetchHome();
     }, []),
   );
@@ -338,7 +339,7 @@ export default function MemberHomeScreen() {
       <ScrollView
         style={{ flex: 1, backgroundColor: "#fff" }}
         contentContainerStyle={{
-          padding: 20,
+          paddingHorizontal: 12,
           paddingTop: 56,
           paddingBottom: 32,
         }}
@@ -507,7 +508,7 @@ export default function MemberHomeScreen() {
         {/* PT 잔여 */}
         <View
           style={{
-            backgroundColor: Colors.bgSub,
+            backgroundColor: "#fff",
             borderRadius: 14,
             padding: 16,
             marginBottom: 12,
@@ -571,7 +572,7 @@ export default function MemberHomeScreen() {
         {/* 이번 주 운동 현황 */}
         <View
           style={{
-            backgroundColor: Colors.bgSub,
+            backgroundColor: "#fff",
             borderRadius: 14,
             padding: 14,
             marginBottom: 12,
@@ -657,7 +658,7 @@ export default function MemberHomeScreen() {
         {/* 이번 주 내 수업 */}
         <View
           style={{
-            backgroundColor: Colors.bgSub,
+            backgroundColor: "#fff",
             borderRadius: 14,
             padding: 14,
             marginBottom: 12,
@@ -1204,7 +1205,7 @@ export default function MemberHomeScreen() {
               autoCapitalize="characters"
               maxLength={6}
               style={{
-                backgroundColor: Colors.bgSub,
+                backgroundColor: "#fff",
                 borderWidth: 2,
                 borderColor:
                   trainerCode.length === 6 ? Colors.green : Colors.border,

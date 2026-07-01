@@ -346,7 +346,8 @@ export default function MemberDietScreen() {
             borderRadius: 14,
             borderWidth: 1,
             borderColor: Colors.border,
-            padding: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
             marginBottom: 14,
           }}
         >
@@ -355,7 +356,7 @@ export default function MemberDietScreen() {
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 10,
+              marginBottom: 6,
             }}
           >
             <TouchableOpacity
@@ -416,9 +417,9 @@ export default function MemberDietScreen() {
                   </Text>
                   <View
                     style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 8,
+                      width: 26,
+                      height: 26,
+                      borderRadius: 7,
                       backgroundColor: isSelected
                         ? Colors.green
                         : isToday

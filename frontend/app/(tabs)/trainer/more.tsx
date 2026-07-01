@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as ExpoClipboard from "expo-clipboard";
 import {
   Alert,
@@ -42,6 +42,8 @@ export default function TrainerMoreScreen() {
   const [profile, setProfile] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const startTimeScrollRef = useRef<ScrollView>(null);
+  const endTimeScrollRef = useRef<ScrollView>(null);
   const [editForm, setEditForm] = useState({
     gymName: "",
     workDays: [] as number[],
@@ -497,7 +499,7 @@ export default function TrainerMoreScreen() {
           style={{
             backgroundColor: "#fff",
             borderRadius: 20,
-            marginBottom: 16,
+            marginBottom: 8,
             borderWidth: 1,
             borderColor: Colors.border,
             overflow: "hidden",
@@ -508,25 +510,11 @@ export default function TrainerMoreScreen() {
             elevation: 2,
           }}
         >
-          {/* 상단: 아바타 + 이름/헬스장 + 수정 */}
-          <View style={{ flexDirection: "row", alignItems: "center", padding: 18, gap: 14 }}>
-            <View
-              style={{
-                width: 54,
-                height: 54,
-                borderRadius: 17,
-                backgroundColor: Colors.green,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontSize: 22, fontWeight: "900", color: "#fff" }}>
-                {profile?.name?.[0] ?? "T"}
-              </Text>
-            </View>
+          {/* 상단: 이름/헬스장 + 수정 */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingTop: 18, paddingBottom: 10, paddingLeft: 28, paddingRight: 18, gap: 14 }}>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.text }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <Text style={{ fontSize: 24, fontWeight: "900", color: Colors.text }}>
                   {profile?.name ?? "-"}
                 </Text>
                 {trialEndDate ? (() => {
@@ -593,12 +581,12 @@ export default function TrainerMoreScreen() {
           <View style={{ height: 1, backgroundColor: Colors.border }} />
 
           {/* 트레이너 코드 */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 10 }}>
             <View>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 }}>
+              <Text style={{ fontSize: 11, color: Colors.textMuted, fontWeight: "600", marginBottom: 2, letterSpacing: 0.3 }}>
                 내 트레이너 코드
               </Text>
-              <Text style={{ fontSize: 22, fontWeight: "900", color: Colors.text, letterSpacing: 4 }}>
+              <Text style={{ fontSize: 20, fontWeight: "900", color: Colors.text, letterSpacing: 4 }}>
                 {profile?.trainerCode ?? "---"}
               </Text>
             </View>
@@ -606,9 +594,9 @@ export default function TrainerMoreScreen() {
               onPress={copyCode}
               style={{
                 backgroundColor: Colors.green,
-                paddingHorizontal: 16,
-                paddingVertical: 9,
-                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 10,
               }}
             >
               <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>복사</Text>
@@ -628,9 +616,9 @@ export default function TrainerMoreScreen() {
                 borderRadius: 14,
                 borderWidth: 1.5,
                 borderColor: Colors.green + "66",
-                backgroundColor: Colors.greenLight,
+                backgroundColor: "#fff",
                 paddingHorizontal: 16,
-                paddingVertical: 14,
+                paddingVertical: 10,
                 marginBottom: 8,
                 flexDirection: "row",
                 alignItems: "center",
@@ -670,9 +658,9 @@ export default function TrainerMoreScreen() {
               borderRadius: 14,
               borderWidth: 1.5,
               borderColor: "#FDE047",
-              backgroundColor: "#FEF9C3",
+              backgroundColor: "#fff",
               paddingHorizontal: 16,
-              paddingVertical: 14,
+              paddingVertical: 10,
               marginBottom: 12,
               flexDirection: "row",
               alignItems: "center",
@@ -1040,6 +1028,7 @@ export default function TrainerMoreScreen() {
                         {key === "startTime" ? "출근" : "퇴근"}
                       </Text>
                       <ScrollView
+                        ref={key === "startTime" ? startTimeScrollRef : endTimeScrollRef}
                         style={{
                           height: 120,
                           backgroundColor: Colors.bgSub,
@@ -1049,6 +1038,15 @@ export default function TrainerMoreScreen() {
                         }}
                         showsVerticalScrollIndicator={false}
                         nestedScrollEnabled
+                        onLayout={() => {
+                          const idx = TIME_OPTIONS.indexOf(editForm[key]);
+                          if (idx >= 0) {
+                            const ref = key === "startTime" ? startTimeScrollRef : endTimeScrollRef;
+                            setTimeout(() => {
+                              ref.current?.scrollTo({ y: Math.max(0, idx * 38 - 38), animated: false });
+                            }, 50);
+                          }
+                        }}
                       >
                         {TIME_OPTIONS.map((t) => (
                           <TouchableOpacity

@@ -98,6 +98,15 @@ public class AuthService {
         return new KakaoLoginResponse(token, false, role);
     }
 
+    // Google Play 심사용 테스트 로그인
+    public KakaoLoginResponse testLogin() {
+        User user = userRepository.findByEmail("dlatoquf1234@gmail.com")
+                .orElseThrow(() -> new RuntimeException("테스트 계정 없음"));
+        String jwt = jwtService.generateToken(user.getId(), user.getEmail());
+        String role = user.getRole() != null ? user.getRole().name() : null;
+        return new KakaoLoginResponse(jwt, false, role);
+    }
+
     public String refreshToken(String oldToken) {
         Long userId = jwtService.getUserIdFromExpiredToken(oldToken);
         User user = userRepository.findById(userId)

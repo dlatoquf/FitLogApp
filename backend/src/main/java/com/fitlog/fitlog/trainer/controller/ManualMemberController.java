@@ -355,6 +355,12 @@ public class ManualMemberController {
             memberMemoRepository.deleteByManualMemberId(m.getId());
             manualBodyLogRepository.deleteByManualMemberId(m.getId());
             workoutLogRepository.deleteByManualMember(m);
+            scheduleRepository.findByManualMember(m).forEach(s -> {
+                if (s.getMemberName() == null) {
+                    s.setMemberName(m.getName());
+                    scheduleRepository.save(s);
+                }
+            });
             scheduleRepository.detachManualMemberFromSchedules(m);
         });
         manualMemberRepository.deleteById(id);

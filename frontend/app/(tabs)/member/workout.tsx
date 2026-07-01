@@ -413,6 +413,7 @@ export default function WorkoutScreen() {
           date: String(l.date ?? l.logDate ?? l.log_date).slice(0, 10),
           workoutType: l.workoutType ?? l.workout_type,
           conditionScore: l.conditionScore ?? null,
+          memo: l.memo ?? null,
           painPoints: l.painPoints ?? null,
           feedback: l.feedback ?? null,
           exercises: l.exercises ?? l.sets ?? l.workoutSets ?? [],

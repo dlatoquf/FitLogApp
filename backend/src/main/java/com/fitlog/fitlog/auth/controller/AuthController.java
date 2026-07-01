@@ -64,6 +64,17 @@ public class AuthController {
         }
     }
 
+    // Google Play 심사용 테스트 로그인 (로고 더블탭)
+    @PostMapping("/test-login")
+    public ResponseEntity<KakaoLoginResponse> testLogin() {
+        try {
+            KakaoLoginResponse res = authService.testLogin();
+            return ResponseEntity.ok(res);
+        } catch (Exception e) {
+            return ResponseEntity.status(401).build();
+        }
+    }
+
     @PostMapping("/profile")
     public void setupProfile(
             @RequestHeader("Authorization") String authorization,

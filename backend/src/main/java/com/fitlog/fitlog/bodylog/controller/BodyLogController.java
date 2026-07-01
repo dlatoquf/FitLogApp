@@ -267,4 +267,111 @@ public class BodyLogController {
 
         return ResponseEntity.ok(Map.of("message", "삭제됐어요.", "logs", remaining));
     }
+
+    // PUT /api/bodylog/manual/{logId} - 트레이너가 미연동 회원 바디로그 수정
+    @PutMapping("/manual/{logId}")
+    public ResponseEntity<Map<String, Object>> updateManualBodyLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long logId,
+            @RequestBody Map<String, Object> body) {
+        String token = authorization.replace("Bearer ", "");
+        jwtService.getUserIdFromToken(token);
+
+        ManualBodyLog log = manualBodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+
+        if (body.get("date") != null && !body.get("date").toString().isBlank())
+            log.setLogDate(LocalDate.parse(body.get("date").toString()));
+        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+
+        manualBodyLogRepository.save(log);
+
+        ManualMember mm = log.getManualMember();
+        List<Map<String, Object>> allLogs = manualBodyLogRepository
+                .findByManualMemberOrderByLogDateAsc(mm)
+                .stream().map(this::toManualMap).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("saved", toManualMap(log), "logs", allLogs));
+    }
+
+    // PUT /api/bodylog/member/{memberId}/log/{logId} - 트레이너가 연동 회원 바디로그 수정
+    @PutMapping("/member/{memberId}/log/{logId}")
+    public ResponseEntity<Map<String, Object>> updateMemberBodyLog(
+            @PathVariable Long memberId,
+            @PathVariable Long logId,
+            @RequestBody Map<String, Object> body) {
+        BodyLog log = bodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+
+        if (body.get("date") != null && !body.get("date").toString().isBlank())
+            log.setLogDate(LocalDate.parse(body.get("date").toString()));
+        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+
+        bodyLogRepository.save(log);
+
+        Member member = memberRepository.findByIdWithUser(memberId)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        List<Map<String, Object>> allLogs = bodyLogRepository
+                .findByMemberOrderByLogDateAsc(member)
+                .stream().map(this::toMap).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("saved", toMap(log), "logs", allLogs));
+    }
+
+    // DELETE /api/bodylog/{logId} - 회원 본인 바디로그 삭제
+    @DeleteMapping("/{logId}")
+    public ResponseEntity<Map<String, Object>> deleteMyBodyLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long logId) {
+        String token = authorization.replace("Bearer ", "");
+        Long userId = jwtService.getUserIdFromToken(token);
+        Member member = memberRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("회원 정보를 찾을 수 없습니다."));
+
+        BodyLog log = bodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+        bodyLogRepository.delete(log);
+
+        List<Map<String, Object>> remaining = bodyLogRepository
+                .findByMemberOrderByLogDateAsc(member)
+                .stream().map(this::toMap).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("message", "삭제됐어요.", "logs", remaining));
+    }
+
+    // PUT /api/bodylog/{logId} - 회원 본인 바디로그 수정
+    @PutMapping("/{logId}")
+    public ResponseEntity<Map<String, Object>> updateMyBodyLog(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long logId,
+            @RequestBody Map<String, Object> body) {
+        String token = authorization.replace("Bearer ", "");
+        Long userId = jwtService.getUserIdFromToken(token);
+        Member member = memberRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("회원 정보를 찾을 수 없습니다."));
+
+        BodyLog log = bodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+
+        if (body.get("date") != null && !body.get("date").toString().isBlank())
+            log.setLogDate(LocalDate.parse(body.get("date").toString()));
+        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+
+        bodyLogRepository.save(log);
+
+        List<Map<String, Object>> allLogs = bodyLogRepository
+                .findByMemberOrderByLogDateAsc(member)
+                .stream().map(this::toMap).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of("saved", toMap(log), "logs", allLogs));
+    }
 }

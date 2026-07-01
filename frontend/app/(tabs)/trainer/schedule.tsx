@@ -393,7 +393,7 @@ export default function TrainerScheduleScreen() {
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(
-    async (isRefresh = false, silent = false) => {
+    async (isRefresh = false, silent = false, extraMonthOverride?: string | null) => {
       cancelledIdsRef.current.clear();
       if (isRefresh) setRefreshing(true);
       else if (!silent) setLoading(true);
@@ -401,8 +401,9 @@ export default function TrainerScheduleScreen() {
         const jwt = await AsyncStorage.getItem("jwt");
         const headers = { Authorization: `Bearer ${jwt}` };
 
-        const extraFetch = secondYearMonthStr
-          ? fetch(`${API_URL}/api/schedule/calendar/month?yearMonth=${secondYearMonthStr}`, { headers })
+        const effectiveExtra = extraMonthOverride !== undefined ? extraMonthOverride : secondYearMonthStr;
+        const extraFetch = effectiveExtra
+          ? fetch(`${API_URL}/api/schedule/calendar/month?yearMonth=${effectiveExtra}`, { headers })
           : Promise.resolve(null);
 
         const [calRes, memoRes, slotSettingsRes, profileRes, calRes2] =
@@ -471,8 +472,8 @@ export default function TrainerScheduleScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      const now = new Date();
       if (!dateNavRef.current) {
-        const now = new Date();
         setSelectedDate(now);
         setViewYear(now.getFullYear());
         setViewMonth(now.getMonth() + 1);
@@ -482,13 +483,15 @@ export default function TrainerScheduleScreen() {
       // 현재 주가 두 달에 걸치는지 확인
       const weekDates = getWeekDatesForOffset(0);
       const monthSet = new Set(weekDates.map((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`));
+      let extraMonth: string | null = null;
       if (monthSet.size > 1) {
-        const months = [...monthSet];
-        setSecondYearMonthStr(months[1]);
+        const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        extraMonth = [...monthSet].find((m) => m !== currentYearMonth) ?? null;
+        if (extraMonth) setSecondYearMonthStr(extraMonth);
       }
       dateNavRef.current = false;
       prevFetchKey.current = yearMonthStr; // useEffect 중복 방지
-      fetchAll(false, hasLoadedRef.current); // 이미 데이터 있으면 스피너 없이 백그라운드 갱신
+      fetchAll(false, hasLoadedRef.current, extraMonth); // 이미 데이터 있으면 스피너 없이 백그라운드 갱신
       fetchMembers();
       AsyncStorage.getItem("schedule_tutorial_done").then((v) => { if (!v) setShowTutorial(true); });
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -611,14 +614,19 @@ export default function TrainerScheduleScreen() {
     const sorted = Object.entries(monthCount).sort((a, b) => b[1] - a[1]);
     const dominantKey = sorted[0][0];
     const [dy, dm] = dominantKey.split("-").map(Number);
+    const newYearMonth = `${dy}-${String(dm).padStart(2, "0")}`;
+    const newSecondMonth = sorted.length > 1 ? sorted[1][0] : null;
+
     if (dy !== viewYear || dm !== viewMonth) {
       setViewYear(dy);
       setViewMonth(dm);
     }
-    if (sorted.length > 1) {
-      setSecondYearMonthStr(sorted[1][0]);
-    } else {
-      setSecondYearMonthStr(null);
+    setSecondYearMonthStr(newSecondMonth);
+
+    // yearMonthStr가 그대로면 useEffect가 안 트리거되므로 직접 fetch
+    if (newYearMonth === yearMonthStr) {
+      prevFetchKey.current = newYearMonth;
+      fetchAll(false, false, newSecondMonth);
     }
   };
   goWeekRef.current = goWeek;
@@ -972,6 +980,9 @@ export default function TrainerScheduleScreen() {
   // ─── 캘린더 그리드 렌더 ──────────────────────────────────────────────────
 
   const renderCalendar = () => {
+    const CAL_W = Dimensions.get("window").width - 24; // paddingHorizontal 12*2
+    const DAY_CELL = Math.floor(CAL_W / 7);
+    const CIRCLE = Math.min(30, DAY_CELL - 4);
     const firstDow = getMonthFirstDayOfWeek(viewYear, viewMonth, weekStartDay);
     const daysInMon = getDaysInMonth(viewYear, viewMonth);
     const todayKey = toDateKey(today);
@@ -1063,9 +1074,9 @@ export default function TrainerScheduleScreen() {
                 >
                   <View
                     style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 15,
+                      width: CIRCLE,
+                      height: CIRCLE,
+                      borderRadius: CIRCLE / 2,
                       backgroundColor: isSelected
                         ? Colors.green
                         : "transparent",
@@ -1131,7 +1142,8 @@ export default function TrainerScheduleScreen() {
     SLOT_H_REF.current = SLOT_H;
     const CELL_FONT = colScale === 3 ? 13 : colScale === 2 ? 12 : 11;
     const CELL_SUB_FONT = colScale === 3 ? 11 : colScale === 2 ? 10 : 9;
-    const GRID_MAX_H = Math.max(540, Dimensions.get("window").height - 330);
+    const SCREEN_H = Dimensions.get("window").height;
+    const GRID_MAX_H = Math.max(400, SCREEN_H - (SCREEN_H < 700 ? 280 : 330));
 
     // 이번 주 슬롯 필터
     const weekSlots = slots.filter((s) => weekDateKeys.includes(s.date));
@@ -1691,7 +1703,7 @@ export default function TrainerScheduleScreen() {
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <ScrollView
         contentContainerStyle={{
-          padding: 20,
+          paddingHorizontal: 12,
           paddingTop: 56,
           paddingBottom: 40,
         }}

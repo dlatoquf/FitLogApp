@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from "@react-native-firebase/messaging";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,8 +29,8 @@ try {
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
-  // 앱 진입 시 JWT 자동검증 중에는 스플래시처럼 로딩 표시
   const [checkingToken, setCheckingToken] = useState(true);
+  const lastLogoTapRef = useRef<number>(0);
 
   // ─────────────────────────────────────────────
   // 앱 최초 진입 시: 저장된 JWT로 자동 로그인 시도
@@ -94,10 +94,28 @@ export default function LoginScreen() {
     if (!role) {
       router.replace("/auth/signup");
     } else if (role === "TRAINER") {
-      router.replace("/onboarding/trainer");
+      router.replace("/(tabs)/trainer/home");
     } else if (role === "MEMBER") {
       router.replace("/(tabs)/member/home");
     }
+  };
+
+  // 로고 더블탭 → 테스트 로그인 (Google Play 심사용)
+  const handleLogoDoubleTap = async () => {
+    const now = Date.now();
+    if (now - lastLogoTapRef.current < 400) {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/auth/test-login`, { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        await AsyncStorage.setItem("jwt", data.jwt);
+        if (data.role) await AsyncStorage.setItem("role", data.role);
+        navigateByRole(data.role);
+      } catch {}
+      finally { setLoading(false); }
+    }
+    lastLogoTapRef.current = now;
   };
 
   // ─────────────────────────────────────────────
@@ -301,16 +319,18 @@ export default function LoginScreen() {
         <View>
           {/* 로고 */}
           <View style={{ alignItems: "center", marginTop: 40 }}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={{
-                width: 120,
-                height: 120,
-                borderRadius: 28,
-                marginBottom: 14,
-              }}
-              resizeMode="contain"
-            />
+            <Pressable onPress={handleLogoDoubleTap}>
+              <Image
+                source={require("../../assets/images/logo.png")}
+                style={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: 28,
+                  marginBottom: 14,
+                }}
+                resizeMode="contain"
+              />
+            </Pressable>
             <Text
               style={{ fontSize: 46, fontWeight: "900", color: Colors.text }}
             >

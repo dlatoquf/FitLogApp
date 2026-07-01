@@ -435,9 +435,9 @@ export default function MemberGrowthScreen() {
         <TouchableOpacity
           onPress={saveLog}
           disabled={saving}
-          style={{ backgroundColor: Colors.green, borderRadius: 12, padding: 14, alignItems: "center" }}
+          style={{ backgroundColor: Colors.green, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center" }}
         >
-          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>
             {saving ? "저장 중..." : "기록 저장"}
           </Text>
         </TouchableOpacity>

@@ -5546,7 +5546,7 @@ export default function MemberDetailScreen() {
               {/* 특이사항 */}
               <View style={{ marginBottom: 14 }}>
                 <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.textSub, marginBottom: 6 }}>
-                  특이사항 (선택)
+                  특이사항
                 </Text>
                 <TextInput
                   value={ptLogMemo}
@@ -5560,11 +5560,11 @@ export default function MemberDetailScreen() {
                     borderWidth: 1,
                     borderColor: Colors.border,
                     borderRadius: 10,
-                    padding: 10,
+                    padding: 8,
                     fontSize: 13,
                     color: Colors.text,
                     textAlignVertical: "top",
-                    minHeight: 60,
+                    minHeight: 44,
                   }}
                 />
               </View>

@@ -249,9 +249,17 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member AND s.status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')")
     void detachMemberFromRecordedSchedules(@Param("member") Member member);
 
+    // 이름 보존용: 회원의 CONFIRMED·COMPLETED·NO_SHOW 스케줄 조회
+    @Query("SELECT s FROM Schedule s WHERE s.member = :member AND s.status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')")
+    List<Schedule> findRecordedSchedulesByMember(@Param("member") Member member);
+
     // 미연동 회원 삭제 시 스케줄에서 회원 참조만 해제 (스케줄 유지)
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Schedule s SET s.manualMember = null WHERE s.manualMember = :manualMember")
     void detachManualMemberFromSchedules(@Param("manualMember") ManualMember manualMember);
+
+    // 이름 보존용: 미연동 회원의 스케줄 조회
+    @Query("SELECT s FROM Schedule s WHERE s.manualMember = :manualMember")
+    List<Schedule> findByManualMember(@Param("manualMember") ManualMember manualMember);
 }
