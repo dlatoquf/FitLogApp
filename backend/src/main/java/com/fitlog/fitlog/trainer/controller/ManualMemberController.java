@@ -115,7 +115,7 @@ public class ManualMemberController {
         boolean isOtNew = "OT".equals(body.get("memo"));
         if (!isOtNew && !trainer.isProEffective()) {
             long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer)
-                    + memberRepository.countByTrainer(trainer);
+                    + memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
             if (nonOtCount >= 5) {
                 return ResponseEntity.status(403).body(null);
             }

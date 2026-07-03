@@ -134,8 +134,9 @@ public class TrainerHomeService {
         LocalDate monthStart = thisMonth.atDay(1);
         LocalDate monthEnd = thisMonth.atEndOfMonth();
 
-        // 연동 회원 + 미연동 회원 합산 (OT 회원 제외)
-        int totalMembers = (int) (memberRepository.countByTrainer(trainer)
+        // 연동 회원 + 미연동 회원 합산 (OT·비활성·PT종료 7일 경과 제외)
+        LocalDate cutoff = today.minusDays(7);
+        int totalMembers = (int) (memberRepository.countByTrainer(trainer, cutoff)
                 + manualMemberRepository.countNonOtByTrainer(trainer));
 
         // 오늘 PT 목록

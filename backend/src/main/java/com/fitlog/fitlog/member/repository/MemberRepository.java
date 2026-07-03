@@ -32,9 +32,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("SELECT m FROM Member m WHERE m.user.id = :userId")
     Optional<Member> findLightByUserId(@Param("userId") Long userId);
 
-    //홈 화면 회원 수 count용 (ACTIVE만)
-    @Query("SELECT COUNT(m) FROM Member m WHERE m.trainer = :trainer AND m.status = 'ACTIVE' AND m.user.deletedAt IS NULL")
-    int countByTrainer(@Param("trainer") Trainer trainer);
+    //홈 화면 회원 수 count용 (ACTIVE + PT 종료 7일 미경과만)
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.trainer = :trainer AND m.status = 'ACTIVE' AND m.user.deletedAt IS NULL " +
+           "AND NOT (m.ptRemaining = 0 AND m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff)")
+    int countByTrainer(@Param("trainer") Trainer trainer, @Param("cutoff") java.time.LocalDate cutoff);
 
     @Query("""
         SELECT m

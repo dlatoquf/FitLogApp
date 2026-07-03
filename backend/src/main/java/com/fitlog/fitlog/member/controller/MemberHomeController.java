@@ -168,7 +168,7 @@ public class MemberHomeController {
         if (trainer == null)
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "유효하지 않은 트레이너 코드예요."));
 
-        long memberCount = memberRepository.countByTrainer(trainer);
+        long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
         boolean isFree = "FREE".equals(trainer.getPlan());
 
         if (isFree && memberCount >= 3) {
@@ -209,7 +209,7 @@ public class MemberHomeController {
 
         // 무료 플랜 5명 제한 (PRO 또는 체험 중이면 무제한)
         if (!trainer.isProEffective()) {
-            long memberCount = memberRepository.countByTrainer(trainer);
+            long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
             if (memberCount >= 5) {
                 return ResponseEntity.badRequest().body(
                         Map.of("message", "해당 트레이너는 무료 플랜으로 최대 5명까지 연결 가능합니다.")
@@ -356,7 +356,7 @@ public class MemberHomeController {
         if (trainer == null)
             return ResponseEntity.badRequest().body(Map.of("message", "유효하지 않은 트레이너 코드예요."));
 
-        long memberCount = memberRepository.countByTrainer(trainer);
+        long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
         boolean isFree = "FREE".equals(trainer.getPlan());
         if (isFree && memberCount >= 3)
             return ResponseEntity.badRequest().body(Map.of("message", "이 트레이너는 현재 무료 플랜 회원이 가득 찼어요."));
