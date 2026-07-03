@@ -295,6 +295,12 @@ public class MemberHomeController {
                 contract.setMember(member);
                 contract.setManualMember(null);
                 ptContractRepository.save(contract);
+                // 가장 오래된 계약의 startDate를 member.ptStartDate에 반영
+                if (contract.getStartDate() != null && !contract.getStartDate().isBlank()
+                        && (member.getPtStartDate() == null || member.getPtStartDate().isBlank())) {
+                    member.setPtStartDate(contract.getStartDate());
+                    memberRepository.save(member);
+                }
             }
 
             // 3-2. schedules 이전: manual_member_id → member_id 로 일괄 업데이트
