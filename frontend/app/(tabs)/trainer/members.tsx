@@ -808,13 +808,7 @@ export default function TrainerMembersScreen() {
                       {locked ? (
                         <Text style={{ fontSize: 16 }}>🔒</Text>
                       ) : (
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "800",
-                            color: "#fff",
-                          }}
-                        >
+                        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
                           {m.name[0]}
                         </Text>
                       )}
@@ -1068,7 +1062,7 @@ export default function TrainerMembersScreen() {
                     marginTop: 2,
                   }}
                 >
-                  PT 없음 · 연결해제 · 이동 회원 관리
+                  PT 종료 · 연결해제 · 비활성 미연동
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setInactiveModal(false)}>
@@ -1125,7 +1119,7 @@ export default function TrainerMembersScreen() {
                           color: Colors.textSub,
                         }}
                       >
-                        피티 종료
+                        PT 종료
                       </Text>
                       <Text style={{ fontSize: 12, color: Colors.textMuted }}>
                         — 90일 후 자동 삭제
@@ -1152,27 +1146,6 @@ export default function TrainerMembersScreen() {
                           borderColor: "#E5E7EB",
                         }}
                       >
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: "#D1D5DB",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            marginRight: 10,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: "800",
-                              color: "#fff",
-                            }}
-                          >
-                            {m.name[0]}
-                          </Text>
-                        </View>
                         <View style={{ flex: 1 }}>
                           <Text
                             style={{
@@ -1192,62 +1165,6 @@ export default function TrainerMembersScreen() {
                           >
                             PT 0 / {m.ptTotal}회
                           </Text>
-                        </View>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            gap: 6,
-                            alignItems: "center",
-                          }}
-                        >
-                          <TouchableOpacity
-                            onPress={async (e) => {
-                              e.stopPropagation();
-                              if (m.isLinked) {
-                                Alert.alert(
-                                  "회원 복귀",
-                                  `${m.name}님을 활성 회원으로 복귀시킬까요?`,
-                                  [
-                                    { text: "취소", style: "cancel" },
-                                    {
-                                      text: "복귀",
-                                      onPress: async () => {
-                                        const jwt = await AsyncStorage.getItem("jwt");
-                                        const res = await fetch(
-                                          `${API_URL}/api/trainer/members/${m.id}/reactivate`,
-                                          { method: "POST", headers: { Authorization: `Bearer ${jwt}` } },
-                                        );
-                                        const result = await res.json();
-                                        if (res.ok) {
-                                          Alert.alert("완료", result.message);
-                                          setInactiveModal(false);
-                                          fetchMembers();
-                                        } else {
-                                          Alert.alert("오류", result.message);
-                                        }
-                                      },
-                                    },
-                                  ],
-                                );
-                              } else {
-                                // 미연동: PT 재등록 모달 자동 오픈
-                                setInactiveModal(false);
-                                router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual&openPtAdd=true` as any);
-                              }
-                            }}
-                            style={{
-                              backgroundColor: Colors.greenLight,
-                              borderRadius: 6,
-                              paddingHorizontal: 7,
-                              paddingVertical: 3,
-                              borderWidth: 1,
-                              borderColor: Colors.green + "44",
-                            }}
-                          >
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>
-                              회원 복귀
-                            </Text>
-                          </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -1306,27 +1223,6 @@ export default function TrainerMembersScreen() {
                           borderColor: "#E5E7EB",
                         }}
                       >
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: "#D1D5DB",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            marginRight: 10,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: "800",
-                              color: "#fff",
-                            }}
-                          >
-                            {m.name[0]}
-                          </Text>
-                        </View>
                         <View style={{ flex: 1 }}>
                           <Text
                             style={{
@@ -1393,12 +1289,12 @@ export default function TrainerMembersScreen() {
                               );
                             }}
                             style={{
-                              backgroundColor: Colors.greenLight,
-                              borderRadius: 6,
-                              paddingHorizontal: 7,
-                              paddingVertical: 3,
+                              backgroundColor: Colors.green + "15",
+                              borderRadius: 10,
+                              paddingHorizontal: 16,
+                              paddingVertical: 8,
                               borderWidth: 1,
-                              borderColor: Colors.green + "44",
+                              borderColor: Colors.green + "40",
                             }}
                           >
                             <Text
@@ -1411,26 +1307,6 @@ export default function TrainerMembersScreen() {
                               회원 복귀
                             </Text>
                           </TouchableOpacity>
-                          <View
-                            style={{
-                              backgroundColor: "#F3F4F6",
-                              borderRadius: 6,
-                              paddingHorizontal: 7,
-                              paddingVertical: 3,
-                              borderWidth: 1,
-                              borderColor: "#D1D5DB",
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                fontWeight: "700",
-                                color: "#6B7280",
-                              }}
-                            >
-                              연결해제
-                            </Text>
-                          </View>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -1490,27 +1366,6 @@ export default function TrainerMembersScreen() {
                           borderColor: "#DDD6FE",
                         }}
                       >
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: "#A78BFA",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            marginRight: 10,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: "800",
-                              color: "#fff",
-                            }}
-                          >
-                            {m.name[0]}
-                          </Text>
-                        </View>
                         <View style={{ flex: 1 }}>
                           <Text
                             style={{
@@ -1627,7 +1482,7 @@ export default function TrainerMembersScreen() {
                               marginTop: 2,
                             }}
                           >
-                            {m.ptEndedAt ? `PT 종료 · 비활성` : "비활성"}
+                            {m.ptEndedAt ? `종료일 ${m.ptEndedAt.replace(/-/g, ".")}` : "비활성"}{m.ptTotal && m.ptTotal > 0 ? ` · 잔여 ${m.ptRemaining ?? 0}회` : ""}
                           </Text>
                         </View>
                         <TouchableOpacity
@@ -1672,9 +1527,9 @@ export default function TrainerMembersScreen() {
                           }}
                           style={{
                             backgroundColor: Colors.green + "15",
-                            borderRadius: 8,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
+                            borderRadius: 10,
+                            paddingHorizontal: 16,
+                            paddingVertical: 8,
                             borderWidth: 1,
                             borderColor: Colors.green + "40",
                           }}

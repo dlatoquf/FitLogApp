@@ -393,13 +393,17 @@ public class ManualMemberController {
             memberMemoRepository.deleteByManualMemberId(m.getId());
             manualBodyLogRepository.deleteByManualMemberId(m.getId());
             workoutLogRepository.deleteByManualMember(m);
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+            // 오늘까지의 스케줄: 이름 보존 후 참조 해제
             scheduleRepository.findByManualMember(m).forEach(s -> {
-                if (s.getMemberName() == null) {
+                if (!s.getDate().isAfter(today) && s.getMemberName() == null) {
                     s.setMemberName(m.getName());
                     scheduleRepository.save(s);
                 }
             });
-            scheduleRepository.detachManualMemberFromSchedules(m);
+            scheduleRepository.detachManualMemberFromSchedulesUpToDate(m, today);
+            // 내일 이후 스케줄 삭제
+            scheduleRepository.deleteByManualMemberAndDateAfter(m, today);
         });
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();

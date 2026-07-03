@@ -2779,10 +2779,8 @@ export default function MemberDetailScreen() {
     const text = isOt
       ? buildOtShareText()
       : buildManualWorkoutShareText(smsPromptData, code || undefined);
-    // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함
-    const inviteUrl = isOt
-      ? "https://fitlog.app"
-      : (Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL);
+    // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함 (회원 OS 모르므로 두 링크 모두 포함)
+    const inviteUrl = "https://linktr.ee/FitLogApp";
     const executionParams = {
       memberId: String(memberId),
       ...(isManual ? { memberType: "manual" } : {}),
@@ -2831,7 +2829,7 @@ export default function MemberDetailScreen() {
     const code = trainerInviteCode ?? "";
     const trainerName = member?.user?.name ?? "트레이너";
     const safeText = String(`안녕하세요! FitLog 앱에서 아래 트레이너 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
-    const safeUrl = String((Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL) ?? "https://fitlog.app");
+    const safeUrl = "https://linktr.ee/FitLogApp";
     try {
       await KakaoShare.shareTextTemplate({
         template: {
@@ -2934,28 +2932,52 @@ export default function MemberDetailScreen() {
       const amountNum = ptForm.amount
         ? Number(ptForm.amount.replace(/,/g, ""))
         : undefined;
-      const body: any = {
-        sessions: Number(ptForm.sessions),
-        startDate: ptForm.startDate || undefined,
-        endDate: ptForm.endDate || undefined,
-        memo: ptForm.memo || undefined,
-        amount: amountNum || undefined,
-        contractDate: ptForm.contractDate || undefined,
-      };
-      if (isFirst && ptForm.remaining !== "") {
-        body.initialRemaining = Number(ptForm.remaining);
-      }
-      const res = await fetch(
-        `${API_URL}/api/trainer/members/${memberId}/pt/add`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
+
+      let res: Response;
+      if (type === "manual") {
+        // 미연동 회원: PUT /api/trainer/manual-members/{id}/pt
+        const body: any = {
+          sessions: Number(ptForm.sessions),
+          amount: amountNum || undefined,
+          memo: ptForm.memo || undefined,
+        };
+        if (ptForm.contractDate) body.paymentDate = ptForm.contractDate;
+        res = await fetch(
+          `${API_URL}/api/trainer/manual-members/${memberId}/pt`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify(body),
           },
-          body: JSON.stringify(body),
-        },
-      );
+        );
+      } else {
+        // 연동 회원: POST /api/trainer/members/{id}/pt/add
+        const body: any = {
+          sessions: Number(ptForm.sessions),
+          startDate: ptForm.startDate || undefined,
+          endDate: ptForm.endDate || undefined,
+          memo: ptForm.memo || undefined,
+          amount: amountNum || undefined,
+          contractDate: ptForm.contractDate || undefined,
+        };
+        if (isFirst && ptForm.remaining !== "") {
+          body.initialRemaining = Number(ptForm.remaining);
+        }
+        res = await fetch(
+          `${API_URL}/api/trainer/members/${memberId}/pt/add`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify(body),
+          },
+        );
+      }
       if (!res.ok) throw new Error("PT 등록 실패");
       setShowPTEdit(false);
       fetchMember();

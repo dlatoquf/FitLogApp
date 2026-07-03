@@ -82,6 +82,8 @@ interface ManualMemberItem {
   id: number;
   name: string;
   ptRemaining: number | null;
+  isActive?: boolean;
+  ptEndedAt?: string | null;
 }
 
 interface CombinedPayMember {
@@ -90,6 +92,7 @@ interface CombinedPayMember {
   ptRemaining: number;
   isManual: boolean;
   isDisconnected: boolean;
+  isPtExpired: boolean;
   originalLinked: Member | null;
   originalManual: ManualMemberItem | null;
 }
@@ -303,6 +306,8 @@ export default function TrainerHomeScreen() {
     [],
   );
   const [payCombinedMembers, setPayCombinedMembers] = useState<CombinedPayMember[]>([]);
+  const [payPtExpiredMembers, setPayPtExpiredMembers] = useState<CombinedPayMember[]>([]);
+  const [payExpiredMode, setPayExpiredMode] = useState(false);
   const [payMembersLoading, setPayMembersLoading] = useState(false);
   const [payMemberSearch, setPayMemberSearch] = useState("");
   const [paySelectedMember, setPaySelectedMember] = useState<Member | null>(
@@ -668,6 +673,7 @@ export default function TrainerHomeScreen() {
     setPayMembers([]);
     setPayManualMembers([]);
     setPayCombinedMembers([]);
+    setPayPtExpiredMembers([]);
     setPayMembersLoading(true);
     setPayAddModal(true);
     try {
@@ -687,12 +693,16 @@ export default function TrainerHomeScreen() {
         const members = await membersRes.json();
         setPayMembers(members);
         members.forEach((m: any) => {
+          const isDisconnected = m.connected === false;
+          // PT 만료: 연결해제 + PT 잔여 0회 + ptEndedAt 있는 경우만
+          const isPtExpired = isDisconnected && m.ptRemaining === 0 && !!m.ptEndedAt;
           combined.push({
             id: m.id,
             name: m.user?.name ?? "",
             ptRemaining: m.ptRemaining ?? 0,
             isManual: false,
-            isDisconnected: m.connected === false,
+            isDisconnected,
+            isPtExpired,
             originalLinked: m as Member,
             originalManual: null,
           });
@@ -702,23 +712,37 @@ export default function TrainerHomeScreen() {
         const manualMembers = await manualRes.json();
         setPayManualMembers(manualMembers);
         manualMembers.forEach((m: any) => {
+          // PT 만료: ptRemaining=0 + ptEndedAt 있음 + 7일 이상 경과한 경우만 (isActive=false 단독은 제외)
+          const isPtExpired = (() => {
+            if (!m.ptEndedAt || !m.ptTotal || m.ptRemaining !== 0) return false;
+            const ended = new Date(m.ptEndedAt);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            ended.setHours(0, 0, 0, 0);
+            return today.getTime() - ended.getTime() >= 7 * 24 * 60 * 60 * 1000;
+          })();
+          const isInactive = m.isActive === false;
           combined.push({
             id: m.id,
             name: m.name ?? "",
             ptRemaining: m.ptRemaining ?? 0,
             isManual: true,
-            isDisconnected: false,
+            isDisconnected: isInactive, // 비활성 미연동은 주 목록 제외용으로 isDisconnected 활용
+            isPtExpired,
             originalLinked: null,
             originalManual: m as ManualMemberItem,
           });
         });
       }
 
-      // 연결해제 + PT 만료 회원 제외, ㄱㄴㄷ순
       combined.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-      const filtered = combined.filter((m) => !m.isDisconnected);
+      // 활성 회원만: 연결해제/비활성 제외, PT 만료도 제외
+      const filtered = combined.filter((m) => !m.isPtExpired && !m.isDisconnected);
+      // PT 만료 회원만 (PT 재등록 대상)
+      const expired = combined.filter((m) => m.isPtExpired);
 
       setPayCombinedMembers(filtered);
+      setPayPtExpiredMembers(expired);
     } catch {
     } finally {
       setPayMembersLoading(false);
@@ -943,18 +967,15 @@ export default function TrainerHomeScreen() {
   const handleKakaoShare = async () => {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
-    const installUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
     const safeText = String(`안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
-    const safeUrl = String(installUrl ?? "https://fitlog.app");
-    const safeWebUrl = String(APP_STORE_URL ?? "https://fitlog.app");
     console.log("[Kakao] shareTextTemplate 시작");
     try {
       const result = await shareTextTemplate({
         template: {
           text: safeText,
           link: {
-            mobileWebUrl: Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL,
-            webUrl: APP_STORE_URL,
+            mobileWebUrl: "https://linktr.ee/FitLogApp",
+            webUrl: "https://linktr.ee/FitLogApp",
             androidExecutionParams: { code },
             iosExecutionParams: { code },
           },
@@ -2501,7 +2522,7 @@ export default function TrainerHomeScreen() {
         visible={payAddModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setPayAddModal(false)}
+        onRequestClose={() => { setPayAddModal(false); setPayExpiredMode(false); }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -2619,16 +2640,84 @@ export default function TrainerHomeScreen() {
               {payMemberType === "existing" ? (
                 <>
                   {/* 기존 연동 회원 선택 */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: Colors.textSub,
-                      marginBottom: 10,
-                    }}
-                  >
-                    회원 선택
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.textSub,
+                      }}
+                    >
+                      회원 선택
+                    </Text>
+                    {payPtExpiredMembers.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setPayExpiredMode(true)}
+                        style={{
+                          backgroundColor: "#FEF3C7",
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderWidth: 1,
+                          borderColor: "#F59E0B44",
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}>
+                          PT 만료 {payPtExpiredMembers.length}명
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {/* PT 만료 회원 선택됨 표시 */}
+                  {(payPtExpiredMembers.some((m) => m.isManual && m.id === paySelectedManualMember?.id) ||
+                    payPtExpiredMembers.some((m) => !m.isManual && m.id === paySelectedMember?.id)) && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        backgroundColor: "#FEF3C7",
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: "#F59E0B44",
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <View
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: "#F59E0B",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>
+                            {(paySelectedManualMember?.name ?? (paySelectedMember as any)?.user?.name ?? "?")[0]}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 14, fontWeight: "700", color: "#92400E" }}>
+                            {paySelectedManualMember?.name ?? (paySelectedMember as any)?.user?.name}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: "#B45309", marginTop: 1 }}>PT 만료 회원 선택됨</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setPaySelectedManualMember(null);
+                          setPaySelectedMember(null);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={{ fontSize: 18, color: "#B45309", fontWeight: "700" }}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   {/* 검색 */}
                   <TextInput
                     value={payMemberSearch}
@@ -2663,11 +2752,11 @@ export default function TrainerHomeScreen() {
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       keyboardShouldPersistTaps="handled"
-                      style={{ height: 90, marginBottom: 20 }}
+                      style={{ marginBottom: 20 }}
                       contentContainerStyle={{
                         gap: 8,
                         paddingRight: 4,
-                        alignItems: "center",
+                        alignItems: "flex-start",
                       }}
                     >
                       {payCombinedMembers.filter((m) =>
@@ -2703,37 +2792,23 @@ export default function TrainerHomeScreen() {
                               minWidth: 68,
                             }}
                           >
-                            <View
-                              style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 10,
-                                backgroundColor: selected
-                                  ? Colors.green
-                                  : "#D1D5DB",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                marginBottom: 4,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 15,
-                                  fontWeight: "800",
-                                  color: "#fff",
-                                }}
-                              >
-                                {m.name[0]}
-                              </Text>
-                            </View>
                             <Text
                               style={{
                                 fontSize: 12,
                                 fontWeight: "700",
                                 color: selected ? Colors.green : Colors.text,
+                                marginBottom: 2,
                               }}
                             >
                               {m.name}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: selected ? Colors.green : Colors.textMuted,
+                              }}
+                            >
+                              잔여 {m.ptRemaining}회
                             </Text>
                             {m.isDisconnected && (
                               <Text
@@ -3043,6 +3118,73 @@ export default function TrainerHomeScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+
+        {/* ── PT 만료 회원 팝업 (payAddModal 내부 오버레이) ── */}
+        {payExpiredMode && (
+          <TouchableOpacity
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 28 }}
+            activeOpacity={1}
+            onPress={() => setPayExpiredMode(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={{ backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "100%" }}
+              onPress={() => {}}
+            >
+              <Text style={{ fontSize: 16, fontWeight: "800", color: Colors.text, marginBottom: 4 }}>PT 만료 회원</Text>
+              <Text style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 16 }}>회원을 선택하면 결제 모달에 자동으로 세팅돼요</Text>
+              {payPtExpiredMembers.length === 0 ? (
+                <Text style={{ fontSize: 13, color: Colors.textMuted, textAlign: "center", paddingVertical: 20 }}>PT 만료 회원이 없어요</Text>
+              ) : (
+                payPtExpiredMembers.map((m) => (
+                  <TouchableOpacity
+                    key={`exp-${m.isManual ? "manual" : "linked"}-${m.id}`}
+                    onPress={() => {
+                      if (m.isManual) {
+                        setPaySelectedManualMember(m.originalManual);
+                        setPaySelectedMember(null);
+                      } else {
+                        setPaySelectedMember(m.originalLinked);
+                        setPaySelectedManualMember(null);
+                      }
+                      setPayExpiredMode(false);
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      marginBottom: 6,
+                      backgroundColor: Colors.bgSub,
+                    }}
+                  >
+                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#D1D5DB", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>{m.name[0]}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>{m.name}</Text>
+                      <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 1 }}>
+                        {m.isManual ? "미연동 · PT 만료" : "연동 · PT 만료"}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: "#F59E0B44" }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}>선택</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+              <TouchableOpacity
+                onPress={() => setPayExpiredMode(false)}
+                style={{ marginTop: 8, alignItems: "center", paddingVertical: 10 }}
+              >
+                <Text style={{ fontSize: 14, color: Colors.textMuted, fontWeight: "600" }}>닫기</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </Modal>
 
       {/* 수업 처리 모달 */}

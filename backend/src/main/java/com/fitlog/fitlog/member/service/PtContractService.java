@@ -110,8 +110,12 @@ public class PtContractService {
             member.setPtRemaining(prevRemaining + request.getSessions());
         }
 
-        // PT 추가 시 만료 카운트다운 초기화 (7일 비활성화 방지)
+        // PT 추가 시 만료 카운트다운 초기화 + INACTIVE 회원 자동 복구
         member.setPtEndedAt(null);
+        if (member.getStatus() == Member.Status.INACTIVE) {
+            member.setStatus(Member.Status.ACTIVE);
+            member.setDisconnectedAt(null);
+        }
 
         // 시작일: 기존에 없으면 세팅, 있으면 유지 (없으면 결제일로 자동 설정)
         if (member.getPtStartDate() == null || member.getPtStartDate().isEmpty()) {

@@ -77,15 +77,15 @@ public class MemberDataCleanupService {
     public void cleanupMemberData(Member member) {
         Long mId = member.getId();
 
-        // 스케줄: 이름 보존 후 참조 해제, 나머지 삭제
+        // 스케줄: 이름 보존 후 참조 해제 (스케줄 기록 보존, 삭제 안 함)
+        // 미래 스케줄은 disconnect 시점에 이미 삭제됨
         scheduleRepository.findRecordedSchedulesByMember(member).forEach(s -> {
-            if (s.getMemberName() == null) {
+            if (s.getMemberName() == null && member.getUser() != null) {
                 s.setMemberName(member.getUser().getName());
                 scheduleRepository.save(s);
             }
         });
         scheduleRepository.detachMemberFromRecordedSchedules(member);
-        scheduleRepository.deleteByMember(member);
 
         // 이하 전부 삭제
         workoutLogRepository.deleteByMember(member);

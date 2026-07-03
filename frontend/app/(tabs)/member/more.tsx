@@ -384,7 +384,7 @@ export default function MemberMoreScreen() {
         {/* 앱 정보 */}
         <FlatSectionHeader title="앱 정보" />
         <View style={{ borderTopWidth: 1, borderColor: Colors.border }}>
-          <FlatRow label="버전" right="1.0.6" last={false} />
+          <FlatRow label="버전" right="1.1.0" last={false} />
           <FlatRow label="이용약관" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/terms.html")} showArrow last={false} />
           <FlatRow label="개인정보처리방침" onPress={() => Linking.openURL("https://dlatoquf.github.io/FitLogApp/docs/privacy.html")} showArrow last />
         </View>

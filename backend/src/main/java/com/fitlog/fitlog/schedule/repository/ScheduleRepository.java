@@ -259,7 +259,31 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     @Query("UPDATE Schedule s SET s.manualMember = null WHERE s.manualMember = :manualMember")
     void detachManualMemberFromSchedules(@Param("manualMember") ManualMember manualMember);
 
+    // 미연동 회원 삭제 시 오늘까지만 참조 해제
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Schedule s SET s.manualMember = null WHERE s.manualMember = :manualMember AND s.date <= :today")
+    void detachManualMemberFromSchedulesUpToDate(@Param("manualMember") ManualMember manualMember, @Param("today") LocalDate today);
+
+    // 미연동 회원 삭제 시 내일 이후 스케줄 삭제
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.manualMember = :manualMember AND s.date > :today")
+    void deleteByManualMemberAndDateAfter(@Param("manualMember") ManualMember manualMember, @Param("today") LocalDate today);
+
     // 이름 보존용: 미연동 회원의 스케줄 조회
     @Query("SELECT s FROM Schedule s WHERE s.manualMember = :manualMember")
     List<Schedule> findByManualMember(@Param("manualMember") ManualMember manualMember);
+
+    // 연동 회원 연결해제 시 오늘까지 스케줄 참조 해제 (기록 보존)
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Schedule s SET s.member = null WHERE s.member = :member AND s.date <= :today AND s.status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')")
+    void detachMemberFromRecordedSchedulesUpToDate(@Param("member") Member member, @Param("today") LocalDate today);
+
+    // 연동 회원 연결해제 시 내일 이후 스케줄 삭제 (상태 무관)
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.member = :member AND s.date > :today")
+    void deleteByMemberAndDateAfter(@Param("member") Member member, @Param("today") LocalDate today);
 }

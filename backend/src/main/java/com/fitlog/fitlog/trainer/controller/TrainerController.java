@@ -410,8 +410,18 @@ public class TrainerController {
         }
         // 데이터는 90일 후 스케줄러가 정리 — 즉시 삭제하지 않음
         member.setStatus(Member.Status.INACTIVE);
-        member.setDisconnectedAt(java.time.LocalDate.now());
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        member.setDisconnectedAt(today);
         memberRepository.save(member);
+        // 오늘까지 스케줄: 이름 보존 후 참조 해제 / 내일 이후 스케줄: 삭제
+        scheduleRepository.findRecordedSchedulesByMember(member).forEach(s -> {
+            if (!s.getDate().isAfter(today) && s.getMemberName() == null) {
+                s.setMemberName(member.getUser() != null ? member.getUser().getName() : null);
+                scheduleRepository.save(s);
+            }
+        });
+        scheduleRepository.detachMemberFromRecordedSchedulesUpToDate(member, today);
+        scheduleRepository.deleteByMemberAndDateAfter(member, today);
         return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
     }
 
