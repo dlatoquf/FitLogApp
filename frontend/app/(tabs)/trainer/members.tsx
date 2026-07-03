@@ -39,6 +39,7 @@ interface DisplayMember {
   phone?: string;
   otCount?: number; // OT 체험 후 PT 전환된 회원의 OT 완료 횟수
   latestMemo?: string;
+  isActive?: boolean; // 미연동 회원 활성 여부 (false = 비활성)
 }
 
 interface Memo {
@@ -148,6 +149,7 @@ export default function TrainerMembersScreen() {
             ptEndedAt: m.ptEndedAt ?? undefined,
             otCount: m.otCount ?? undefined,
             latestMemo: m.latestMemo ?? undefined,
+            isActive: m.isActive !== false,
           }))
         : [];
 
@@ -360,10 +362,9 @@ export default function TrainerMembersScreen() {
     return daysLeft > 0 ? daysLeft : null; // 0 이하면 이미 비활성화됨
   };
 
-  // 비활성 "피티 종료" 회원의 자동 삭제까지 남은 일수
-  // ptEndedAt + 37일(유예 7 + 비활성 30) - 오늘
+  // 비활성 "피티 종료" 회원의 자동 삭제까지 남은 일수 (ptEndedAt + 90일)
   const ptAutoDeleteDaysLeft = (m: DisplayMember): number => {
-    if (!m.ptEndedAt) return 30;
+    if (!m.ptEndedAt) return 90;
     const ended = new Date(m.ptEndedAt);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -371,12 +372,12 @@ export default function TrainerMembersScreen() {
     const diffDays = Math.floor(
       (today.getTime() - ended.getTime()) / (1000 * 60 * 60 * 24),
     );
-    return Math.max(0, 37 - diffDays);
+    return Math.max(0, 90 - diffDays);
   };
 
-  // 비활성: PT종료 / 연결해제 / 이동 — 메인 목록에서 제외, ⋮ 모달로 관리
+  // 비활성: PT종료 / 연결해제 / 이동 / 미연동 비활성 — 메인 목록에서 제외, ⋮ 모달로 관리
   const isInactive = (m: DisplayMember) =>
-    isPtEnded(m) || (!m.connected && !m.moved) || m.moved;
+    isPtEnded(m) || (!m.connected && !m.moved) || m.moved || m.isActive === false;
 
   // 메인 목록: 활성 회원만
   const activeMembers = allMembers.filter((m) => !isInactive(m));
@@ -419,8 +420,11 @@ export default function TrainerMembersScreen() {
     (m) => m.isLinked && !m.connected && !m.moved && !isPtEnded(m),
   );
   const movedMembers = allMembers.filter((m) => m.moved);
+  const inactiveManualMembers = allMembers.filter(
+    (m) => !m.isLinked && m.isActive === false && !isPtEnded(m),
+  );
   const inactiveCount =
-    ptEndedMembers.length + disconnectedMembers.length + movedMembers.length;
+    ptEndedMembers.length + disconnectedMembers.length + movedMembers.length + inactiveManualMembers.length;
 
   const linkedCount = allMembers.filter(
     (m) => m.isLinked && m.connected && !isPtEnded(m) && !m.moved,
@@ -936,7 +940,7 @@ export default function TrainerMembersScreen() {
                         피티 종료
                       </Text>
                       <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                        — 30일 후 자동 삭제
+                        — 90일 후 자동 삭제
                       </Text>
                     </View>
                     {ptEndedMembers.map((m) => (
@@ -1089,7 +1093,7 @@ export default function TrainerMembersScreen() {
                         연결해제
                       </Text>
                       <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                        — 30일 후 자동 삭제
+                        — 90일 후 자동 삭제
                       </Text>
                     </View>
                     {disconnectedMembers.map((m) => (
@@ -1335,6 +1339,85 @@ export default function TrainerMembersScreen() {
                             이동
                           </Text>
                         </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* 비활성 미연동 회원 섹션 */}
+                {inactiveManualMembers.length > 0 && (
+                  <View style={{ marginBottom: 20 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                      <View style={{ width: 3, height: 14, backgroundColor: "#9CA3AF", borderRadius: 2 }} />
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub }}>
+                        비활성 미연동
+                      </Text>
+                      <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                        — 90일 후 자동 삭제
+                      </Text>
+                    </View>
+                    {inactiveManualMembers.map((m) => (
+                      <TouchableOpacity
+                        key={m.key}
+                        onPress={() => {
+                          setInactiveModal(false);
+                          router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual` as any);
+                        }}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F9FAFB",
+                          borderRadius: 10,
+                          padding: 12,
+                          marginBottom: 6,
+                          borderWidth: 1,
+                          borderColor: "#E5E7EB",
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "600", color: Colors.textSub }}>{m.name}</Text>
+                          <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                            {m.ptEndedAt ? `PT 종료 · 비활성` : "비활성"}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Alert.alert("회원 복귀", `${m.name}님을 복귀시킬까요?`, [
+                              { text: "취소", style: "cancel" },
+                              {
+                                text: "복귀",
+                                onPress: async () => {
+                                  try {
+                                    const jwt = await AsyncStorage.getItem("jwt");
+                                    const res = await fetch(`${API_URL}/api/trainer/manual-members/${m.id}/reactivate`, {
+                                      method: "POST",
+                                      headers: { Authorization: `Bearer ${jwt}` },
+                                    });
+                                    const result = await res.json();
+                                    if (res.ok) {
+                                      Alert.alert("완료", result.message);
+                                      fetchMembers();
+                                    } else {
+                                      Alert.alert("오류", result.message);
+                                    }
+                                  } catch {
+                                    Alert.alert("오류", "복귀 처리 중 오류가 발생했어요.");
+                                  }
+                                },
+                              },
+                            ]);
+                          }}
+                          style={{
+                            backgroundColor: Colors.green + "15",
+                            borderRadius: 8,
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderWidth: 1,
+                            borderColor: Colors.green + "40",
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
+                        </TouchableOpacity>
                       </TouchableOpacity>
                     ))}
                   </View>

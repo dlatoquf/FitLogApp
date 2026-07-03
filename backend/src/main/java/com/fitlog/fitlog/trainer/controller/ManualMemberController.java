@@ -84,6 +84,7 @@ public class ManualMemberController {
             map.put("paymentDate", m.getPaymentDate());
             map.put("ptEndedAt", m.getPtEndedAt());
             map.put("otCount", m.getOtCount());
+            map.put("isActive", m.isActive());
             memberMemoRepository.findTop1ByManualMemberOrderByCreatedAtDesc(m)
                     .ifPresent(memo -> map.put("latestMemo", memo.getContent()));
             result.add(map);
@@ -339,6 +340,30 @@ public class ManualMemberController {
         manualMemberRepository.save(m);
 
         return ResponseEntity.ok(m);
+    }
+
+    // POST /api/trainer/manual-members/{id}/deactivate — 비활성화 (isActive=false, 90일 후 삭제)
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<Map<String, Object>> deactivate(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        m.setActive(false);
+        manualMemberRepository.save(m);
+        return ResponseEntity.ok(Map.of("message", "회원이 비활성화됐어요."));
+    }
+
+    // POST /api/trainer/manual-members/{id}/reactivate — 재활성화 (isActive=true)
+    @PostMapping("/{id}/reactivate")
+    public ResponseEntity<Map<String, Object>> reactivate(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        m.setActive(true);
+        manualMemberRepository.save(m);
+        return ResponseEntity.ok(Map.of("message", "회원이 복귀됐어요."));
     }
 
     @DeleteMapping("/{id}")

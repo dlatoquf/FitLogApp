@@ -353,10 +353,12 @@ function HistoryTable({
   logs,
   trainerPlan,
   onViewMedia,
+  dateOnly,
 }: {
   logs: FitLog[];
   trainerPlan: "FREE" | "PRO";
   onViewMedia?: (mediaList: any[]) => void;
+  dateOnly?: boolean;
 }) {
   const [histTab, setHistTab] = useState<0 | 1>(0);
 
@@ -843,7 +845,7 @@ function HistoryTable({
   return (
     <View style={{ flex: 1 }}>
       {/* 내부 탭 */}
-      <View
+      {!dateOnly && <View
         style={{
           flexDirection: "row",
           paddingHorizontal: 20,
@@ -875,13 +877,13 @@ function HistoryTable({
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
 
       {/* ── 날짜별 탭 ── */}
-      {histTab === 0 && (
+      {(dateOnly || histTab === 0) && (
         <View style={{ flex: 1 }}>
           {/* 날짜 입력 + 조회 버튼 */}
-          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 }}>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1 }}>
                 <TextInput
@@ -986,7 +988,7 @@ function HistoryTable({
       )}
 
       {/* ── 운동종목별 탭 ── */}
-      {histTab === 1 && (
+      {!dateOnly && histTab === 1 && (
         <View style={{ flex: 1 }}>
           {/* 바깥 터치 시 드롭다운 닫기 — 테이블보다 위, 드롭다운보다 아래 */}
           {exDropOpen && (
@@ -1500,11 +1502,43 @@ export default function MemberDetailScreen() {
     );
   };
 
-  // ⋮ 메뉴: 미연동 회원 삭제
+  // ⋮ 메뉴: 미연동 회원 비활성화 (90일 후 삭제)
+  const handleDeactivateManualMember = async () => {
+    Alert.alert(
+      "비활성화",
+      `${member?.user.name}님을 비활성화할까요?\n데이터는 90일간 유지되며, 복귀 가능해요.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "비활성화",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setMemberActionLoading(true);
+              const jwt = await AsyncStorage.getItem("jwt");
+              const res = await fetch(
+                `${API_URL}/api/trainer/manual-members/${memberId}/deactivate`,
+                { method: "POST", headers: { Authorization: `Bearer ${jwt}` } },
+              );
+              if (!res.ok) throw new Error();
+              Alert.alert("완료", "회원이 비활성화됐어요.");
+              router.back();
+            } catch {
+              Alert.alert("오류", "비활성화 중 오류가 발생했어요.");
+            } finally {
+              setMemberActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // ⋮ 메뉴: 미연동 회원 즉시 삭제
   const handleDeleteManualMember = async () => {
     Alert.alert(
       "회원 삭제",
-      `${member?.user.name}님을 삭제할까요?\n운동 기록 등 모든 데이터가 삭제돼요.`,
+      `${member?.user.name}님을 삭제할까요?\n운동 기록 등 모든 데이터가 즉시 삭제돼요.`,
       [
         { text: "취소", style: "cancel" },
         {
@@ -5249,40 +5283,11 @@ export default function MemberDetailScreen() {
       {/* PT 수업 등록/수정 모달 */}
       <Modal
         visible={showFitLogForm}
-        transparent
+        transparent={false}
         animationType="slide"
         onRequestClose={resetFitLogForm}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}
-            activeOpacity={1}
-            onPress={resetFitLogForm}
-          />
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              maxHeight: FULL_H * 0.92,
-            }}
-          >
-            {/* 드래그 핸들 */}
-            <View
-              style={{ alignItems: "center", paddingTop: 10, paddingBottom: 2 }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 4,
-                  backgroundColor: Colors.border,
-                  borderRadius: 2,
-                }}
-              />
-            </View>
+          <View style={{ flex: 1, backgroundColor: "#fff" }}>
             {/* 헤더 */}
             <View
               style={{
@@ -5290,22 +5295,18 @@ export default function MemberDetailScreen() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 paddingHorizontal: 20,
-                paddingVertical: 14,
+                paddingTop: Platform.OS === "ios" ? 56 : 20,
+                paddingBottom: 14,
                 borderBottomWidth: 1,
                 borderBottomColor: Colors.border,
               }}
             >
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
               >
-                <View
-                  style={{
-                    width: 4,
-                    height: 18,
-                    backgroundColor: Colors.green,
-                    borderRadius: 2,
-                  }}
-                />
+                <TouchableOpacity onPress={resetFitLogForm} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 22, color: Colors.text }}>←</Text>
+                </TouchableOpacity>
                 <Text
                   style={{
                     fontSize: 16,
@@ -5322,34 +5323,18 @@ export default function MemberDetailScreen() {
                       : "PT 수업 등록"}
                 </Text>
               </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-              >
-                <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-                  {toDateKey(selectedDate)}
-                </Text>
-                <TouchableOpacity
-                  onPress={resetFitLogForm}
-                  style={{ padding: 4 }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 20,
-                      color: Colors.textMuted,
-                      lineHeight: 24,
-                    }}
-                  >
-                    ✕
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                {toDateKey(selectedDate)}
+              </Text>
             </View>
             {/* 폼 내용 */}
-            <ScrollView
+            <KeyboardAwareScrollView
               style={{ paddingHorizontal: 20 }}
-              contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
+              contentContainerStyle={{ paddingTop: 16, paddingBottom: 120 }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              enableOnAndroid
+              extraScrollHeight={20}
             >
               {/* 지난 수업 챌린지 결과 */}
               {lastSessionMissions.length > 0 && (
@@ -5410,12 +5395,8 @@ export default function MemberDetailScreen() {
                         style={{
                           flex: 1,
                           fontSize: 13,
-                          color:
-                            m.status === "DONE"
-                              ? Colors.textMuted
-                              : Colors.text,
-                          textDecorationLine:
-                            m.status === "DONE" ? "line-through" : "none",
+                          color: m.status === "DONE" ? Colors.textMuted : Colors.text,
+                          textDecorationLine: m.status === "DONE" ? "line-through" : "none",
                         }}
                       >
                         {m.content}
@@ -5424,16 +5405,44 @@ export default function MemberDetailScreen() {
                         style={{
                           fontSize: 11,
                           fontWeight: "700",
-                          color:
-                            m.status === "DONE" ? Colors.green : Colors.red,
+                          color: m.status === "DONE" ? Colors.green : Colors.red,
                         }}
                       >
                         {m.status === "DONE" ? "완료" : "미완료"}
                       </Text>
+                      <TouchableOpacity
+                        onPress={() => setLastSessionMissions(prev => prev.filter(x => x.id !== m.id))}
+                        style={{ padding: 4 }}
+                      >
+                        <Text style={{ fontSize: 14, color: Colors.textMuted }}>✕</Text>
+                      </TouchableOpacity>
                     </View>
                   ))}
                 </View>
               )}
+
+              {/* 전체 운동 기록 보기 */}
+              <TouchableOpacity
+                onPress={async () => {
+                  await fetchFitLogHistory();
+                  setShowHistoryModal(true);
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1,
+                  borderColor: Colors.green + "55",
+                  borderRadius: 8,
+                  paddingVertical: 6,
+                  backgroundColor: Colors.green + "11",
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green }}>
+                  전체 운동 기록 보기
+                </Text>
+              </TouchableOpacity>
 
               {/* 부위 선택 */}
               <View style={{ marginBottom: 10 }}>
@@ -5961,8 +5970,8 @@ export default function MemberDetailScreen() {
                         <TouchableOpacity
                           onPress={() => handlePickMedia(ei)}
                           style={{
-                            width: 64,
-                            height: 64,
+                            width: 48,
+                            height: 48,
                             borderWidth: 1,
                             borderStyle: "dashed",
                             borderColor: Colors.green + "66",
@@ -5972,18 +5981,8 @@ export default function MemberDetailScreen() {
                             alignItems: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 20, color: Colors.green }}>
-                            +
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 9,
-                              color: Colors.green,
-                              marginTop: 2,
-                            }}
-                          >
-                            사진/영상
-                          </Text>
+                          <Text style={{ fontSize: 16, color: Colors.green }}>+</Text>
+                          <Text style={{ fontSize: 8, color: Colors.green, marginTop: 1 }}>사진/영상</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -6007,22 +6006,16 @@ export default function MemberDetailScreen() {
                   ])
                 }
                 style={{
-                  backgroundColor: Colors.greenLight,
+                  backgroundColor: Colors.green + "11",
                   borderWidth: 1,
-                  borderColor: Colors.green + "44",
-                  borderRadius: 10,
-                  padding: 10,
+                  borderColor: Colors.green + "55",
+                  borderRadius: 8,
+                  paddingVertical: 6,
                   alignItems: "center",
                   marginBottom: 14,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: Colors.green,
-                    fontWeight: "700",
-                  }}
-                >
+                <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>
                   + 운동 추가
                 </Text>
               </TouchableOpacity>
@@ -6198,9 +6191,36 @@ export default function MemberDetailScreen() {
                         : "PT 수업 등록 + 회원 알림"}
                 </Text>
               </TouchableOpacity>
-            </ScrollView>
+
+            </KeyboardAwareScrollView>
+
+            {/* 전체 운동 기록 바텀시트 (폼 모달 안) */}
+            <Modal
+              visible={showHistoryModal}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setShowHistoryModal(false)}
+            >
+              <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}>
+                <View style={{ flex: 1, marginTop: 60, backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                    <Text style={{ fontSize: 17, fontWeight: "800", color: Colors.text }}>{member?.user?.name}님 운동 기록</Text>
+                    <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
+                      <Text style={{ fontSize: 22, color: Colors.textMuted }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {allFitLogs.length === 0 ? (
+                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 36, marginBottom: 12 }}>📋</Text>
+                      <Text style={{ fontSize: 15, color: Colors.textMuted }}>등록된 운동 기록이 없어요</Text>
+                    </View>
+                  ) : (
+                    <HistoryTable dateOnly logs={allFitLogs} trainerPlan={trainerPlan} onViewMedia={(mediaList) => { setShowHistoryModal(false); setMediaGallery(mediaList); setMediaGalleryIndex(0); }} />
+                  )}
+                </View>
+              </View>
+            </Modal>
           </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* 운동로그 카카오톡 공유 확인 모달 */}
@@ -7466,33 +7486,49 @@ export default function MemberDetailScreen() {
 
           <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
             {isManual ? (
-              /* 미연동 회원: 삭제 */
-              <TouchableOpacity
-                onPress={() => {
-                  closeMenuModal();
-                  setTimeout(() => handleDeleteManualMember(), 300);
-                }}
-                style={{
-                  paddingVertical: 16,
-                  borderBottomWidth: 1,
-                  borderBottomColor: Colors.border,
-                }}
-              >
-                <Text
-                  style={{ fontSize: 16, color: "#EF4444", fontWeight: "600" }}
-                >
-                  회원 삭제
-                </Text>
-                <Text
+              /* 미연동 회원: 비활성화 + 삭제 */
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    closeMenuModal();
+                    setTimeout(() => handleDeactivateManualMember(), 300);
+                  }}
                   style={{
-                    fontSize: 12,
-                    color: Colors.textMuted,
-                    marginTop: 2,
+                    paddingVertical: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
                   }}
                 >
-                  운동 기록 등 모든 데이터가 삭제돼요
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={{ fontSize: 16, color: "#EF4444", fontWeight: "600" }}
+                  >
+                    비활성화
+                  </Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                    데이터는 90일간 유지되며, 복귀 가능해요
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    closeMenuModal();
+                    setTimeout(() => handleDeleteManualMember(), 300);
+                  }}
+                  style={{
+                    paddingVertical: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 16, color: "#EF4444", fontWeight: "600" }}
+                  >
+                    회원 삭제
+                  </Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                    운동 기록 등 모든 데이터가 즉시 삭제돼요
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
               /* 연동 회원: 연결 해제 */
               <TouchableOpacity
