@@ -114,7 +114,7 @@ public class ManualMemberController {
         // 무료 플랜 5명 제한 (OT 회원은 제외, PT 회원 기준)
         boolean isOtNew = "OT".equals(body.get("memo"));
         if (!isOtNew && !trainer.isProEffective()) {
-            long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer)
+            long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer, java.time.LocalDate.now().minusDays(7))
                     + memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
             if (nonOtCount >= 5) {
                 return ResponseEntity.status(403).body(null);

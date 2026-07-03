@@ -17,10 +17,11 @@ public interface ManualMemberRepository extends JpaRepository<ManualMember, Long
            "AND m.ptTotal IS NOT NULL ORDER BY m.ptRemaining ASC")
     List<ManualMember> findNonOtByTrainer(@Param("trainer") Trainer trainer);
 
-    // PT 등록된 활성 미연동 회원 수 (총 회원 수 계산용 — 비활성 제외)
+    // PT 등록된 활성 미연동 회원 수 (총 회원 수 계산용 — 비활성·PT종료 7일 경과 제외)
     @Query("SELECT COUNT(m) FROM ManualMember m WHERE m.trainer = :trainer " +
-           "AND m.ptTotal IS NOT NULL AND m.active = true")
-    long countNonOtByTrainer(@Param("trainer") Trainer trainer);
+           "AND m.ptTotal IS NOT NULL AND m.active = true " +
+           "AND NOT (m.ptRemaining = 0 AND m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff)")
+    long countNonOtByTrainer(@Param("trainer") Trainer trainer, @Param("cutoff") java.time.LocalDate cutoff);
 
     // 전체 미연동 회원 수 (OT 포함)
     long countByTrainer(Trainer trainer);
