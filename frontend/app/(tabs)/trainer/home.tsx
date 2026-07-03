@@ -1336,12 +1336,12 @@ export default function TrainerHomeScreen() {
                       borderWidth: 1,
                       borderColor: Colors.border,
                       borderRadius: 8,
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
                       backgroundColor: "#fff",
                     }}
                   >
-                    <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                    <Text style={{ fontSize: 11, color: Colors.textMuted }}>
                       목표 수업 수정
                     </Text>
                   </TouchableOpacity>
@@ -1509,7 +1509,7 @@ export default function TrainerHomeScreen() {
                         }}
                       >
                         <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                          목표 수정
+                          목표 매출 수정
                         </Text>
                       </TouchableOpacity>
                       {/* PDF 버튼 */}
@@ -2405,13 +2405,18 @@ export default function TrainerHomeScreen() {
               </TouchableOpacity>
             </GestureDetector>
 
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>
-                {goalModalMode === "sessions" ? "목표 수업 수정" : goalModalMode === "revenue" ? "목표 매출 수정" : "목표 설정"}
-              </Text>
-              <View style={{ backgroundColor: Colors.greenLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.green + "44" }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>월 단위</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text }}>
+                  {goalModalMode === "sessions" ? "목표 수업 수정" : goalModalMode === "revenue" ? "목표 매출 수정" : "목표 설정"}
+                </Text>
+                <View style={{ backgroundColor: Colors.greenLight, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.green + "44" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>월 단위</Text>
+                </View>
               </View>
+              <TouchableOpacity onPress={() => setGoalModal(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: Colors.textMuted }}>✕</Text>
+              </TouchableOpacity>
             </View>
             <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
               매달 초기화돼요
