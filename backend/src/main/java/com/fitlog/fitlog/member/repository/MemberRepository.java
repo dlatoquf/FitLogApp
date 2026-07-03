@@ -106,7 +106,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
                 @Param("trainerId") Long trainerId
         );
 
-    // INACTIVE 30일 경과 — 트레이너 목록에서 제거 대상 (trainer 참조 해제)
+    // INACTIVE 90일 경과 — 트레이너 목록에서 제거 대상 (trainer 참조 해제)
     @Query("""
         SELECT m FROM Member m JOIN FETCH m.user
         WHERE m.status = 'INACTIVE'

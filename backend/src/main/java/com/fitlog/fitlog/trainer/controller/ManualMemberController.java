@@ -347,9 +347,16 @@ public class ManualMemberController {
     public ResponseEntity<Map<String, Object>> deactivate(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
+        Long userId = jwtService.getUserIdFromToken(authorization.replace("Bearer ", ""));
+        Trainer trainer = trainerRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         m.setActive(false);
+        // ptEndedAt이 없으면 오늘로 설정 — 90일 후 스케줄러가 삭제할 수 있도록
+        if (m.getPtEndedAt() == null) m.setPtEndedAt(java.time.LocalDate.now());
         manualMemberRepository.save(m);
         return ResponseEntity.ok(Map.of("message", "회원이 비활성화됐어요."));
     }
@@ -359,8 +366,13 @@ public class ManualMemberController {
     public ResponseEntity<Map<String, Object>> reactivate(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
+        Long userId = jwtService.getUserIdFromToken(authorization.replace("Bearer ", ""));
+        Trainer trainer = trainerRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         m.setActive(true);
         manualMemberRepository.save(m);
         return ResponseEntity.ok(Map.of("message", "회원이 복귀됐어요."));
