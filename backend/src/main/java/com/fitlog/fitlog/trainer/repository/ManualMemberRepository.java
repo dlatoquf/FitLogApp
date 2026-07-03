@@ -34,7 +34,11 @@ public interface ManualMemberRepository extends JpaRepository<ManualMember, Long
     // OT 회원 중 이름 일치 — 전화번호 없을 때 폴백
     java.util.Optional<ManualMember> findByTrainerAndMemoAndName(Trainer trainer, String memo, String name);
 
-    // PT 종료 후 37일(유예 7 + 비활성 30) 경과 → 자동 삭제 대상
-    @Query("SELECT m FROM ManualMember m WHERE m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff")
+    // PT 종료 7일 경과 AND 아직 활성 → isActive=false 처리 대상
+    @Query("SELECT m FROM ManualMember m WHERE m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff AND m.active = true")
+    java.util.List<ManualMember> findPtEndedToInactivate(@Param("cutoff") java.time.LocalDate cutoff);
+
+    // PT 종료 후 90일 경과 AND isActive=false → 자동 삭제 대상
+    @Query("SELECT m FROM ManualMember m WHERE m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff AND m.active = false")
     java.util.List<ManualMember> findPtEndedForCleanup(@Param("cutoff") java.time.LocalDate cutoff);
 }

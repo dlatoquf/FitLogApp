@@ -21,34 +21,34 @@ public class InactiveMemberCleanupScheduler {
         this.memberDataCleanupService = memberDataCleanupService;
     }
 
-    // 매일 새벽 4시 — 비활성화(INACTIVE) 후 30일 경과 회원 트레이너 목록에서 제거
+    // 매일 새벽 4시 — 비활성화(INACTIVE) 후 90일 경과 회원 데이터 정리
     @Scheduled(cron = "0 0 4 * * *")
     @Transactional
     public void cleanupInactiveMembers() {
-        LocalDate cutoff = LocalDate.now().minusDays(30);
+        LocalDate cutoff = LocalDate.now().minusDays(90);
 
-        // 1. 비활성화 30일 경과 → 데이터 정리 후 트레이너 목록에서 완전히 제거
+        // 1. 비활성화 90일 경과 → 데이터 정리 후 트레이너 목록에서 완전히 제거
         List<Member> inactiveExpired = memberRepository.findInactiveMembersToCleanup(cutoff);
         for (Member member : inactiveExpired) {
             memberDataCleanupService.cleanupMemberData(member);
             member.setTrainer(null);
             member.setDisconnectedAt(null);
             memberRepository.save(member);
-            System.out.println("비활성화 30일 경과 정리: 회원ID=" + member.getId());
+            System.out.println("비활성화 90일 경과 정리: 회원ID=" + member.getId());
         }
 
-        // 2. 트레이너 이동 회원 30일 경과 → 이전 트레이너 참조 해제
+        // 2. 트레이너 이동 회원 90일 경과 → 이전 트레이너 참조 해제
         List<Member> movedExpired = memberRepository.findMovedMembersToCleanup(cutoff);
         for (Member member : movedExpired) {
             member.setPreviousTrainerId(null);
             member.setDisconnectedAt(null);
             memberRepository.save(member);
-            System.out.println("이동 30일 경과 정리: 회원ID=" + member.getId());
+            System.out.println("이동 90일 경과 정리: 회원ID=" + member.getId());
         }
 
         int total = inactiveExpired.size() + movedExpired.size();
         if (total > 0) {
-            System.out.println("30일 경과 정리 완료: " + total + "명");
+            System.out.println("90일 경과 정리 완료: " + total + "명");
         }
     }
 }

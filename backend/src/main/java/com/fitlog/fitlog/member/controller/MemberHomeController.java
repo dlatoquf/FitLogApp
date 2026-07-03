@@ -371,7 +371,7 @@ public class MemberHomeController {
             return ResponseEntity.badRequest().body(Map.of("message", "연결된 트레이너가 없어요."));
         Trainer trainer = member.getTrainer();
         String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
-        memberDataCleanupService.cleanupMemberData(member);
+        // 데이터는 90일 후 스케줄러가 정리 — 즉시 삭제하지 않음
         member.setStatus(com.fitlog.fitlog.member.entity.Member.Status.INACTIVE);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);

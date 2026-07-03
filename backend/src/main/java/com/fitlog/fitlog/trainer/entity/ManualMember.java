@@ -48,6 +48,10 @@ public class ManualMember {
     @Column(name = "ot_count")
     private Integer otCount;
 
+    // PT 만료 7일 후 비활성화 (false = 비활성, true = 활성)
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -78,4 +82,6 @@ public class ManualMember {
     public void setPtEndedAt(java.time.LocalDate ptEndedAt) { this.ptEndedAt = ptEndedAt; }
     public Integer getOtCount() { return otCount; }
     public void setOtCount(Integer otCount) { this.otCount = otCount; }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 }

@@ -408,8 +408,8 @@ public class TrainerController {
         if (!trainer.getId().equals(member.getTrainer() != null ? member.getTrainer().getId() : null)) {
             return ResponseEntity.status(403).body(Map.of("message", "권한이 없습니다."));
         }
-        memberDataCleanupService.cleanupMemberData(member);
-        member.setTrainer(null);
+        // 데이터는 90일 후 스케줄러가 정리 — 즉시 삭제하지 않음
+        member.setStatus(Member.Status.INACTIVE);
         member.setDisconnectedAt(java.time.LocalDate.now());
         memberRepository.save(member);
         return ResponseEntity.ok(Map.of("message", "회원 연결이 해제됐어요."));
