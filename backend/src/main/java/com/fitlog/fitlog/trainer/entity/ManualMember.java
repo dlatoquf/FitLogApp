@@ -49,7 +49,7 @@ public class ManualMember {
     private Integer otCount;
 
     // PT 만료 7일 후 비활성화 (false = 비활성, true = 활성)
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean active = true;
 
     @Column(name = "created_at")
