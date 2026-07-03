@@ -17,8 +17,8 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases from "react-native-purchases";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../../constants/Colors";
 import { API_URL } from "../../../constants/api";
 
@@ -248,7 +248,10 @@ export default function TrainerMembersScreen() {
       return;
     }
     if (!addPhone.trim()) {
-      Alert.alert("알림", "전화번호를 입력해주세요.\n연동 시 회원 매칭에 사용됩니다.");
+      Alert.alert(
+        "알림",
+        "전화번호를 입력해주세요.\n연동 시 회원 매칭에 사용됩니다.",
+      );
       return;
     }
     if (!addPt.trim()) {
@@ -377,20 +380,24 @@ export default function TrainerMembersScreen() {
 
   // 비활성: PT종료 / 연결해제 / 이동 / 미연동 비활성 — 메인 목록에서 제외, ⋮ 모달로 관리
   const isInactive = (m: DisplayMember) =>
-    isPtEnded(m) || (!m.connected && !m.moved) || m.moved || m.isActive === false;
+    isPtEnded(m) ||
+    (!m.connected && !m.moved) ||
+    m.moved ||
+    m.isActive === false;
 
   // 메인 목록: 활성 회원만
   const activeMembers = allMembers.filter((m) => !isInactive(m));
 
   // FREE 플랜: 잔여 적은순으로 정렬 후 5명까지만 활성, 나머지 잠금
-  const freeUnlockedKeys = plan === "FREE"
-    ? new Set(
-        [...activeMembers]
-          .sort((a, b) => a.ptRemaining - b.ptRemaining)
-          .slice(0, 5)
-          .map((m) => m.key)
-      )
-    : null;
+  const freeUnlockedKeys =
+    plan === "FREE"
+      ? new Set(
+          [...activeMembers]
+            .sort((a, b) => a.ptRemaining - b.ptRemaining)
+            .slice(0, 5)
+            .map((m) => m.key),
+        )
+      : null;
 
   const isLocked = (m: { key: string }) =>
     freeUnlockedKeys !== null && !freeUnlockedKeys.has(m.key);
@@ -424,7 +431,10 @@ export default function TrainerMembersScreen() {
     (m) => !m.isLinked && m.isActive === false && !isPtEnded(m),
   );
   const inactiveCount =
-    ptEndedMembers.length + disconnectedMembers.length + movedMembers.length + inactiveManualMembers.length;
+    ptEndedMembers.length +
+    disconnectedMembers.length +
+    movedMembers.length +
+    inactiveManualMembers.length;
 
   const linkedCount = allMembers.filter(
     (m) => m.isLinked && m.connected && !isPtEnded(m) && !m.moved,
@@ -501,7 +511,10 @@ export default function TrainerMembersScreen() {
                 setAddModal(true);
               }}
               style={{
-                backgroundColor: plan === "FREE" && activeMembers.length >= 5 ? "#F3F4F6" : Colors.bgSub,
+                backgroundColor:
+                  plan === "FREE" && activeMembers.length >= 5
+                    ? "#F3F4F6"
+                    : Colors.bgSub,
                 borderRadius: 8,
                 paddingHorizontal: 10,
                 paddingVertical: 6,
@@ -509,13 +522,34 @@ export default function TrainerMembersScreen() {
                 alignItems: "center",
                 gap: 3,
                 borderWidth: 1,
-                borderColor: plan === "FREE" && activeMembers.length >= 5 ? "#E5E7EB" : Colors.border,
+                borderColor:
+                  plan === "FREE" && activeMembers.length >= 5
+                    ? "#E5E7EB"
+                    : Colors.border,
               }}
             >
-              <Text style={{ fontSize: 13, color: plan === "FREE" && activeMembers.length >= 5 ? "#9CA3AF" : Colors.textSub, fontWeight: "700" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color:
+                    plan === "FREE" && activeMembers.length >= 5
+                      ? "#9CA3AF"
+                      : Colors.textSub,
+                  fontWeight: "700",
+                }}
+              >
                 {plan === "FREE" && activeMembers.length >= 5 ? "🔒" : "+"}
               </Text>
-              <Text style={{ fontSize: 12, color: plan === "FREE" && activeMembers.length >= 5 ? "#9CA3AF" : Colors.textSub, fontWeight: "600" }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color:
+                    plan === "FREE" && activeMembers.length >= 5
+                      ? "#9CA3AF"
+                      : Colors.textSub,
+                  fontWeight: "600",
+                }}
+              >
                 기존 회원 추가
               </Text>
             </TouchableOpacity>
@@ -638,10 +672,18 @@ export default function TrainerMembersScreen() {
                 borderRadius: 20,
                 borderWidth: 1,
                 borderColor: sortBy === "ptAsc" ? Colors.green : Colors.border,
-                backgroundColor: sortBy === "ptAsc" ? Colors.greenLight : Colors.bgSub,
+                backgroundColor:
+                  sortBy === "ptAsc" ? Colors.greenLight : Colors.bgSub,
               }}
             >
-              <Text style={{ fontSize: 11, color: sortBy === "ptAsc" ? Colors.green : Colors.textMuted }}>잔여 적은순</Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: sortBy === "ptAsc" ? Colors.green : Colors.textMuted,
+                }}
+              >
+                잔여 적은순
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setSortBy("nameAsc")}
@@ -650,11 +692,20 @@ export default function TrainerMembersScreen() {
                 paddingVertical: 6,
                 borderRadius: 20,
                 borderWidth: 1,
-                borderColor: sortBy === "nameAsc" ? Colors.green : Colors.border,
-                backgroundColor: sortBy === "nameAsc" ? Colors.greenLight : Colors.bgSub,
+                borderColor:
+                  sortBy === "nameAsc" ? Colors.green : Colors.border,
+                backgroundColor:
+                  sortBy === "nameAsc" ? Colors.greenLight : Colors.bgSub,
               }}
             >
-              <Text style={{ fontSize: 11, color: sortBy === "nameAsc" ? Colors.green : Colors.textMuted }}>ㄱㄴㄷ순</Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: sortBy === "nameAsc" ? Colors.green : Colors.textMuted,
+                }}
+              >
+                ㄱㄴㄷ순
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -705,100 +756,238 @@ export default function TrainerMembersScreen() {
             const locked = isLocked(m);
 
             return (
-            <React.Fragment key={m.key}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  backgroundColor: locked ? "#F9FAFB" : "#fff",
-                  borderRadius: 10,
-                  marginBottom: 6,
-                  borderWidth: 1,
-                  borderColor: locked ? "#E5E7EB" : Colors.border,
-                  overflow: "hidden",
-                }}
-              >
-                {/* 왼쪽: 회원상세로 이동 (잠금 시 결제 모달) */}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (locked) { setPaymentVisible(true); return; }
-                    if (m.isLinked) {
-                      router.push(`/(tabs)/trainer/member-detail?id=${m.id}` as any);
-                    } else {
-                      router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual`);
-                    }
+              <React.Fragment key={m.key}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    backgroundColor: locked ? "#F9FAFB" : "#fff",
+                    borderRadius: 10,
+                    marginBottom: 6,
+                    borderWidth: 1,
+                    borderColor: locked ? "#E5E7EB" : Colors.border,
+                    overflow: "hidden",
                   }}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 12 }}
                 >
-                  {/* 아바타 */}
-                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: locked ? "#D1D5DB" : Colors.green, justifyContent: "center", alignItems: "center", marginRight: 10 }}>
-                    {locked
-                      ? <Text style={{ fontSize: 16 }}>🔒</Text>
-                      : <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>{m.name[0]}</Text>
-                    }
-                  </View>
-
-                  {/* 이름 + 뱃지 + 메모 미리보기 */}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: locked ? Colors.textMuted : Colors.text }}>{m.name}</Text>
-                      {!m.isLinked && !locked && (
-                        <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: Colors.greenLight, borderWidth: 1, borderColor: Colors.green + "33" }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700", color: Colors.green + "AA" }}>미연동</Text>
-                        </View>
-                      )}
-                      {locked && (
-                        <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#9CA3AF" }}>PRO</Text>
-                        </View>
-                      )}
-                    </View>
-                    {!locked && m.latestMemo ? (
-                      <Text numberOfLines={1} style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}>
-                        {m.latestMemo.length > 18 ? m.latestMemo.slice(0, 18) + "..." : m.latestMemo}
-                      </Text>
-                    ) : null}
-                    {locked && (
-                      <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>PRO로 업그레이드하면 열려요</Text>
-                    )}
-                  </View>
-
-                  {/* PT 잔여 */}
-                  {!locked && (
-                    <View style={{ alignItems: "center", minWidth: 44 }}>
-                      {m.ptTotal > 0 ? (
-                        <>
-                          <Text style={{ fontSize: 20, fontWeight: "900", color }}>{m.ptRemaining}</Text>
-                          <Text style={{ fontSize: 10, color: Colors.textMuted }}>/ {m.ptTotal}회</Text>
-                        </>
-                      ) : (
-                        <View style={{ backgroundColor: Colors.goldBg, borderWidth: 1, borderColor: Colors.gold + "44", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, color: Colors.gold, fontWeight: "700" }}>미등록</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* 오른쪽: 메모 칸 (잠금 시 숨김) */}
-                {!locked && (
+                  {/* 왼쪽: 회원상세로 이동 (잠금 시 결제 모달) */}
                   <TouchableOpacity
-                    onPress={() => openMemos(m)}
+                    onPress={() => {
+                      if (locked) {
+                        setPaymentVisible(true);
+                        return;
+                      }
+                      if (m.isLinked) {
+                        router.push(
+                          `/(tabs)/trainer/member-detail?id=${m.id}` as any,
+                        );
+                      } else {
+                        router.push(
+                          `/(tabs)/trainer/member-detail?id=${m.id}&type=manual`,
+                        );
+                      }
+                    }}
                     style={{
-                      width: 46,
-                      borderLeftWidth: 1,
-                      borderLeftColor: Colors.border,
+                      flex: 1,
+                      flexDirection: "row",
                       alignItems: "center",
-                      justifyContent: "center",
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
                     }}
                   >
-                    {m.latestMemo ? (
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green, marginBottom: 3 }} />
-                    ) : null}
-                    <Text style={{ fontSize: 10, fontWeight: "700", color: m.latestMemo ? Colors.green : Colors.textMuted }}>메모</Text>
+                    {/* 아바타 */}
+                    <View
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 10,
+                        backgroundColor: locked ? "#D1D5DB" : Colors.green,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginRight: 10,
+                      }}
+                    >
+                      {locked ? (
+                        <Text style={{ fontSize: 16 }}>🔒</Text>
+                      ) : (
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "800",
+                            color: "#fff",
+                          }}
+                        >
+                          {m.name[0]}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* 이름 + 뱃지 + 메모 미리보기 */}
+                    <View style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "700",
+                            color: locked ? Colors.textMuted : Colors.text,
+                          }}
+                        >
+                          {m.name}
+                        </Text>
+                        {!m.isLinked && !locked && (
+                          <View
+                            style={{
+                              paddingHorizontal: 5,
+                              paddingVertical: 2,
+                              borderRadius: 5,
+                              backgroundColor: Colors.greenLight,
+                              borderWidth: 1,
+                              borderColor: Colors.green + "33",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "700",
+                                color: Colors.green + "AA",
+                              }}
+                            >
+                              미연동
+                            </Text>
+                          </View>
+                        )}
+                        {locked && (
+                          <View
+                            style={{
+                              paddingHorizontal: 5,
+                              paddingVertical: 2,
+                              borderRadius: 5,
+                              backgroundColor: "#F3F4F6",
+                              borderWidth: 1,
+                              borderColor: "#E5E7EB",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "700",
+                                color: "#9CA3AF",
+                              }}
+                            >
+                              PRO
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {!locked && m.latestMemo ? (
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 11,
+                            color: Colors.textMuted,
+                            marginTop: 2,
+                          }}
+                        >
+                          {m.latestMemo.length > 18
+                            ? m.latestMemo.slice(0, 18) + "..."
+                            : m.latestMemo}
+                        </Text>
+                      ) : null}
+                      {locked && (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#9CA3AF",
+                            marginTop: 2,
+                          }}
+                        >
+                          PRO로 업그레이드하면 열려요
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* PT 잔여 */}
+                    {!locked && (
+                      <View style={{ alignItems: "center", minWidth: 44 }}>
+                        {m.ptTotal > 0 ? (
+                          <>
+                            <Text
+                              style={{ fontSize: 20, fontWeight: "900", color }}
+                            >
+                              {m.ptRemaining}
+                            </Text>
+                            <Text
+                              style={{ fontSize: 10, color: Colors.textMuted }}
+                            >
+                              / {m.ptTotal}회
+                            </Text>
+                          </>
+                        ) : (
+                          <View
+                            style={{
+                              backgroundColor: Colors.goldBg,
+                              borderWidth: 1,
+                              borderColor: Colors.gold + "44",
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: Colors.gold,
+                                fontWeight: "700",
+                              }}
+                            >
+                              미등록
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </TouchableOpacity>
-                )}
-              </View>
-            </React.Fragment>
+
+                  {/* 오른쪽: 메모 칸 (잠금 시 숨김) */}
+                  {!locked && (
+                    <TouchableOpacity
+                      onPress={() => openMemos(m)}
+                      style={{
+                        width: 46,
+                        borderLeftWidth: 1,
+                        borderLeftColor: Colors.border,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {m.latestMemo ? (
+                        <View
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: Colors.green,
+                            marginBottom: 3,
+                          }}
+                        />
+                      ) : null}
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: "700",
+                          color: m.latestMemo ? Colors.green : Colors.textMuted,
+                        }}
+                      >
+                        메모
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </React.Fragment>
             );
           })
         )}
@@ -904,7 +1093,6 @@ export default function TrainerMembersScreen() {
 
             {inactiveCount === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <Text style={{ fontSize: 32, marginBottom: 10 }}>✅</Text>
                 <Text style={{ fontSize: 14, color: Colors.textMuted }}>
                   비활성 회원이 없어요
                 </Text>
@@ -1005,59 +1193,61 @@ export default function TrainerMembersScreen() {
                             PT 0 / {m.ptTotal}회
                           </Text>
                         </View>
-                        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-                          {m.isLinked && (
-                            <TouchableOpacity
-                              onPress={async (e) => {
-                                e.stopPropagation();
-                                Alert.alert("회원 복귀", `${m.name}님을 활성 회원으로 복귀시킬까요?`, [
-                                  { text: "취소", style: "cancel" },
-                                  {
-                                    text: "복귀",
-                                    onPress: async () => {
-                                      const jwt = await AsyncStorage.getItem("jwt");
-                                      const res = await fetch(`${API_URL}/api/trainer/members/${m.id}/reactivate`, {
-                                        method: "POST",
-                                        headers: { Authorization: `Bearer ${jwt}` },
-                                      });
-                                      const result = await res.json();
-                                      if (res.ok) {
-                                        Alert.alert("완료", result.message);
-                                        setInactiveModal(false);
-                                        fetchMembers();
-                                      } else {
-                                        Alert.alert("오류", result.message);
-                                      }
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
+                          <TouchableOpacity
+                            onPress={async (e) => {
+                              e.stopPropagation();
+                              if (m.isLinked) {
+                                Alert.alert(
+                                  "회원 복귀",
+                                  `${m.name}님을 활성 회원으로 복귀시킬까요?`,
+                                  [
+                                    { text: "취소", style: "cancel" },
+                                    {
+                                      text: "복귀",
+                                      onPress: async () => {
+                                        const jwt = await AsyncStorage.getItem("jwt");
+                                        const res = await fetch(
+                                          `${API_URL}/api/trainer/members/${m.id}/reactivate`,
+                                          { method: "POST", headers: { Authorization: `Bearer ${jwt}` } },
+                                        );
+                                        const result = await res.json();
+                                        if (res.ok) {
+                                          Alert.alert("완료", result.message);
+                                          setInactiveModal(false);
+                                          fetchMembers();
+                                        } else {
+                                          Alert.alert("오류", result.message);
+                                        }
+                                      },
                                     },
-                                  },
-                                ]);
-                              }}
-                              style={{
-                                backgroundColor: Colors.greenLight,
-                                borderRadius: 6,
-                                paddingHorizontal: 7,
-                                paddingVertical: 3,
-                                borderWidth: 1,
-                                borderColor: Colors.green + "44",
-                              }}
-                            >
-                              <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
-                            </TouchableOpacity>
-                          )}
-                          <View
+                                  ],
+                                );
+                              } else {
+                                // 미연동: PT 재등록 모달 자동 오픈
+                                setInactiveModal(false);
+                                router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual&openPtAdd=true` as any);
+                              }
+                            }}
                             style={{
-                              backgroundColor: "#F3F4F6",
+                              backgroundColor: Colors.greenLight,
                               borderRadius: 6,
                               paddingHorizontal: 7,
                               paddingVertical: 3,
                               borderWidth: 1,
-                              borderColor: "#D1D5DB",
+                              borderColor: Colors.green + "44",
                             }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280" }}>
-                              피티 종료
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>
+                              회원 복귀
                             </Text>
-                          </View>
+                          </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -1160,31 +1350,47 @@ export default function TrainerMembersScreen() {
                             {m.ptTotal > 0 ? ` · 잔여 ${m.ptRemaining}회` : ""}
                           </Text>
                         </View>
-                        <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
                           <TouchableOpacity
                             onPress={async (e) => {
                               e.stopPropagation();
-                              Alert.alert("회원 복귀", `${m.name}님을 활성 회원으로 복귀시킬까요?`, [
-                                { text: "취소", style: "cancel" },
-                                {
-                                  text: "복귀",
-                                  onPress: async () => {
-                                    const jwt = await AsyncStorage.getItem("jwt");
-                                    const res = await fetch(`${API_URL}/api/trainer/members/${m.id}/reactivate`, {
-                                      method: "POST",
-                                      headers: { Authorization: `Bearer ${jwt}` },
-                                    });
-                                    const result = await res.json();
-                                    if (res.ok) {
-                                      Alert.alert("완료", result.message);
-                                      setInactiveModal(false);
-                                      fetchMembers();
-                                    } else {
-                                      Alert.alert("오류", result.message);
-                                    }
+                              Alert.alert(
+                                "회원 복귀",
+                                `${m.name}님을 활성 회원으로 복귀시킬까요?`,
+                                [
+                                  { text: "취소", style: "cancel" },
+                                  {
+                                    text: "복귀",
+                                    onPress: async () => {
+                                      const jwt =
+                                        await AsyncStorage.getItem("jwt");
+                                      const res = await fetch(
+                                        `${API_URL}/api/trainer/members/${m.id}/reactivate`,
+                                        {
+                                          method: "POST",
+                                          headers: {
+                                            Authorization: `Bearer ${jwt}`,
+                                          },
+                                        },
+                                      );
+                                      const result = await res.json();
+                                      if (res.ok) {
+                                        Alert.alert("완료", result.message);
+                                        setInactiveModal(false);
+                                        fetchMembers();
+                                      } else {
+                                        Alert.alert("오류", result.message);
+                                      }
+                                    },
                                   },
-                                },
-                              ]);
+                                ],
+                              );
                             }}
                             style={{
                               backgroundColor: Colors.greenLight,
@@ -1195,7 +1401,15 @@ export default function TrainerMembersScreen() {
                               borderColor: Colors.green + "44",
                             }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: "700",
+                                color: Colors.green,
+                              }}
+                            >
+                              회원 복귀
+                            </Text>
                           </TouchableOpacity>
                           <View
                             style={{
@@ -1347,9 +1561,29 @@ export default function TrainerMembersScreen() {
                 {/* 비활성 미연동 회원 섹션 */}
                 {inactiveManualMembers.length > 0 && (
                   <View style={{ marginBottom: 20 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                      <View style={{ width: 3, height: 14, backgroundColor: "#9CA3AF", borderRadius: 2 }} />
-                      <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.textSub }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 3,
+                          height: 14,
+                          backgroundColor: "#9CA3AF",
+                          borderRadius: 2,
+                        }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: Colors.textSub,
+                        }}
+                      >
                         비활성 미연동
                       </Text>
                       <Text style={{ fontSize: 12, color: Colors.textMuted }}>
@@ -1361,7 +1595,9 @@ export default function TrainerMembersScreen() {
                         key={m.key}
                         onPress={() => {
                           setInactiveModal(false);
-                          router.push(`/(tabs)/trainer/member-detail?id=${m.id}&type=manual` as any);
+                          router.push(
+                            `/(tabs)/trainer/member-detail?id=${m.id}&type=manual` as any,
+                          );
                         }}
                         style={{
                           flexDirection: "row",
@@ -1375,37 +1611,64 @@ export default function TrainerMembersScreen() {
                         }}
                       >
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: Colors.textSub }}>{m.name}</Text>
-                          <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: "600",
+                              color: Colors.textSub,
+                            }}
+                          >
+                            {m.name}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: Colors.textMuted,
+                              marginTop: 2,
+                            }}
+                          >
                             {m.ptEndedAt ? `PT 종료 · 비활성` : "비활성"}
                           </Text>
                         </View>
                         <TouchableOpacity
                           onPress={() => {
-                            Alert.alert("회원 복귀", `${m.name}님을 복귀시킬까요?`, [
-                              { text: "취소", style: "cancel" },
-                              {
-                                text: "복귀",
-                                onPress: async () => {
-                                  try {
-                                    const jwt = await AsyncStorage.getItem("jwt");
-                                    const res = await fetch(`${API_URL}/api/trainer/manual-members/${m.id}/reactivate`, {
-                                      method: "POST",
-                                      headers: { Authorization: `Bearer ${jwt}` },
-                                    });
-                                    const result = await res.json();
-                                    if (res.ok) {
-                                      Alert.alert("완료", result.message);
-                                      fetchMembers();
-                                    } else {
-                                      Alert.alert("오류", result.message);
+                            Alert.alert(
+                              "회원 복귀",
+                              `${m.name}님을 복귀시킬까요?`,
+                              [
+                                { text: "취소", style: "cancel" },
+                                {
+                                  text: "복귀",
+                                  onPress: async () => {
+                                    try {
+                                      const jwt =
+                                        await AsyncStorage.getItem("jwt");
+                                      const res = await fetch(
+                                        `${API_URL}/api/trainer/manual-members/${m.id}/reactivate`,
+                                        {
+                                          method: "POST",
+                                          headers: {
+                                            Authorization: `Bearer ${jwt}`,
+                                          },
+                                        },
+                                      );
+                                      const result = await res.json();
+                                      if (res.ok) {
+                                        Alert.alert("완료", result.message);
+                                        fetchMembers();
+                                      } else {
+                                        Alert.alert("오류", result.message);
+                                      }
+                                    } catch {
+                                      Alert.alert(
+                                        "오류",
+                                        "복귀 처리 중 오류가 발생했어요.",
+                                      );
                                     }
-                                  } catch {
-                                    Alert.alert("오류", "복귀 처리 중 오류가 발생했어요.");
-                                  }
+                                  },
                                 },
-                              },
-                            ]);
+                              ],
+                            );
                           }}
                           style={{
                             backgroundColor: Colors.green + "15",
@@ -1416,7 +1679,15 @@ export default function TrainerMembersScreen() {
                             borderColor: Colors.green + "40",
                           }}
                         >
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.green }}>회원 복귀</Text>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "700",
+                              color: Colors.green,
+                            }}
+                          >
+                            회원 복귀
+                          </Text>
                         </TouchableOpacity>
                       </TouchableOpacity>
                     ))}
@@ -1433,7 +1704,10 @@ export default function TrainerMembersScreen() {
         visible={memoModal}
         transparent
         animationType="slide"
-        onRequestClose={() => { setMemoModal(false); fetchMembers(); }}
+        onRequestClose={() => {
+          setMemoModal(false);
+          fetchMembers();
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1449,7 +1723,10 @@ export default function TrainerMembersScreen() {
               backgroundColor: "rgba(0,0,0,0.4)",
             }}
             activeOpacity={1}
-            onPress={() => { setMemoModal(false); fetchMembers(); }}
+            onPress={() => {
+              setMemoModal(false);
+              fetchMembers();
+            }}
           />
           <View
             style={{
@@ -1646,9 +1923,11 @@ export default function TrainerMembersScreen() {
           onPress={() => setPaymentVisible(false)}
         >
           <GestureDetector
-            gesture={Gesture.Pan().runOnJS(true).onEnd((e) => {
-              if (e.translationY > 80) setPaymentVisible(false);
-            })}
+            gesture={Gesture.Pan()
+              .runOnJS(true)
+              .onEnd((e) => {
+                if (e.translationY > 80) setPaymentVisible(false);
+              })}
           >
             <View
               onStartShouldSetResponder={() => true}
@@ -1742,7 +2021,9 @@ export default function TrainerMembersScreen() {
                     lineHeight: 22,
                   }}
                 >
-                  {"✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."}
+                  {
+                    "✓ 회원 무제한 관리\n   PRO로 업그레이드해서 회원 수 제한 없이\n   모든 회원을 관리할 수 있어요."
+                  }
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {
@@ -1758,7 +2039,9 @@ export default function TrainerMembersScreen() {
                       const current = offerings?.current;
                       const pkg =
                         current?.monthly ??
-                        current?.availablePackages?.find((p: any) => p.identifier === "$rc_monthly") ??
+                        current?.availablePackages?.find(
+                          (p: any) => p.identifier === "$rc_monthly",
+                        ) ??
                         current?.availablePackages?.[0];
                       if (!pkg) {
                         Alert.alert("오류", "구독 상품을 불러오지 못했어요.");
@@ -1819,7 +2102,16 @@ export default function TrainerMembersScreen() {
                   구독 복원하기
                 </Text>
               </TouchableOpacity>
-              <Text style={{ textAlign: "center", fontSize: 11, color: Colors.textMuted, lineHeight: 17, marginTop: 20, marginBottom: 4 }}>
+              <Text
+                style={{
+                  textAlign: "center",
+                  fontSize: 11,
+                  color: Colors.textMuted,
+                  lineHeight: 17,
+                  marginTop: 20,
+                  marginBottom: 4,
+                }}
+              >
                 {Platform.OS === "ios"
                   ? "구독은 매월 자동 갱신되며, 다음 결제일 24시간 전까지\nApple ID 설정 > 구독에서 취소할 수 있습니다.\n환불은 Apple 정책에 따릅니다."
                   : "구독은 매월 자동 갱신되며, 다음 결제일 24시간 전까지\nGoogle Play에서 취소할 수 있습니다.\n환불은 Google Play 정책에 따릅니다."}

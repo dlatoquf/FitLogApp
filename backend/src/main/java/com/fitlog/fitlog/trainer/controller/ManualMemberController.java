@@ -304,6 +304,7 @@ public class ManualMemberController {
         m.setPtTotal((m.getPtTotal() != null ? m.getPtTotal() : 0) + sessions);
         m.setPtRemaining((m.getPtRemaining() != null ? m.getPtRemaining() : 0) + sessions);
         m.setPtEndedAt(null); // 재결제 시 비활성화 타이머 초기화
+        m.setActive(true);   // 비활성 상태였어도 PT 재등록 시 자동 복귀
         // OT 회원이 PT 결제 시 memo를 결제 메모 또는 null로 변경
         if ("OT".equalsIgnoreCase(m.getMemo())) {
             String paymentMemo = body.containsKey("memo") ? (String) body.get("memo") : null;
