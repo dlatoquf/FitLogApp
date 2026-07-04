@@ -983,8 +983,6 @@ export default function TrainerHomeScreen() {
               link: {
                 mobileWebUrl: "https://fitlog-api.duckdns.org/download",
                 webUrl: "https://fitlog-api.duckdns.org/download",
-                androidExecutionParams: `code=${code}`,
-                iosExecutionParams: `code=${code}`,
               },
             },
           ],

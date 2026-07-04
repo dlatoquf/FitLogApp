@@ -2801,8 +2801,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://fitlog-api.duckdns.org/download",
                 webUrl: "https://fitlog-api.duckdns.org/download",
-                androidExecutionParams: isManual ? `memberId=${memberId}&memberType=manual` : `memberId=${memberId}`,
-                iosExecutionParams: isManual ? `memberId=${memberId}&memberType=manual` : `memberId=${memberId}`,
               },
             },
           ],
@@ -2844,8 +2842,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://fitlog-api.duckdns.org/download",
                 webUrl: "https://fitlog-api.duckdns.org/download",
-                androidExecutionParams: `code=${code}`,
-                iosExecutionParams: `code=${code}`,
               },
             },
           ],
