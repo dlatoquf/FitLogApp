@@ -974,22 +974,22 @@ export default function TrainerHomeScreen() {
         template: {
           text: safeText,
           link: {
-            mobileWebUrl: "https://linktr.ee/FitLogApp",
-            webUrl: "https://linktr.ee/FitLogApp",
+            mobileWebUrl: "https://fitlog-api.duckdns.org/download",
+            webUrl: "https://fitlog-api.duckdns.org/download",
           },
           buttons: [
             {
               title: "Android 다운로드",
               link: {
-                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                mobileWebUrl: "https://fitlog-api.duckdns.org/download/android",
+                webUrl: "https://fitlog-api.duckdns.org/download/android",
               },
             },
             {
               title: "iOS 다운로드",
               link: {
-                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                mobileWebUrl: "https://fitlog-api.duckdns.org/download/ios",
+                webUrl: "https://fitlog-api.duckdns.org/download/ios",
               },
             },
           ],
