@@ -1,6 +1,7 @@
 package com.fitlog.fitlog;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,12 +14,18 @@ public class DownloadController {
     private static final String APP_STORE_URL = "https://apps.apple.com/app/fitlog/id6769366090";
 
     @GetMapping(value = "/download/android", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> downloadAndroid() {
+    public ResponseEntity<String> downloadAndroid(HttpServletRequest request) {
+        String ua = request.getHeader("User-Agent");
+        boolean isAndroid = ua != null && ua.contains("Android");
+        if (!isAndroid) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return redirect(PLAY_STORE_URL);
     }
 
     @GetMapping(value = "/download/ios", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> downloadIos() {
+    public ResponseEntity<String> downloadIos(HttpServletRequest request) {
+        String ua = request.getHeader("User-Agent");
+        boolean isAndroid = ua != null && ua.contains("Android");
+        if (isAndroid) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return redirect(APP_STORE_URL);
     }
 
