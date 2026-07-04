@@ -2780,7 +2780,7 @@ export default function MemberDetailScreen() {
       ? buildOtShareText()
       : buildManualWorkoutShareText(smsPromptData, code || undefined);
     // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함 (회원 OS 모르므로 두 링크 모두 포함)
-    const inviteUrl = "https://fitlog-api.duckdns.org/download";
+    const inviteUrl = "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
     setSmsPromptData((p) => ({ ...p, visible: false }));
     const safeText = String(text ?? "");
     const safeUrl = String(inviteUrl ?? "https://fitlog.app");
@@ -2797,17 +2797,10 @@ export default function MemberDetailScreen() {
           },
           buttons: [
             {
-              title: "Android 다운로드",
+              title: "FitLog 앱 설치하기",
               link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/android",
-                webUrl: "https://fitlog-api.duckdns.org/download/android",
-              },
-            },
-            {
-              title: "iOS 다운로드",
-              link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/ios",
-                webUrl: "https://fitlog-api.duckdns.org/download/ios",
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
               },
             },
           ],
@@ -2837,7 +2830,7 @@ export default function MemberDetailScreen() {
     const code = trainerInviteCode ?? "";
     const trainerName = member?.user?.name ?? "트레이너";
     const safeText = String(`안녕하세요! FitLog 앱에서 아래 트레이너 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
-    const safeUrl = "https://fitlog-api.duckdns.org/download";
+    const safeUrl = "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
     try {
       await KakaoShare.shareTextTemplate({
         template: {
@@ -2845,17 +2838,10 @@ export default function MemberDetailScreen() {
           link: { mobileWebUrl: safeUrl, webUrl: safeUrl },
           buttons: [
             {
-              title: "Android 다운로드",
+              title: "FitLog 앱 설치하기",
               link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/android",
-                webUrl: "https://fitlog-api.duckdns.org/download/android",
-              },
-            },
-            {
-              title: "iOS 다운로드",
-              link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/ios",
-                webUrl: "https://fitlog-api.duckdns.org/download/ios",
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
               },
             },
           ],

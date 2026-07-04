@@ -291,7 +291,10 @@ export default function RootLayout() {
           const jwt = jwtEntry[1];
           const role = roleEntry[1];
 
-          if (memberId) {
+          if (!memberId && !code) {
+            // params 없음 = 다운로드 버튼 클릭 → 스토어로 이동
+            Linking.openURL(Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL);
+          } else if (memberId) {
             // 운동로그 공유 링크
             if (role === "TRAINER") {
               router.push({

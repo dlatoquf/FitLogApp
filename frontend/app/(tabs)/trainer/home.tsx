@@ -968,33 +968,25 @@ export default function TrainerHomeScreen() {
     const code = data?.trainerCode ?? "";
     const trainerName = data?.trainerName ?? "트레이너";
     const safeText = String(`안녕하세요! ${trainerName} 트레이너입니다.\n\nFitLog 앱에서 아래 코드를 입력하면 바로 연결돼요!\n\n트레이너 코드: ${code}`);
-    console.log("[Kakao] shareTextTemplate 시작");
-    try {
-      const result = await shareTextTemplate({
-        template: {
-          text: safeText,
+    const template = {
+      text: safeText,
+      link: {
+        mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+        webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+      },
+      buttons: [
+        {
+          title: "FitLog 앱 설치하기",
           link: {
-            mobileWebUrl: "https://fitlog-api.duckdns.org/download",
-            webUrl: "https://fitlog-api.duckdns.org/download",
+            mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+            webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
           },
-          buttons: [
-            {
-              title: "Android 다운로드",
-              link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/android",
-                webUrl: "https://fitlog-api.duckdns.org/download/android",
-              },
-            },
-            {
-              title: "iOS 다운로드",
-              link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download/ios",
-                webUrl: "https://fitlog-api.duckdns.org/download/ios",
-              },
-            },
-          ],
         },
-      });
+      ],
+    };
+    console.log("[Kakao] shareTextTemplate 시작, template:", JSON.stringify(template));
+    try {
+      const result = await shareTextTemplate({ template });
       console.log("[Kakao] 성공:", JSON.stringify(result));
     } catch (e: any) {
       console.log("[Kakao] 실패 전체:", JSON.stringify(e));
