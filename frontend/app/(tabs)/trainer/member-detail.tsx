@@ -2781,9 +2781,6 @@ export default function MemberDetailScreen() {
       : buildManualWorkoutShareText(smsPromptData, code || undefined);
     // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함 (회원 OS 모르므로 두 링크 모두 포함)
     const inviteUrl = "https://linktr.ee/FitLogApp";
-    const executionParams = isManual
-      ? `memberId=${memberId}&memberType=manual`
-      : `memberId=${memberId}`;
     setSmsPromptData((p) => ({ ...p, visible: false }));
     const safeText = String(text ?? "");
     const safeUrl = String(inviteUrl ?? "https://fitlog.app");
@@ -2804,7 +2801,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                ...(executionParams && { androidExecutionParams: executionParams }),
               },
             },
             {
@@ -2812,7 +2808,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                ...(executionParams && { iosExecutionParams: executionParams }),
               },
             },
           ],
@@ -2854,7 +2849,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                androidExecutionParams: `code=${code}`,
               },
             },
             {
@@ -2862,7 +2856,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                iosExecutionParams: `code=${code}`,
               },
             },
           ],
