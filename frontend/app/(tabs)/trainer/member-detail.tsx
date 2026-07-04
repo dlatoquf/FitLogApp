@@ -2797,10 +2797,17 @@ export default function MemberDetailScreen() {
           },
           buttons: [
             {
-              title: "FitLog 다운로드",
+              title: "Android 다운로드",
               link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download",
-                webUrl: "https://fitlog-api.duckdns.org/download",
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+              },
+            },
+            {
+              title: "iOS 다운로드",
+              link: {
+                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
               },
             },
           ],
@@ -2838,10 +2845,17 @@ export default function MemberDetailScreen() {
           link: { mobileWebUrl: safeUrl, webUrl: safeUrl },
           buttons: [
             {
-              title: "FitLog 다운로드",
+              title: "Android 다운로드",
               link: {
-                mobileWebUrl: "https://fitlog-api.duckdns.org/download",
-                webUrl: "https://fitlog-api.duckdns.org/download",
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+              },
+            },
+            {
+              title: "iOS 다운로드",
+              link: {
+                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
               },
             },
           ],
