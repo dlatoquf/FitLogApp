@@ -2801,6 +2801,7 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                androidExecutionParams: isManual ? `memberId=${memberId}&memberType=manual` : `memberId=${memberId}`,
               },
             },
             {
@@ -2808,6 +2809,7 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                iosExecutionParams: isManual ? `memberId=${memberId}&memberType=manual` : `memberId=${memberId}`,
               },
             },
           ],
@@ -2849,6 +2851,7 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                androidExecutionParams: `code=${code}`,
               },
             },
             {
@@ -2856,6 +2859,7 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                iosExecutionParams: `code=${code}`,
               },
             },
           ],
