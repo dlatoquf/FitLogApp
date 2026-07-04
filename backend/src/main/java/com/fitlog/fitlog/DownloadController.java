@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DownloadController {
 
     private static final String PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp";
+    private static final String PLAY_STORE_MARKET_URL = "market://details?id=com.anonymous.FitLogApp";
     private static final String APP_STORE_URL = "https://apps.apple.com/app/fitlog/id6769366090";
 
     @GetMapping(value = "/download/android", produces = MediaType.TEXT_HTML_VALUE)
@@ -18,7 +19,7 @@ public class DownloadController {
         String ua = request.getHeader("User-Agent");
         boolean isAndroid = ua != null && ua.contains("Android");
         if (!isAndroid) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        return redirect(PLAY_STORE_URL);
+        return redirect(PLAY_STORE_MARKET_URL, PLAY_STORE_URL);
     }
 
     @GetMapping(value = "/download/ios", produces = MediaType.TEXT_HTML_VALUE)
@@ -33,13 +34,20 @@ public class DownloadController {
     public ResponseEntity<String> download(HttpServletRequest request) {
         String ua = request.getHeader("User-Agent");
         boolean isAndroid = ua != null && ua.contains("Android");
-        return redirect(isAndroid ? PLAY_STORE_URL : APP_STORE_URL);
+        return isAndroid ? redirect(PLAY_STORE_MARKET_URL, PLAY_STORE_URL) : redirect(APP_STORE_URL);
     }
 
     private ResponseEntity<String> redirect(String url) {
+        return redirect(url, null);
+    }
+
+    private ResponseEntity<String> redirect(String url, String fallbackUrl) {
+        String script = fallbackUrl != null
+                ? "try{window.location.replace('" + url + "');}catch(e){window.location.replace('" + fallbackUrl + "');}"
+                : "window.location.replace('" + url + "');";
         String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'>" +
                 "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
-                "<script>window.location.replace('" + url + "');</script>" +
+                "<script>" + script + "</script>" +
                 "</head><body></body></html>";
         return ResponseEntity.ok(html);
     }
