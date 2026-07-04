@@ -2798,10 +2798,6 @@ export default function MemberDetailScreen() {
           link: {
             mobileWebUrl: safeUrl,
             webUrl: safeUrl,
-            ...(executionParams && {
-              iosExecutionParams: executionParams,
-              androidExecutionParams: executionParams,
-            }),
           },
           buttons: [
             {
@@ -2809,7 +2805,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                ...(executionParams && { androidExecutionParams: executionParams }),
               },
             },
             {
@@ -2817,7 +2812,6 @@ export default function MemberDetailScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                ...(executionParams && { iosExecutionParams: executionParams }),
               },
             },
           ],
@@ -2852,7 +2846,7 @@ export default function MemberDetailScreen() {
       await KakaoShare.shareTextTemplate({
         template: {
           text: safeText,
-          link: { mobileWebUrl: safeUrl, webUrl: safeUrl, iosExecutionParams: { code }, androidExecutionParams: { code } },
+          link: { mobileWebUrl: safeUrl, webUrl: safeUrl },
           buttons: [
             {
               title: "Android 다운로드",
