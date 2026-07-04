@@ -983,7 +983,7 @@ export default function TrainerHomeScreen() {
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                androidExecutionParams: { code },
+                androidExecutionParams: `code=${code}`,
               },
             },
             {
@@ -991,7 +991,7 @@ export default function TrainerHomeScreen() {
               link: {
                 mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                iosExecutionParams: { code },
+                iosExecutionParams: `code=${code}`,
               },
             },
           ],
