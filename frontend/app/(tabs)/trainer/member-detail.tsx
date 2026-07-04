@@ -2803,6 +2803,22 @@ export default function MemberDetailScreen() {
               androidExecutionParams: executionParams,
             }),
           },
+          buttons: [
+            {
+              title: "iOS 다운로드",
+              link: {
+                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+              },
+            },
+            {
+              title: "Android 다운로드",
+              link: {
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+              },
+            },
+          ],
         },
       });
       console.log("[Kakao] 성공:", JSON.stringify(result));
@@ -2835,7 +2851,22 @@ export default function MemberDetailScreen() {
         template: {
           text: safeText,
           link: { mobileWebUrl: safeUrl, webUrl: safeUrl },
-          buttonTitle: "FitLog 앱 설치하기",
+          buttons: [
+            {
+              title: "iOS 다운로드",
+              link: {
+                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+              },
+            },
+            {
+              title: "Android 다운로드",
+              link: {
+                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+              },
+            },
+          ],
         },
       });
     } catch (e: any) {
