@@ -979,18 +979,11 @@ export default function TrainerHomeScreen() {
           },
           buttons: [
             {
-              title: "Android 다운로드",
+              title: "FitLog 다운로드",
               link: {
-                mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-                webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+                mobileWebUrl: "https://fitlog-api.duckdns.org/download",
+                webUrl: "https://fitlog-api.duckdns.org/download",
                 androidExecutionParams: `code=${code}`,
-              },
-            },
-            {
-              title: "iOS 다운로드",
-              link: {
-                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
                 iosExecutionParams: `code=${code}`,
               },
             },
