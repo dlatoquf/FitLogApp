@@ -971,15 +971,15 @@ export default function TrainerHomeScreen() {
     const template = {
       text: safeText,
       link: {
-        mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-        webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+        mobileWebUrl: "https://fitlog-api.duckdns.org/download",
+        webUrl: "https://fitlog-api.duckdns.org/download",
       },
       buttons: [
         {
           title: "FitLog 앱 설치하기",
           link: {
-            mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
-            webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
+            mobileWebUrl: "https://fitlog-api.duckdns.org/download",
+            webUrl: "https://fitlog-api.duckdns.org/download",
           },
         },
       ],
