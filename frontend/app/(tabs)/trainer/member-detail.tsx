@@ -2805,19 +2805,19 @@ export default function MemberDetailScreen() {
           },
           buttons: [
             {
-              title: "iOS 다운로드",
-              link: {
-                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
-                ...(executionParams && { iosExecutionParams: executionParams }),
-              },
-            },
-            {
               title: "Android 다운로드",
               link: {
                 mobileWebUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 webUrl: "https://play.google.com/store/apps/details?id=com.anonymous.FitLogApp",
                 ...(executionParams && { androidExecutionParams: executionParams }),
+              },
+            },
+            {
+              title: "iOS 다운로드",
+              link: {
+                mobileWebUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                webUrl: "https://apps.apple.com/app/fitlog/id6769366090",
+                ...(executionParams && { iosExecutionParams: executionParams }),
               },
             },
           ],
