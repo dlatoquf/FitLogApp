@@ -63,7 +63,7 @@ public class PtContractService {
         PtContract contract = new PtContract();
         contract.setTrainer(trainer);
         contract.setMember(member);
-        contract.setMemberName(member.getUser().getName());
+        contract.setMemberName(member.getCachedName() != null ? member.getCachedName() : member.getUser().getName());
         contract.setTotalSessions(request.getSessions());
         contract.setRemainSessions(request.getSessions());
         contract.setAmount(request.getAmount());
@@ -163,14 +163,31 @@ public class PtContractService {
             Member member = contract.getMember();
             if (member != null) {
                 member.setPtTotal(Math.max(0, (member.getPtTotal() != null ? member.getPtTotal() : 0) + diff));
-                member.setPtRemaining(Math.max(0, (member.getPtRemaining() != null ? member.getPtRemaining() : 0) + diff));
+                int rawMemberRemaining = (member.getPtRemaining() != null ? member.getPtRemaining() : 0) + diff;
+                int memberRemaining = Math.max(0, rawMemberRemaining);
+                member.setPtRemaining(memberRemaining);
+                if (rawMemberRemaining == 0) {
+                    // 자연스럽게 정확히 0이 된 경우에만 종료 타이머 시작
+                    member.setPtEndedAt(java.time.LocalDate.now());
+                } else if (memberRemaining > 0) {
+                    member.setPtEndedAt(null);
+                }
+                // rawMemberRemaining < 0: 클램핑된 경우 — ptEndedAt 건드리지 않음
                 memberRepository.save(member);
             }
             // 미연동 회원 ptTotal / ptRemaining 동기화
             ManualMember manualMember = contract.getManualMember();
             if (manualMember != null) {
                 manualMember.setPtTotal(Math.max(0, (manualMember.getPtTotal() != null ? manualMember.getPtTotal() : 0) + diff));
-                manualMember.setPtRemaining(Math.max(0, (manualMember.getPtRemaining() != null ? manualMember.getPtRemaining() : 0) + diff));
+                int rawManualRemaining = (manualMember.getPtRemaining() != null ? manualMember.getPtRemaining() : 0) + diff;
+                int manualRemaining = Math.max(0, rawManualRemaining);
+                manualMember.setPtRemaining(manualRemaining);
+                if (rawManualRemaining == 0) {
+                    manualMember.setPtEndedAt(java.time.LocalDate.now());
+                } else if (manualRemaining > 0) {
+                    manualMember.setPtEndedAt(null);
+                }
+                // rawManualRemaining < 0: 클램핑된 경우 — ptEndedAt 건드리지 않음
                 manualMemberRepository.save(manualMember);
             }
         }

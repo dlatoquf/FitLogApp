@@ -97,8 +97,11 @@ public class ManualMemberController {
     public ResponseEntity<ManualMember> getOne(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
+        Trainer trainer = getTrainerFromAuth(authorization);
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).build();
         return ResponseEntity.ok(m);
     }
 
@@ -269,17 +272,28 @@ public class ManualMemberController {
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
+        Trainer trainer = getTrainerFromAuth(authorization);
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).build();
         if (body.get("sessions") != null) {
             int newSessions = ((Number) body.get("sessions")).intValue();
+            int newRemaining;
             if (body.get("ptRemaining") != null) {
                 m.setPtTotal(newSessions);
-                m.setPtRemaining(((Number) body.get("ptRemaining")).intValue());
+                newRemaining = ((Number) body.get("ptRemaining")).intValue();
+                m.setPtRemaining(newRemaining);
             } else {
                 int diff = newSessions - (m.getPtTotal() != null ? m.getPtTotal() : 0);
                 m.setPtTotal(newSessions);
-                m.setPtRemaining(Math.max(0, (m.getPtRemaining() != null ? m.getPtRemaining() : 0) + diff));
+                newRemaining = Math.max(0, (m.getPtRemaining() != null ? m.getPtRemaining() : 0) + diff);
+                m.setPtRemaining(newRemaining);
+            }
+            if (newRemaining == 0) {
+                m.setPtEndedAt(java.time.LocalDate.now());
+            } else if (newRemaining > 0) {
+                m.setPtEndedAt(null);
             }
         }
         if (body.get("amount") != null) {
@@ -298,8 +312,11 @@ public class ManualMemberController {
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
+        Trainer trainer = getTrainerFromAuth(authorization);
         ManualMember m = manualMemberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).build();
         int sessions = ((Number) body.get("sessions")).intValue();
         m.setPtTotal((m.getPtTotal() != null ? m.getPtTotal() : 0) + sessions);
         m.setPtRemaining((m.getPtRemaining() != null ? m.getPtRemaining() : 0) + sessions);
@@ -384,6 +401,11 @@ public class ManualMemberController {
     public ResponseEntity<Void> delete(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
+        Trainer trainer = getTrainerFromAuth(authorization);
+        ManualMember target = manualMemberRepository.findById(id).orElse(null);
+        if (target == null) return ResponseEntity.noContent().build();
+        if (!target.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).build();
         manualMemberRepository.findById(id).ifPresent(m -> {
             ptContractRepository.findByManualMember(m).forEach(c -> {
                 c.setMemberName(m.getName()); // 이름 보존
@@ -407,6 +429,46 @@ public class ManualMemberController {
         });
         manualMemberRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // 즉시 비활성화 (PT 잔여 0 후 트레이너가 바로 비활성화 선택)
+    @PostMapping("/{id}/deactivate-now")
+    public ResponseEntity<Map<String, Object>> deactivateNow(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        Trainer trainer = getTrainerFromAuth(authorization);
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
+        m.setActive(false);
+        m.setPtEndedAt(java.time.LocalDate.now().minusDays(7)); // 유예기간 이미 지난 것으로 처리
+        manualMemberRepository.save(m);
+        return ResponseEntity.ok(Map.of("message", "회원이 비활성화됐어요."));
+    }
+
+    @PatchMapping("/{id}/name")
+    public ResponseEntity<Map<String, Object>> updateName(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainerFromAuth(authorization);
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
+        String newName = body.get("name");
+        if (newName == null || newName.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("message", "이름을 입력해주세요."));
+        m.setName(newName.trim());
+        manualMemberRepository.save(m);
+        return ResponseEntity.ok(Map.of("message", "이름이 수정됐어요.", "name", m.getName()));
+    }
+
+    private Trainer getTrainerFromAuth(String authorization) {
+        Long userId = jwtService.getUserIdFromToken(authorization.replace("Bearer ", ""));
+        return trainerRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
     }
 
     private String formatPhone(String phone) {

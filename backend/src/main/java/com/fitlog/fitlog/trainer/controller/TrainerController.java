@@ -197,10 +197,13 @@ public class TrainerController {
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
 
-        getTrainer(authorization);
+        Trainer trainer = getTrainer(authorization);
 
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+
+        if (member.getTrainer() == null || !member.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
 
         if (body.containsKey("ptTotal"))
             member.setPtTotal(body.get("ptTotal") != null ? ((Number) body.get("ptTotal")).intValue() : null);
@@ -208,8 +211,7 @@ public class TrainerController {
             Integer newRemaining = body.get("ptRemaining") != null
                     ? ((Number) body.get("ptRemaining")).intValue() : null;
             member.setPtRemaining(newRemaining);
-            // 잔여가 0이 되면 ptEndedAt 기록, 0보다 크면 초기화 (재등록)
-            if (newRemaining != null && newRemaining == 0 && member.getPtEndedAt() == null) {
+            if (newRemaining != null && newRemaining == 0) {
                 member.setPtEndedAt(java.time.LocalDate.now());
             } else if (newRemaining != null && newRemaining > 0) {
                 member.setPtEndedAt(null);
@@ -231,7 +233,41 @@ public class TrainerController {
         return ResponseEntity.ok(result);
     }
 
+    @PatchMapping("/trainer/members/{id}/name")
+    public ResponseEntity<Map<String, Object>> updateMemberName(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainer(authorization);
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (member.getTrainer() == null || !member.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
+        String newName = body.get("name");
+        if (newName == null || newName.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("message", "이름을 입력해주세요."));
+        member.setCachedName(newName.trim());
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("message", "이름이 수정됐어요.", "name", member.getCachedName()));
+    }
+
     // DELETE /api/trainer/me - 트레이너 계정 삭제
+    // 연동 회원 즉시 비활성화 (PT 잔여 0 후 트레이너가 바로 비활성화 선택)
+    @PostMapping("/trainer/members/{id}/deactivate-now")
+    public ResponseEntity<Map<String, Object>> deactivateMemberNow(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        Trainer trainer = getTrainer(authorization);
+        com.fitlog.fitlog.member.entity.Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (member.getTrainer() == null || !member.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
+        member.setStatus(com.fitlog.fitlog.member.entity.Member.Status.INACTIVE);
+        member.setPtEndedAt(java.time.LocalDate.now().minusDays(7));
+        memberRepository.save(member);
+        return ResponseEntity.ok(Map.of("message", "회원이 비활성화됐어요."));
+    }
+
     @DeleteMapping("/trainer/me")
     public ResponseEntity<Map<String, Object>> deleteMe(
             @RequestHeader("Authorization") String authorization) {

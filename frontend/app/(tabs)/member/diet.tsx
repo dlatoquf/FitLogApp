@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CommentSection from "../../../components/CommentSection";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -19,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Colors } from "../../../constants/Colors";
 import {
   API_URL,
@@ -88,6 +90,8 @@ export default function MemberDietScreen() {
       }
     }
   }, [dateParam]);
+  const [memberId, setMemberId] = useState<number | null>(null);
+  const [trainerId, setTrainerId] = useState<number | null>(null);
   const [photos, setPhotos] = useState<DietPhoto[]>([]);
   const [dayFeedback, setDayFeedback] = useState<DayFeedback | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +116,9 @@ export default function MemberDietScreen() {
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+      // 날짜 전환 시 이전 날짜의 memberId/trainerId가 남지 않도록 초기화
+      setMemberId(null);
+      setTrainerId(null);
       try {
         const jwt = await AsyncStorage.getItem("jwt");
         const res = await fetch(`${API_URL}/api/diet/photos?date=${dateKey}`, {
@@ -121,6 +128,8 @@ export default function MemberDietScreen() {
           const data = await res.json();
           setPhotos(data.photos ?? []);
           setDayFeedback(data.feedback ?? null);
+          if (data.memberId) setMemberId(data.memberId);
+          if (data.trainerId) setTrainerId(data.trainerId);
         } else {
           setPhotos([]);
           setDayFeedback(null);
@@ -139,7 +148,7 @@ export default function MemberDietScreen() {
   useFocusEffect(
     useCallback(() => {
       setSelectedDate(new Date());
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      scrollRef.current?.scrollToPosition(0, 0, false);
       fetchData();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
@@ -307,7 +316,7 @@ export default function MemberDietScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      <ScrollView
+      <KeyboardAwareScrollView
         ref={scrollRef}
         contentContainerStyle={{
           padding: 20,
@@ -632,9 +641,18 @@ export default function MemberDietScreen() {
                 </Text>
               )}
             </View>
+            {photos.length > 0 && memberId && trainerId && (
+              <CommentSection
+                targetType="DIET_DAY"
+                targetId={memberId}
+                date={dateKey}
+                trainerId={trainerId}
+                memberId={memberId}
+              />
+            )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* ── 식단 추가 모달 ────────────────────────────────────────────────────── */}
       <Modal

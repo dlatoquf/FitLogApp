@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,7 @@ interface DisplayMember {
   otCount?: number; // OT 체험 후 PT 전환된 회원의 OT 완료 횟수
   latestMemo?: string;
   isActive?: boolean; // 미연동 회원 활성 여부 (false = 비활성)
+  deleted?: boolean; // 탈퇴 회원 여부
 }
 
 interface Memo {
@@ -81,6 +82,9 @@ export default function TrainerMembersScreen() {
   const [memoInput, setMemoInput] = useState("");
   const [addingMemo, setAddingMemo] = useState(false);
 
+  // 웰컴 배너 (첫 가입 후 회원 추가 유도)
+  const [welcomeBanner, setWelcomeBanner] = useState(false);
+
   // 기존 회원 추가 모달
   const [addModal, setAddModal] = useState(false);
   const [addName, setAddName] = useState("");
@@ -90,6 +94,9 @@ export default function TrainerMembersScreen() {
   const [addPaymentDate, setAddPaymentDate] = useState(""); // 결제일
   const [addAmount, setAddAmount] = useState(""); // 결제 금액
   const [adding, setAdding] = useState(false);
+  const [editNameTarget, setEditNameTarget] = useState<DisplayMember | null>(null);
+  const [editNameInput, setEditNameInput] = useState("");
+  const [editNameLoading, setEditNameLoading] = useState(false);
 
   const getTodayStr = () => {
     const d = new Date();
@@ -132,6 +139,7 @@ export default function TrainerMembersScreen() {
             ptTotal: m.ptTotal ?? 0,
             goal: m.goal,
             latestMemo: m.latestMemo ?? undefined,
+            deleted: m.deleted === true,
           }))
         : [];
 
@@ -168,11 +176,19 @@ export default function TrainerMembersScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchMembers();
+      AsyncStorage.getItem("showMemberWelcome").then(async (flag) => {
+        if (flag === "1") {
+          await AsyncStorage.removeItem("showMemberWelcome");
+          setWelcomeBanner(true);
+        }
+      });
     }, [fetchMembers]),
   );
 
   // ── 메모 조회 ──────────────────────────────────────────────────────────────
+  const memoTargetIdRef = useRef<number | null>(null);
   const openMemos = async (m: DisplayMember) => {
+    memoTargetIdRef.current = m.id;
     setMemoTarget(m);
     setMemoInput("");
     setMemos([]);
@@ -186,10 +202,11 @@ export default function TrainerMembersScreen() {
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
-      if (res.ok) setMemos(await res.json());
+      // fetch 완료 시점에 다른 회원으로 바뀌었으면 결과 버림
+      if (res.ok && memoTargetIdRef.current === m.id) setMemos(await res.json());
     } catch {
     } finally {
-      setMemosLoading(false);
+      if (memoTargetIdRef.current === m.id) setMemosLoading(false);
     }
   };
 
@@ -242,6 +259,36 @@ export default function TrainerMembersScreen() {
   };
 
   // ── 기존 회원 추가 ───────────────────────────────────────────────────────
+  const saveEditName = async () => {
+    if (!editNameTarget || !editNameInput.trim()) return;
+    setEditNameLoading(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const url = editNameTarget.isLinked
+        ? `${API_URL}/api/trainer/members/${editNameTarget.id}/name`
+        : `${API_URL}/api/trainer/manual-members/${editNameTarget.id}/name`;
+      const res = await fetch(url, {
+        method: editNameTarget.isLinked ? "PATCH" : "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ name: editNameInput.trim() }),
+      });
+      if (res.ok) {
+        setAllMembers((prev) =>
+          prev.map((m) => m.key === editNameTarget.key ? { ...m, name: editNameInput.trim() } : m)
+        );
+        setEditNameTarget(null);
+        setEditNameInput("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert("오류", data.message ?? "이름 수정에 실패했어요.");
+      }
+    } catch {
+      Alert.alert("오류", "이름 수정에 실패했어요.");
+    } finally {
+      setEditNameLoading(false);
+    }
+  };
+
   const addManualMember = async () => {
     if (!addName.trim()) {
       Alert.alert("알림", "이름을 입력해주세요.");
@@ -388,9 +435,11 @@ export default function TrainerMembersScreen() {
   // 메인 목록: 활성 회원만
   const activeMembers = allMembers.filter((m) => !isInactive(m));
 
+  const isInTrial = !!trialEndDate && new Date(trialEndDate) > new Date();
+
   // FREE 플랜: 잔여 적은순으로 정렬 후 5명까지만 활성, 나머지 잠금
   const freeUnlockedKeys =
-    plan === "FREE"
+    plan === "FREE" && !isInTrial
       ? new Set(
           [...activeMembers]
             .sort((a, b) => a.ptRemaining - b.ptRemaining)
@@ -474,6 +523,7 @@ export default function TrainerMembersScreen() {
           />
         }
       >
+
         {/* 헤더 */}
         <View
           style={{
@@ -499,7 +549,7 @@ export default function TrainerMembersScreen() {
             {/* 회원 추가 버튼 */}
             <TouchableOpacity
               onPress={() => {
-                if (plan === "FREE" && activeMembers.length >= 5) {
+                if (plan === "FREE" && !isInTrial && activeMembers.length >= 5) {
                   setPaymentVisible(true);
                   return;
                 }
@@ -512,7 +562,7 @@ export default function TrainerMembersScreen() {
               }}
               style={{
                 backgroundColor:
-                  plan === "FREE" && activeMembers.length >= 5
+                  plan === "FREE" && !isInTrial && activeMembers.length >= 5
                     ? "#F3F4F6"
                     : Colors.bgSub,
                 borderRadius: 8,
@@ -523,7 +573,7 @@ export default function TrainerMembersScreen() {
                 gap: 3,
                 borderWidth: 1,
                 borderColor:
-                  plan === "FREE" && activeMembers.length >= 5
+                  plan === "FREE" && !isInTrial && activeMembers.length >= 5
                     ? "#E5E7EB"
                     : Colors.border,
               }}
@@ -532,19 +582,19 @@ export default function TrainerMembersScreen() {
                 style={{
                   fontSize: 13,
                   color:
-                    plan === "FREE" && activeMembers.length >= 5
+                    plan === "FREE" && !isInTrial && activeMembers.length >= 5
                       ? "#9CA3AF"
                       : Colors.textSub,
                   fontWeight: "700",
                 }}
               >
-                {plan === "FREE" && activeMembers.length >= 5 ? "🔒" : "+"}
+                {plan === "FREE" && !isInTrial && activeMembers.length >= 5 ? "🔒" : "+"}
               </Text>
               <Text
                 style={{
                   fontSize: 12,
                   color:
-                    plan === "FREE" && activeMembers.length >= 5
+                    plan === "FREE" && !isInTrial && activeMembers.length >= 5
                       ? "#9CA3AF"
                       : Colors.textSub,
                   fontWeight: "600",
@@ -823,15 +873,24 @@ export default function TrainerMembersScreen() {
                           gap: 5,
                         }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "700",
-                            color: locked ? Colors.textMuted : Colors.text,
+                        <TouchableOpacity
+                          onLongPress={() => {
+                            if (locked) return;
+                            setEditNameTarget(m);
+                            setEditNameInput(m.name);
                           }}
+                          activeOpacity={1}
                         >
-                          {m.name}
-                        </Text>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: "700",
+                              color: locked ? Colors.textMuted : Colors.text,
+                            }}
+                          >
+                            {m.name}
+                          </Text>
+                        </TouchableOpacity>
                         {!m.isLinked && !locked && (
                           <View
                             style={{
@@ -1253,7 +1312,7 @@ export default function TrainerMembersScreen() {
                             alignItems: "center",
                           }}
                         >
-                          <TouchableOpacity
+                          {!m.deleted && <TouchableOpacity
                             onPress={async (e) => {
                               e.stopPropagation();
                               Alert.alert(
@@ -1306,7 +1365,7 @@ export default function TrainerMembersScreen() {
                             >
                               회원 복귀
                             </Text>
-                          </TouchableOpacity>
+                          </TouchableOpacity>}
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -1990,6 +2049,47 @@ export default function TrainerMembersScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── 웰컴 팝업 ──────────────────────────────────────────────────── */}
+      <Modal visible={welcomeBanner} transparent animationType="fade" onRequestClose={() => setWelcomeBanner(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 }}
+          activeOpacity={1}
+          onPress={() => setWelcomeBanner(false)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 24, width: "100%" }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>
+                기존 회원을 추가해보세요
+              </Text>
+              <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 24, lineHeight: 20 }}>
+                앱 가입 전 회원도 직접 등록해서{"\n"}PT 기록을 관리할 수 있어요.
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setWelcomeBanner(false);
+                  setAddName("");
+                  setAddPhone("");
+                  setAddPt("");
+                  setAddPtRemaining("");
+                  setAddPaymentDate("");
+                  setAddAmount("");
+                  setAddModal(true);
+                }}
+                style={{ backgroundColor: Colors.green, borderRadius: 12, paddingVertical: 13, alignItems: "center", marginBottom: 10 }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>기존 회원 추가하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setWelcomeBanner(false)}
+                style={{ alignItems: "center", paddingVertical: 8 }}
+              >
+                <Text style={{ fontSize: 14, color: Colors.textMuted }}>나중에 할게요</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── 기존 회원 추가 모달 ──────────────────────────────────────────── */}
       <Modal
         visible={addModal}
@@ -2257,6 +2357,57 @@ export default function TrainerMembersScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 이름 수정 모달 ──────────────────────────────────────────── */}
+      <Modal
+        visible={!!editNameTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setEditNameTarget(null); setEditNameInput(""); }}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
+          activeOpacity={1}
+          onPress={() => { setEditNameTarget(null); setEditNameInput(""); }}
+        >
+          <TouchableOpacity activeOpacity={1} style={{ width: "85%", backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>이름 수정</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>{editNameTarget?.name}</Text>
+            <TextInput
+              value={editNameInput}
+              onChangeText={setEditNameInput}
+              placeholder="새 이름 입력"
+              placeholderTextColor={Colors.textMuted}
+              style={{
+                backgroundColor: Colors.bgSub,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                padding: 12,
+                fontSize: 15,
+                color: Colors.text,
+                marginBottom: 16,
+              }}
+              autoFocus
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => { setEditNameTarget(null); setEditNameInput(""); }}
+                style={{ flex: 1, padding: 13, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}
+              >
+                <Text style={{ color: Colors.textMuted, fontWeight: "600" }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={saveEditName}
+                disabled={editNameLoading}
+                style={{ flex: 1, padding: 13, borderRadius: 10, backgroundColor: Colors.green, alignItems: "center" }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>{editNameLoading ? "저장 중..." : "저장"}</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

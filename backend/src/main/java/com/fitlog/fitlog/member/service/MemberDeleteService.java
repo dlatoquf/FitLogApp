@@ -98,11 +98,14 @@ public class MemberDeleteService {
 
         // 3. 개인정보 삭제: 로그인 불가 처리
         //    카카오 연동 해제 → 재로그인 불가
-        //    이름을 "탈퇴한 회원"으로 변경 → 트레이너 화면에 표시
-        //    이메일·푸시토큰 제거
+        //    이메일·푸시토큰 제거 (이름은 member.cachedName에 보존됨)
+        // cachedName이 없는 기존 회원은 user.name을 cachedName에 복사해두고 삭제
+        if (member.getCachedName() == null && user.getName() != null) {
+            member.setCachedName(user.getName());
+            memberRepository.save(member);
+        }
         user.setKakaoId(null);
         user.setEmail("deleted_" + userId + "@fitlog.deleted");
-        user.setName("탈퇴한 회원");
         user.setFcmToken(null);
         // 탈퇴일(deletedAt)은 유지
         userRepository.save(user);

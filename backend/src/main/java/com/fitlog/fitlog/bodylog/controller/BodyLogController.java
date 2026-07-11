@@ -8,6 +8,7 @@ import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.trainer.entity.ManualMember;
 import com.fitlog.fitlog.trainer.repository.ManualMemberRepository;
+import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.auth.service.JwtService;
 import com.fitlog.fitlog.notification.service.NotificationService;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class BodyLogController {
     private final ManualBodyLogRepository manualBodyLogRepository;
     private final MemberRepository memberRepository;
     private final ManualMemberRepository manualMemberRepository;
+    private final TrainerRepository trainerRepository;
     private final JwtService jwtService;
     private final NotificationService notificationService;
 
@@ -35,14 +37,28 @@ public class BodyLogController {
                              ManualBodyLogRepository manualBodyLogRepository,
                              MemberRepository memberRepository,
                              ManualMemberRepository manualMemberRepository,
+                             TrainerRepository trainerRepository,
                              JwtService jwtService,
                              NotificationService notificationService) {
         this.bodyLogRepository = bodyLogRepository;
         this.manualBodyLogRepository = manualBodyLogRepository;
         this.memberRepository = memberRepository;
         this.manualMemberRepository = manualMemberRepository;
+        this.trainerRepository = trainerRepository;
         this.jwtService = jwtService;
         this.notificationService = notificationService;
+    }
+
+    private ManualMember findManualMemberOrRedirect(Long manualMemberId) {
+        return manualMemberRepository.findById(manualMemberId)
+                .orElseGet(() -> {
+                    memberRepository.findByFormerManualMemberId(manualMemberId).ifPresent(linked -> {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.GONE,
+                                "{\"linkedMemberId\":" + linked.getId() + "}");
+                    });
+                    throw new RuntimeException("미연동 회원을 찾을 수 없습니다.");
+                });
     }
 
     private Map<String, Object> toMap(BodyLog log) {
@@ -53,21 +69,23 @@ public class BodyLogController {
         map.put("bodyFat",     log.getBodyFat());
         map.put("bodyFatMass", log.getBodyFatMass());
         map.put("muscleMass",  log.getMuscleMass());
-        map.put("memo",        log.getMemo());
-        map.put("createdAt",   log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
+        map.put("memo",            log.getMemo());
+        map.put("inbodyImageUrl",  log.getInbodyImageUrl());
+        map.put("createdAt",       log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
         return map;
     }
 
     private Map<String, Object> toManualMap(ManualBodyLog log) {
         Map<String, Object> map = new HashMap<>();
-        map.put("id",          log.getId());
-        map.put("date",        log.getLogDate() != null ? log.getLogDate().toString() : "");
-        map.put("weight",      log.getWeight());
-        map.put("bodyFat",     log.getBodyFat());
-        map.put("bodyFatMass", log.getBodyFatMass());
-        map.put("muscleMass",  log.getMuscleMass());
-        map.put("memo",        log.getMemo());
-        map.put("createdAt",   log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
+        map.put("id",              log.getId());
+        map.put("date",            log.getLogDate() != null ? log.getLogDate().toString() : "");
+        map.put("weight",          log.getWeight());
+        map.put("bodyFat",         log.getBodyFat());
+        map.put("bodyFatMass",     log.getBodyFatMass());
+        map.put("muscleMass",      log.getMuscleMass());
+        map.put("memo",            log.getMemo());
+        map.put("inbodyImageUrl",  log.getInbodyImageUrl());
+        map.put("createdAt",       log.getCreatedAt() != null ? log.getCreatedAt().toString() : null);
         return map;
     }
 
@@ -88,20 +106,31 @@ public class BodyLogController {
     // POST /api/bodylog/member/{memberId} - 트레이너가 연동 회원 바디로그 저장
     @PostMapping("/member/{memberId}")
     public ResponseEntity<Map<String, Object>> saveBodyLogForMember(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable Long memberId,
             @RequestBody Map<String, Object> body) {
+        String token = authorization.replace("Bearer ", "");
+        Long userId = jwtService.getUserIdFromToken(token);
+        Long trainerId = trainerRepository.findTrainerIdByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보를 찾을 수 없습니다."));
+
         Member member = memberRepository.findByIdWithUser(memberId)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+
+        if (member.getTrainer() == null || !trainerId.equals(member.getTrainer().getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "담당 회원이 아닙니다."));
+        }
 
         BodyLog log = new BodyLog();
         log.setMember(member);
         log.setLogDate(java.time.LocalDate.now());
         log.setCreatedAt(java.time.LocalDateTime.now());
-        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
-        if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
-        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
-        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.get("memo") != null)        log.setMemo(body.get("memo").toString());
+        if (body.get("weight") != null)          log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFat") != null)         log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
+        if (body.get("bodyFatMass") != null)     log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)      log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.get("memo") != null)            log.setMemo(body.get("memo").toString());
+        if (body.get("inbodyImageUrl") != null)  log.setInbodyImageUrl(body.get("inbodyImageUrl").toString());
         bodyLogRepository.save(log);
 
         // 회원에게 바디로그 작성 알림
@@ -143,11 +172,12 @@ public class BodyLogController {
         log.setMember(member);
         log.setLogDate(java.time.LocalDate.now());
         log.setCreatedAt(java.time.LocalDateTime.now());
-        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
-        if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
-        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
-        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.get("memo") != null)        log.setMemo(body.get("memo").toString());
+        if (body.get("weight") != null)          log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFat") != null)         log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
+        if (body.get("bodyFatMass") != null)     log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)      log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.get("memo") != null)            log.setMemo(body.get("memo").toString());
+        if (body.get("inbodyImageUrl") != null)  log.setInbodyImageUrl(body.get("inbodyImageUrl").toString());
 
         bodyLogRepository.save(log);
 
@@ -191,8 +221,7 @@ public class BodyLogController {
         String token = authorization.replace("Bearer ", "");
         jwtService.getUserIdFromToken(token);
 
-        ManualMember mm = manualMemberRepository.findById(manualMemberId)
-                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        ManualMember mm = findManualMemberOrRedirect(manualMemberId);
         List<Map<String, Object>> result = manualBodyLogRepository
                 .findByManualMemberOrderByLogDateAsc(mm)
                 .stream()
@@ -210,8 +239,7 @@ public class BodyLogController {
         String token = authorization.replace("Bearer ", "");
         jwtService.getUserIdFromToken(token);
 
-        ManualMember mm = manualMemberRepository.findById(manualMemberId)
-                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+        ManualMember mm = findManualMemberOrRedirect(manualMemberId);
 
         ManualBodyLog log = new ManualBodyLog();
         log.setManualMember(mm);
@@ -223,11 +251,12 @@ public class BodyLogController {
             log.setLogDate(LocalDate.now());
         }
         log.setCreatedAt(LocalDateTime.now());
-        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
-        if (body.get("bodyFat") != null)     log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
-        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
-        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.get("memo") != null)        log.setMemo(body.get("memo").toString());
+        if (body.get("weight") != null)          log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFat") != null)         log.setBodyFat(((Number) body.get("bodyFat")).doubleValue());
+        if (body.get("bodyFatMass") != null)     log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)      log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.get("memo") != null)            log.setMemo(body.get("memo").toString());
+        if (body.get("inbodyImageUrl") != null)  log.setInbodyImageUrl(body.get("inbodyImageUrl").toString());
 
         manualBodyLogRepository.save(log);
 
@@ -285,7 +314,8 @@ public class BodyLogController {
         if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
         if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
         if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+        if (body.containsKey("bodyFat"))         log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+        if (body.containsKey("inbodyImageUrl"))  log.setInbodyImageUrl(body.get("inbodyImageUrl") != null ? body.get("inbodyImageUrl").toString() : null);
 
         manualBodyLogRepository.save(log);
 
@@ -300,23 +330,38 @@ public class BodyLogController {
     // PUT /api/bodylog/member/{memberId}/log/{logId} - 트레이너가 연동 회원 바디로그 수정
     @PutMapping("/member/{memberId}/log/{logId}")
     public ResponseEntity<Map<String, Object>> updateMemberBodyLog(
+            @RequestHeader("Authorization") String authorization,
             @PathVariable Long memberId,
             @PathVariable Long logId,
             @RequestBody Map<String, Object> body) {
-        BodyLog log = bodyLogRepository.findById(logId)
-                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
-
-        if (body.get("date") != null && !body.get("date").toString().isBlank())
-            log.setLogDate(LocalDate.parse(body.get("date").toString()));
-        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
-        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
-        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
-
-        bodyLogRepository.save(log);
+        String token = authorization.replace("Bearer ", "");
+        Long userId = jwtService.getUserIdFromToken(token);
+        Long trainerId = trainerRepository.findTrainerIdByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("트레이너 정보를 찾을 수 없습니다."));
 
         Member member = memberRepository.findByIdWithUser(memberId)
                 .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+
+        if (member.getTrainer() == null || !trainerId.equals(member.getTrainer().getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "담당 회원이 아닙니다."));
+        }
+
+        BodyLog log = bodyLogRepository.findById(logId)
+                .orElseThrow(() -> new RuntimeException("바디로그를 찾을 수 없습니다."));
+
+        if (log.getMember() == null || !log.getMember().getId().equals(memberId))
+            return ResponseEntity.status(403).body(Map.of("error", "해당 회원의 바디로그가 아닙니다."));
+
+        if (body.get("date") != null && !body.get("date").toString().isBlank())
+            log.setLogDate(LocalDate.parse(body.get("date").toString()));
+        if (body.get("weight") != null)          log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFatMass") != null)     log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)      log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.containsKey("bodyFat"))         log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+        if (body.containsKey("inbodyImageUrl"))  log.setInbodyImageUrl(body.get("inbodyImageUrl") != null ? body.get("inbodyImageUrl").toString() : null);
+
+        bodyLogRepository.save(log);
+
         List<Map<String, Object>> allLogs = bodyLogRepository
                 .findByMemberOrderByLogDateAsc(member)
                 .stream().map(this::toMap).collect(Collectors.toList());
@@ -361,10 +406,11 @@ public class BodyLogController {
 
         if (body.get("date") != null && !body.get("date").toString().isBlank())
             log.setLogDate(LocalDate.parse(body.get("date").toString()));
-        if (body.get("weight") != null)      log.setWeight(((Number) body.get("weight")).doubleValue());
-        if (body.get("bodyFatMass") != null) log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
-        if (body.get("muscleMass") != null)  log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
-        if (body.containsKey("bodyFat"))     log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+        if (body.get("weight") != null)          log.setWeight(((Number) body.get("weight")).doubleValue());
+        if (body.get("bodyFatMass") != null)     log.setBodyFatMass(((Number) body.get("bodyFatMass")).doubleValue());
+        if (body.get("muscleMass") != null)      log.setMuscleMass(((Number) body.get("muscleMass")).doubleValue());
+        if (body.containsKey("bodyFat"))         log.setBodyFat(body.get("bodyFat") != null ? ((Number) body.get("bodyFat")).doubleValue() : null);
+        if (body.containsKey("inbodyImageUrl"))  log.setInbodyImageUrl(body.get("inbodyImageUrl") != null ? body.get("inbodyImageUrl").toString() : null);
 
         bodyLogRepository.save(log);
 

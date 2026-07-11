@@ -67,7 +67,7 @@ public class TrainerHomeService {
 
     // 계약의 회원명 반환 (연동 or 미연동)
     private String contractMemberName(PtContract c) {
-        if (c.getMember() != null) return c.getMember().getUser().getName();
+        if (c.getMember() != null) return c.getMember().getCachedName() != null ? c.getMember().getCachedName() : c.getMember().getUser().getName();
         if (c.getManualMember() != null) return c.getManualMember().getName();
         if (c.getMemberName() != null) return c.getMemberName(); // 삭제된 미연동 회원 이름 보존
         return "알 수 없음";
@@ -149,7 +149,8 @@ public class TrainerHomeService {
                     boolean isDeleted = s.getMember() == null && s.getManualMember() == null;
                     Long id = isDeleted ? null : (isManual ? s.getManualMember().getId() : s.getMember().getId());
                     String name = isDeleted ? (s.getMemberName() != null ? s.getMemberName() : "탈퇴 회원")
-                            : (isManual ? s.getManualMember().getName() : s.getMember().getUser().getName());
+                            : (isManual ? s.getManualMember().getName()
+                            : (s.getMember().getCachedName() != null ? s.getMember().getCachedName() : s.getMember().getUser().getName()));
                     int remaining = isDeleted ? 0 : (isManual
                             ? (s.getManualMember().getPtRemaining() != null ? s.getManualMember().getPtRemaining() : 0)
                             : (s.getMember().getPtRemaining() != null ? s.getMember().getPtRemaining() : 0));

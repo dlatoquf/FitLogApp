@@ -101,7 +101,7 @@ public class MemberHomeController {
             // 탈퇴 전 트레이너 정보 저장 후 알림
             Member member = memberHomeService.getMemberByToken(authorization);
             if (member.getTrainer() != null && member.getTrainer().getUser() != null) {
-                String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
+                String memberName = member.getCachedName() != null ? member.getCachedName() : (member.getUser() != null ? member.getUser().getName() : "회원");
                 notificationService.sendNotification(
                         member.getTrainer().getUser(),
                         "MEMBER_DELETED",
@@ -227,6 +227,7 @@ public class MemberHomeController {
         }
         member.setTrainer(trainer);
         member.setStatus(com.fitlog.fitlog.member.entity.Member.Status.ACTIVE);
+        if (member.getUser() != null) member.setCachedName(member.getUser().getName());
         // 같은 트레이너에 재연결이면 disconnectedAt·previousTrainerId 초기화
         if (member.getPreviousTrainerId() == null || member.getPreviousTrainerId().equals(trainer.getId())) {
             member.setDisconnectedAt(null);
@@ -322,7 +323,12 @@ public class MemberHomeController {
             }
             manualBodyLogRepository.deleteAll(manualBodyLogs);
 
-            // 4. 미연동 회원 삭제 (이 시점엔 메모/로그/계약/일정/바디로그 참조가 없으므로 RESTRICT/SET NULL 위반 없음)
+            // 4. 구 미연동 ID 기억 → 트레이너 앱이 구 ID로 요청할 때 리다이렉트 가능
+            member.setFormerManualMemberId(mm.getId());
+            memberRepository.save(member);
+
+
+            // 5. 미연동 회원 삭제 (이 시점엔 메모/로그/계약/일정/바디로그 참조가 없으므로 RESTRICT/SET NULL 위반 없음)
             manualMemberRepository.delete(mm);
             merged = true;
         }
@@ -333,7 +339,7 @@ public class MemberHomeController {
                 notificationService.sendNotification(
                     trainer.getUser(),
                     "NEW_MEMBER",
-                    member.getUser().getName() + "님이 회원으로 등록됐어요.",
+                    (member.getCachedName() != null ? member.getCachedName() : member.getUser().getName()) + "님이 회원으로 등록됐어요.",
                     "MEMBER",
                     member.getId()
                 );
@@ -376,7 +382,7 @@ public class MemberHomeController {
         if (member.getTrainer() == null || member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.INACTIVE)
             return ResponseEntity.badRequest().body(Map.of("message", "연결된 트레이너가 없어요."));
         Trainer trainer = member.getTrainer();
-        String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
+        String memberName = member.getCachedName() != null ? member.getCachedName() : (member.getUser() != null ? member.getUser().getName() : "회원");
         // 데이터는 90일 후 스케줄러가 정리 — 즉시 삭제하지 않음
         member.setStatus(com.fitlog.fitlog.member.entity.Member.Status.INACTIVE);
         java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
@@ -385,7 +391,7 @@ public class MemberHomeController {
         // 오늘까지 스케줄: 이름 보존 후 참조 해제 / 내일 이후 스케줄: 삭제
         scheduleRepository.findRecordedSchedulesByMember(member).forEach(s -> {
             if (!s.getDate().isAfter(today) && s.getMemberName() == null) {
-                s.setMemberName(member.getUser() != null ? member.getUser().getName() : null);
+                s.setMemberName(member.getCachedName() != null ? member.getCachedName() : (member.getUser() != null ? member.getUser().getName() : null));
                 scheduleRepository.save(s);
             }
         });

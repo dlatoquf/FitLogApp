@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CommentSection from "../../../components/CommentSection";
 import KakaoShare from "@react-native-kakao/share";
 import { useFocusEffect } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
@@ -6,6 +7,7 @@ import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { Image as ExpoImage } from "expo-image";
 import * as MediaLibrary from "expo-media-library";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
@@ -63,6 +65,7 @@ interface BodyLog {
   bodyFat?: number; // 체지방률 (%) - 자동계산
   muscleMass?: number;
   memo?: string;
+  inbodyImageUrl?: string;
 }
 
 const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -1370,6 +1373,7 @@ export default function MemberDetailScreen() {
   const [savingFitLog, setSavingFitLog] = useState(false);
   const [trainerPlan, setTrainerPlan] = useState<"FREE" | "PRO">("FREE");
   const [trainerInviteCode, setTrainerInviteCode] = useState("");
+  const [myTrainerId, setMyTrainerId] = useState<number | null>(null);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -1383,12 +1387,14 @@ export default function MemberDetailScreen() {
     conditionScore: number | null;
     feedback: string;
     missions: string[];
+    ptEnded?: boolean;
   }>({
     visible: false,
     exercises: [],
     conditionScore: null,
     feedback: "",
     missions: [],
+    ptEnded: false,
   });
   const [mediaGallery, setMediaGallery] = useState<
     { url: string; mediaType: string }[]
@@ -1410,6 +1416,9 @@ export default function MemberDetailScreen() {
   const [blBodyFatMass, setBlBodyFatMass] = useState("");
   const [blMuscleMass, setBlMuscleMass] = useState("");
   const [blSaving, setBlSaving] = useState(false);
+  const [blInbodyUploading, setBlInbodyUploading] = useState(false);
+  const [pendingBlInbodyUrl, setPendingBlInbodyUrl] = useState<string | null>(null);
+  const [expandedBodyImages, setExpandedBodyImages] = useState<Set<number>>(new Set());
 
   // 바디로그 수정 모달
   const [editingLog, setEditingLog] = useState<{ id: number; date: string; weight: string; bodyFatMass: string; muscleMass: string } | null>(null);
@@ -1429,6 +1438,9 @@ export default function MemberDetailScreen() {
   });
   const [savingPtDirect, setSavingPtDirect] = useState(false);
   const [memberActionLoading, setMemberActionLoading] = useState(false);
+  const [editNameVisible, setEditNameVisible] = useState(false);
+  const [editNameInput, setEditNameInput] = useState("");
+  const [editNameLoading, setEditNameLoading] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const menuModalY = useRef(new Animated.Value(0)).current;
   const menuPanResponder = useRef(
@@ -1797,6 +1809,7 @@ export default function MemberDetailScreen() {
           bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
           muscleMass: l.muscleMass,
           memo: l.memo,
+          inbodyImageUrl: l.inbodyImageUrl,
         }));
         setBodyLogs(processed);
       }
@@ -1807,6 +1820,52 @@ export default function MemberDetailScreen() {
     } finally {
       setEditSaving(false);
     }
+  };
+
+  // ── 인바디 사진 분석 ───────────────────────────────────────────────────
+  const handleInbodyPick = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("권한 필요", "사진 접근 권한이 필요해요."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setBlInbodyUploading(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      if (!jwt) throw new Error("로그인이 필요해요.");
+      const asset = result.assets[0];
+      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const contentType = ext === "png" ? "image/png" : "image/jpeg";
+      const { uploadToS3 } = await import("@/utils/s3Upload");
+      const imageUrl = await uploadToS3(asset.uri, contentType, "inbody", jwt);
+      const analyzeRes = await fetch(`${API_URL}/api/bodylog/analyze-inbody`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ imageUrl }),
+      });
+      if (!analyzeRes.ok) throw new Error("AI 분석에 실패했어요.");
+      const analyzed = await analyzeRes.json();
+      setPendingBlInbodyUrl(imageUrl);
+      if (analyzed.weight != null) setBlWeight(String(analyzed.weight));
+      if (analyzed.muscleMass != null) setBlMuscleMass(String(analyzed.muscleMass));
+      if (analyzed.bodyFatMass != null) setBlBodyFatMass(String(analyzed.bodyFatMass));
+      Alert.alert("인바디 분석 완료", "수치가 자동으로 입력됐어요. 확인 후 저장해주세요.");
+    } catch (e: any) {
+      Alert.alert("오류", e.message ?? "인바디 분석에 실패했어요.");
+    } finally {
+      setBlInbodyUploading(false);
+    }
+  };
+
+  const toggleBodyImage = (id: number) => {
+    setExpandedBodyImages(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   // ── 바디로그 저장 (트레이너 — growth.tsx와 동일 구조) ───────────────────
@@ -1823,6 +1882,7 @@ export default function MemberDetailScreen() {
         bodyFatMass: blBodyFatMass ? parseFloat(blBodyFatMass) : null,
         bodyFat: autoBodyFat,
         muscleMass: blMuscleMass ? parseFloat(blMuscleMass) : null,
+        inbodyImageUrl: pendingBlInbodyUrl ?? undefined,
       };
 
       const url = isManual
@@ -1852,12 +1912,14 @@ export default function MemberDetailScreen() {
               : l.bodyFat,
           muscleMass: l.muscleMass,
           memo: l.memo,
+          inbodyImageUrl: l.inbodyImageUrl,
         }));
         setBodyLogs(processed);
       }
       setBlWeight("");
       setBlBodyFatMass("");
       setBlMuscleMass("");
+      setPendingBlInbodyUrl(null);
       Alert.alert("완료", "바디로그가 저장됐어요!");
     } catch (e: any) {
       Alert.alert("오류", e.message);
@@ -2182,6 +2244,7 @@ export default function MemberDetailScreen() {
             : l.bodyFat,
         muscleMass: l.muscleMass,
         memo: l.memo,
+        inbodyImageUrl: l.inbodyImageUrl,
       }));
       setBodyLogs(processed);
     } catch {
@@ -2263,6 +2326,7 @@ export default function MemberDetailScreen() {
             d?.trainerCode ?? d?.inviteCode ?? d?.referralCode ?? d?.code ?? "",
           ),
         );
+        if (d?.trainerId) setMyTrainerId(d.trainerId);
       }
     })();
   }, []);
@@ -2579,6 +2643,34 @@ export default function MemberDetailScreen() {
     saveFitLog();
   };
 
+  const saveEditName = async () => {
+    if (!editNameInput.trim() || !member) return;
+    setEditNameLoading(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      const url = isManual
+        ? `${API_URL}/api/trainer/manual-members/${memberId}/name`
+        : `${API_URL}/api/trainer/members/${memberId}/name`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ name: editNameInput.trim() }),
+      });
+      if (res.ok) {
+        setMember((prev) => prev ? { ...prev, user: { ...prev.user, name: editNameInput.trim() } } : prev);
+        setEditNameVisible(false);
+        setEditNameInput("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert("오류", data.message ?? "이름 수정에 실패했어요.");
+      }
+    } catch {
+      Alert.alert("오류", "이름 수정에 실패했어요.");
+    } finally {
+      setEditNameLoading(false);
+    }
+  };
+
   const saveFitLog = async () => {
     const valid = exercises.filter((ex) => ex.name.trim());
     if (!valid.length) {
@@ -2645,6 +2737,28 @@ export default function MemberDetailScreen() {
         body: JSON.stringify(body),
       });
 
+      if (res.status === 410 && isManual && !editingFitLogId) {
+        // 연동된 회원 → 연동 엔드포인트로 자동 재시도
+        const errData = await res.json().catch(() => ({}));
+        const linkedMemberId = errData.linkedMemberId;
+        if (linkedMemberId) {
+          const retryUrl = `${API_URL}${ENDPOINTS.fitlog.create}`;
+          const retryBody = { ...body, memberId: linkedMemberId };
+          delete retryBody.workoutType;
+          const retryRes = await fetch(retryUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+            body: JSON.stringify(retryBody),
+          });
+          if (!retryRes.ok) throw new Error("PT 기록 저장 실패 (재시도)");
+          Alert.alert("완료", "회원이 앱에 가입해서 자동으로 연동됐어요!\nPT 기록이 저장됐습니다.\n회원 목록에서 새로고침해주세요.");
+          setShowFitLogForm(false);
+          fetchFitLogs(true);
+          return;
+        }
+        // linkedMemberId 없이 410 → body 이미 소비됨, 명시적 에러 처리
+        throw new Error("회원 정보가 변경됐어요. 회원 목록을 새로고침 후 다시 시도해주세요.");
+      }
       if (!res.ok) {
         const message = await res.text();
         if (editingFitLogId && res.status === 404) {
@@ -2652,7 +2766,10 @@ export default function MemberDetailScreen() {
         }
         throw new Error(message || "PT 기록 저장 실패");
       }
-      // 미연동 회원 & 신규 저장 → 문자 발송 여부 모달로 물어보기
+      const savedData = await res.json().catch(() => ({}));
+      const newPtRemaining: number = savedData.ptRemaining ?? -1;
+
+      // 미연동 회원 & 신규 저장 → 카카오 공유 모달 (PT 0회면 닫힌 후 비활성화 alert)
       if (isManual && !editingFitLogId) {
         const savedExercises = valid.map((ex) => ({
           name: ex.name,
@@ -2671,6 +2788,7 @@ export default function MemberDetailScreen() {
           conditionScore: ptCondition,
           feedback: ptWorkoutFeedback.trim(),
           missions: ptMissions.filter((m) => m.trim().length > 0),
+          ptEnded: newPtRemaining === 0,
         });
       } else {
         Alert.alert(
@@ -2679,7 +2797,35 @@ export default function MemberDetailScreen() {
             ? "PT 수업 기록이 수정됐어요!"
             : "PT 수업 기록이 등록됐어요!",
         );
+        // 연동 회원 PT 잔여 0회 → 비활성화 선택 알림
+        if (!editingFitLogId && newPtRemaining === 0) {
+          const deactivateUrl = `${API_URL}/api/trainer/members/${memberId}/deactivate-now`;
+          setTimeout(() => {
+            Alert.alert(
+              "PT 잔여 0회",
+              "7일 뒤에 비활성화 처리됩니다.\n바로 비활성화할까요?",
+              [
+                { text: "7일 뒤 비활성화", style: "cancel" },
+                {
+                  text: "지금 비활성화",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      const jwt = await AsyncStorage.getItem("jwt");
+                      await fetch(deactivateUrl, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${jwt}` },
+                      });
+                      fetchMember();
+                    } catch {}
+                  },
+                },
+              ],
+            );
+          }, 500);
+        }
       }
+      await AsyncStorage.removeItem(`fitlog_draft_${memberId}`);
       resetFitLogForm();
       // 캐시 무효화 후 재조회
       setFitLogCache({});
@@ -2774,6 +2920,31 @@ export default function MemberDetailScreen() {
     return `${memberName}님, 오늘 체험 수업 정말 수고하셨어요!\n\n오늘 진행한 운동\n\n${exerciseText}\n\n자세한 세트, 무게, 횟수와 피드백은 트레이너에게 직접 확인해보세요.\n\n오늘 경험하신 것처럼 체계적인 PT를 꾸준히 받으시면 목표에 훨씬 빠르게 가까워질 수 있어요.`;
   };
 
+  const showPtEndedDeactivateAlert = () => {
+    const deactivateUrl = `${API_URL}/api/trainer/manual-members/${memberId}/deactivate-now`;
+    Alert.alert(
+      "PT 잔여 0회",
+      "7일 뒤에 비활성화 처리됩니다.\n바로 비활성화할까요?",
+      [
+        { text: "7일 뒤 비활성화", style: "cancel" },
+        {
+          text: "지금 비활성화",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const jwt = await AsyncStorage.getItem("jwt");
+              await fetch(deactivateUrl, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${jwt}` },
+              });
+              fetchMember();
+            } catch {}
+          },
+        },
+      ],
+    );
+  };
+
   const shareManualWorkoutLog = async () => {
     const code = trainerInviteCode.trim();
     const text = isOt
@@ -2781,7 +2952,9 @@ export default function MemberDetailScreen() {
       : buildManualWorkoutShareText(smsPromptData, code || undefined);
     // OT는 앱스토어 링크 없음 — PT 미연동만 앱스토어 링크 포함 (회원 OS 모르므로 두 링크 모두 포함)
     const inviteUrl = "https://fitlog-api.duckdns.org/download";
+    const ptEnded = smsPromptData.ptEnded;
     setSmsPromptData((p) => ({ ...p, visible: false }));
+    if (ptEnded) setTimeout(showPtEndedDeactivateAlert, 300);
     const safeText = String(text ?? "");
     const safeUrl = String(inviteUrl ?? "https://fitlog.app");
     console.log("[Kakao] shareTextTemplate 시작");
@@ -3042,6 +3215,32 @@ export default function MemberDetailScreen() {
       }
       setShowPtDirectEdit(false);
       fetchMember();
+      if (remaining === 0) {
+        const deactivateUrl = type === "manual"
+          ? `${API_URL}/api/trainer/manual-members/${memberId}/deactivate-now`
+          : `${API_URL}/api/trainer/members/${memberId}/deactivate-now`;
+        Alert.alert(
+          "PT 잔여 0회",
+          "7일 뒤에 비활성화 처리됩니다.\n바로 비활성화할까요?",
+          [
+            { text: "7일 뒤 비활성화", style: "cancel" },
+            {
+              text: "지금 비활성화",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  const jwt = await AsyncStorage.getItem("jwt");
+                  await fetch(deactivateUrl, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${jwt}` },
+                  });
+                  fetchMember();
+                } catch {}
+              },
+            },
+          ],
+        );
+      }
     } catch (e: any) {
       Alert.alert("오류", e.message ?? "수정에 실패했어요.");
     } finally {
@@ -4142,9 +4341,7 @@ export default function MemberDetailScreen() {
             <TouchableOpacity onPress={() => router.push("/(tabs)/trainer/members" as any)}>
               <Text style={{ fontSize: 22, color: Colors.textMuted }}>←</Text>
             </TouchableOpacity>
-            <Text
-              style={{ fontSize: 22, fontWeight: "800", color: Colors.text }}
-            >
+            <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.text }}>
               {member.user.name}
             </Text>
             {/* 미연동 / OT 뱃지 */}
@@ -4172,6 +4369,19 @@ export default function MemberDetailScreen() {
                 </Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              onPress={() => { setEditNameInput(member.user.name); setEditNameVisible(true); }}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                backgroundColor: Colors.bgSub,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: Colors.textMuted }}>수정</Text>
+            </TouchableOpacity>
           </View>
           {/* 오른쪽: 공지사항 + ⋮ 메뉴 */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -4616,6 +4826,15 @@ export default function MemberDetailScreen() {
                 </View>
               </View>
             )}
+            {dietPhotos.length > 0 && myTrainerId && (
+              <CommentSection
+                targetType="DIET_DAY"
+                targetId={memberId}
+                date={toDateKey(selectedDate)}
+                trainerId={myTrainerId}
+                memberId={memberId}
+              />
+            )}
           </View>
         )}
 
@@ -4672,7 +4891,7 @@ export default function MemberDetailScreen() {
               </View>
               {dayPtLogs.length === 0 && (
                 <TouchableOpacity
-                  onPress={() => {
+                  onPress={async () => {
                     fetchFitLogHistory();
                     if (!isManual) {
                       AsyncStorage.getItem("jwt").then((jwt) => {
@@ -4693,7 +4912,41 @@ export default function MemberDetailScreen() {
                           .catch(() => {});
                       });
                     }
-                    setShowFitLogForm(true);
+                    const draftKey = `fitlog_draft_${memberId}`;
+                    const draft = await AsyncStorage.getItem(draftKey);
+                    if (draft) {
+                      Alert.alert(
+                        "임시저장된 내용이 있어요",
+                        "이어서 작성할까요?",
+                        [
+                          {
+                            text: "새로 작성",
+                            style: "destructive",
+                            onPress: () => {
+                              AsyncStorage.removeItem(draftKey);
+                              setShowFitLogForm(true);
+                            },
+                          },
+                          {
+                            text: "불러오기",
+                            onPress: () => {
+                              try {
+                                const parsed = JSON.parse(draft);
+                                if (parsed.exercises) setExercises(parsed.exercises);
+                                if (parsed.ptBodyParts) setPtBodyParts(parsed.ptBodyParts);
+                                if (parsed.ptCondition !== undefined) setPtCondition(parsed.ptCondition);
+                                if (parsed.ptLogMemo !== undefined) setPtLogMemo(parsed.ptLogMemo);
+                                if (parsed.ptWorkoutFeedback !== undefined) setPtWorkoutFeedback(parsed.ptWorkoutFeedback);
+                                if (parsed.ptMissions) setPtMissions(parsed.ptMissions);
+                              } catch {}
+                              setShowFitLogForm(true);
+                            },
+                          },
+                        ],
+                      );
+                    } else {
+                      setShowFitLogForm(true);
+                    }
                   }}
                   style={{
                     backgroundColor: Colors.green + "22",
@@ -4770,14 +5023,22 @@ export default function MemberDetailScreen() {
                       </Text>
                     </View>
 
-                    {dayPtLogs.map((log: any) =>
-                      renderFitLogCard(
-                        log,
-                        isOt ? "#F97316" : Colors.green,
-                        isOt ? "OT 수업 완료" : "PT 수업 완료",
-                        () => startEditFitLog(log),
-                      ),
-                    )}
+                    {dayPtLogs.map((log: any) => {
+                      const wid = log.workoutId ?? log.id;
+                      return (
+                        <View key={wid} style={{ marginBottom: 14 }}>
+                          {renderFitLogCard(
+                            log,
+                            isOt ? "#F97316" : Colors.green,
+                            isOt ? "OT 수업 완료" : "PT 수업 완료",
+                            () => startEditFitLog(log),
+                          )}
+                          {!isManual && (
+                            <CommentSection targetType="WORKOUT_LOG" targetId={wid} />
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
 
@@ -4810,11 +5071,19 @@ export default function MemberDetailScreen() {
                         OT 수업
                       </Text>
                     </View>
-                    {dayOtLogs.map((log: any) =>
-                      renderFitLogCard(log, "#F97316", "OT 수업 완료", () =>
-                        startEditFitLog(log),
-                      ),
-                    )}
+                    {dayOtLogs.map((log: any) => {
+                      const wid = log.workoutId ?? log.id;
+                      return (
+                        <View key={wid} style={{ marginBottom: 14 }}>
+                          {renderFitLogCard(log, "#F97316", "OT 수업 완료", () =>
+                            startEditFitLog(log),
+                          )}
+                          {!isManual && (
+                            <CommentSection targetType="WORKOUT_LOG" targetId={wid} />
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
 
@@ -4948,6 +5217,9 @@ export default function MemberDetailScreen() {
                               </TouchableOpacity>
                             </View>
                           </View>
+                          {!isManual && (
+                            <CommentSection targetType="WORKOUT_LOG" targetId={wid} />
+                          )}
                         </View>
                       );
                     })}
@@ -4981,16 +5253,28 @@ export default function MemberDetailScreen() {
                 borderColor: Colors.border,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: "700",
-                  color: Colors.text,
-                  marginBottom: 12,
-                }}
-              >
-                기록 추가
-              </Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>기록 추가</Text>
+                {/* 인바디 사진 분석 버튼 — 결제 연동 후 활성화 예정
+                <TouchableOpacity
+                  onPress={handleInbodyPick}
+                  disabled={blInbodyUploading}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.green + "18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: Colors.green + "40" }}
+                >
+                  {blInbodyUploading
+                    ? <ActivityIndicator size="small" color={Colors.green} />
+                    : <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green }}>📊 인바디</Text>
+                  }
+                </TouchableOpacity>
+                */}
+              </View>
+              {/* 인바디 첨부 표시 — 결제 연동 후 활성화 예정
+              {pendingBlInbodyUrl && (
+                <View style={{ backgroundColor: Colors.greenLight, borderRadius: 8, padding: 8, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "600" }}>✅ 인바디 사진이 첨부됩니다</Text>
+                </View>
+              )}
+              */}
               <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
                 {[
                   {
@@ -5188,6 +5472,14 @@ export default function MemberDetailScreen() {
                         </Text>
                         {log.id && (
                           <View style={{ flexDirection: "row", gap: 8 }}>
+                            {log.inbodyImageUrl && (
+                              <TouchableOpacity
+                                onPress={() => toggleBodyImage(log.id!)}
+                                style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: Colors.green + "18", borderRadius: 6, borderWidth: 1, borderColor: Colors.green + "40" }}
+                              >
+                                <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "600" }}>{expandedBodyImages.has(log.id!) ? "사진 닫기" : "사진"}</Text>
+                              </TouchableOpacity>
+                            )}
                             <TouchableOpacity
                               onPress={() => setEditingLog({
                                 id: log.id!,
@@ -5303,6 +5595,15 @@ export default function MemberDetailScreen() {
                           </View>
                         ))}
                       </View>
+                      {log.inbodyImageUrl && log.id != null && expandedBodyImages.has(log.id) && (
+                        <View style={{ marginTop: 12 }}>
+                          <ExpoImage
+                            source={{ uri: log.inbodyImageUrl }}
+                            style={{ width: "100%", height: 280, borderRadius: 8 }}
+                            contentFit="contain"
+                          />
+                        </View>
+                      )}
                     </View>
                   );
                 })
@@ -6001,19 +6302,19 @@ export default function MemberDetailScreen() {
                         <TouchableOpacity
                           onPress={() => handlePickMedia(ei)}
                           style={{
-                            width: 48,
-                            height: 48,
+                            width: 72,
+                            height: 72,
                             borderWidth: 1,
                             borderStyle: "dashed",
                             borderColor: Colors.green + "66",
-                            borderRadius: 8,
+                            borderRadius: 10,
                             backgroundColor: Colors.greenLight,
                             justifyContent: "center",
                             alignItems: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 16, color: Colors.green }}>+</Text>
-                          <Text style={{ fontSize: 8, color: Colors.green, marginTop: 1 }}>사진/영상</Text>
+                          <Text style={{ fontSize: 22, color: Colors.green }}>+</Text>
+                          <Text style={{ fontSize: 10, color: Colors.green, marginTop: 2 }}>사진/영상</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -6195,11 +6496,42 @@ export default function MemberDetailScreen() {
                 </View>
               )}
 
-              {/* 저장 버튼 */}
+              {/* 임시저장 + 저장 버튼 */}
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 0 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  const draftKey = `fitlog_draft_${memberId}`;
+                  const draft = {
+                    exercises,
+                    ptBodyParts,
+                    ptCondition,
+                    ptLogMemo,
+                    ptWorkoutFeedback,
+                    ptMissions,
+                  };
+                  await AsyncStorage.setItem(draftKey, JSON.stringify(draft));
+                  Alert.alert("임시저장 완료", "나중에 이어서 작성할 수 있어요.", [
+                    { text: "확인", onPress: resetFitLogForm },
+                  ]);
+                }}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: Colors.green,
+                  borderRadius: 14,
+                  padding: 14,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.green }}>
+                  임시저장
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={checkScheduleAndSave}
                 disabled={savingFitLog}
                 style={{
+                  flex: 2,
                   backgroundColor: Colors.green,
                   borderRadius: 14,
                   padding: 14,
@@ -6222,6 +6554,7 @@ export default function MemberDetailScreen() {
                         : "PT 수업 등록 + 회원 알림"}
                 </Text>
               </TouchableOpacity>
+              </View>
 
             </KeyboardAwareScrollView>
 
@@ -6259,9 +6592,11 @@ export default function MemberDetailScreen() {
         visible={smsPromptData.visible}
         transparent
         animationType="fade"
-        onRequestClose={() =>
-          setSmsPromptData((p) => ({ ...p, visible: false }))
-        }
+        onRequestClose={() => {
+          const ptEnded = smsPromptData.ptEnded;
+          setSmsPromptData((p) => ({ ...p, visible: false }));
+          if (ptEnded) showPtEndedDeactivateAlert();
+        }}
       >
         <View
           style={{
@@ -6311,9 +6646,11 @@ export default function MemberDetailScreen() {
             </Text>
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                onPress={() =>
-                  setSmsPromptData((p) => ({ ...p, visible: false }))
-                }
+                onPress={() => {
+                  const ptEnded = smsPromptData.ptEnded;
+                  setSmsPromptData((p) => ({ ...p, visible: false }));
+                  if (ptEnded) setTimeout(showPtEndedDeactivateAlert, 300);
+                }}
                 style={{
                   flex: 1,
                   paddingVertical: 13,
@@ -7726,6 +8063,58 @@ export default function MemberDetailScreen() {
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── 이름 수정 모달 ── */}
+      <Modal
+        visible={editNameVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setEditNameVisible(false); setEditNameInput(""); }}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
+            activeOpacity={1}
+            onPress={() => { setEditNameVisible(false); setEditNameInput(""); }}
+          >
+            <TouchableOpacity activeOpacity={1} style={{ width: "85%", backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 16 }}>이름 수정</Text>
+              <TextInput
+                value={editNameInput}
+                onChangeText={setEditNameInput}
+                placeholder="새 이름 입력"
+                placeholderTextColor={Colors.textMuted}
+                style={{
+                  backgroundColor: Colors.bgSub,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  padding: 12,
+                  fontSize: 15,
+                  color: Colors.text,
+                  marginBottom: 16,
+                }}
+                autoFocus
+              />
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => { setEditNameVisible(false); setEditNameInput(""); }}
+                  style={{ flex: 1, padding: 13, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}
+                >
+                  <Text style={{ color: Colors.textMuted, fontWeight: "600" }}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={saveEditName}
+                  disabled={editNameLoading}
+                  style={{ flex: 1, padding: 13, borderRadius: 10, backgroundColor: Colors.green, alignItems: "center" }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>{editNameLoading ? "저장 중..." : "저장"}</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
     </View>

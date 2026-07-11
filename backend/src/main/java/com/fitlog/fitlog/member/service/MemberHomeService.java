@@ -127,7 +127,6 @@ public class MemberHomeService {
         Member member = getMember(authorization);
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-        LocalDate weekEnd = today.with(DayOfWeek.SUNDAY);
 
         boolean isActive = member.getStatus() == com.fitlog.fitlog.member.entity.Member.Status.ACTIVE;
         if (member.getTrainer() == null || !isActive) {
@@ -135,19 +134,8 @@ public class MemberHomeService {
         }
 
         return scheduleRepository
-                .findByTrainerAndDateBetween(member.getTrainer(), today, weekEnd)
+                .findConfirmedOrCompletedByMemberFrom(member, today)
                 .stream()
-                .filter(s -> s.getMember() != null)
-                .filter(s -> Objects.equals(s.getMember().getId(), member.getId()))
-                .filter(s ->
-                        "CONFIRMED".equals(s.getStatusStr()) ||
-                                "COMPLETED".equals(s.getStatusStr())
-                )
-                .sorted(
-                        Comparator
-                                .comparing(Schedule::getDate)
-                                .thenComparing(Schedule::getStartTime)
-                )
                 .map(s -> {
                     Map<String, Object> map = new HashMap<>();
                     map.put("scheduleId", s.getId());

@@ -24,6 +24,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("SELECT m FROM Member m JOIN FETCH m.user LEFT JOIN FETCH m.trainer t LEFT JOIN FETCH t.user WHERE m.user.id = :userId")
     Optional<Member> findByUserId(@Param("userId") Long userId);
 
+    // 여러 userId 한 번에 조회 (댓글 N+1 방지용)
+    @Query("SELECT m FROM Member m JOIN FETCH m.user WHERE m.user.id IN :userIds")
+    List<Member> findByUserIdIn(@Param("userIds") java.util.Collection<Long> userIds);
+
     // id로 조회 시 user까지 JOIN FETCH (LazyInitializationException 방지)
     @Query("SELECT m FROM Member m JOIN FETCH m.user WHERE m.id = :id")
     Optional<Member> findByIdWithUser(@Param("id") Long id);
@@ -150,4 +154,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
           AND m.user.deletedAt IS NULL
     """)
     List<Member> findAllWithBirthDate();
+
+    // 구 미연동 ID로 연동된 회원 조회 (트레이너 앱의 구 ID 요청 리다이렉트용)
+    Optional<Member> findByFormerManualMemberId(Long formerManualMemberId);
 }

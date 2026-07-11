@@ -118,7 +118,8 @@ public class NotificationScheduler {
     // 3. 매주 월요일 오전 9시(KST) – 트레이너 다음 주 슬롯 자동 생성
     //    (슬롯 생성만, 회원 알림 없음 — 트레이너 전용 운영)
     // ─────────────────────────────────────────────────────────
-    @Scheduled(cron = "0 0 9 * * MON", zone = "Asia/Seoul")
+    // 자동 오픈 비활성화 — 트레이너가 직접 주간 칸 클릭으로 스케줄 추가
+    // @Scheduled(cron = "0 0 9 * * MON", zone = "Asia/Seoul")
     public void autoOpenNextWeekSchedules() {
         List<Trainer> allTrainers = trainerRepository.findAll();
         for (Trainer trainer : allTrainers) {
@@ -159,7 +160,8 @@ public class NotificationScheduler {
                 // 생일 알림 설정 꺼진 트레이너 스킵
                 if (!trainer.getNotifBirthday()) continue;
 
-                String name = member.getUser().getName();
+                String name = member.getCachedName() != null ? member.getCachedName()
+                        : (member.getUser() != null ? member.getUser().getName() : "회원");
 
                 if (memberMD.equals(todayMD)) {
                     notificationService.sendNotification(
