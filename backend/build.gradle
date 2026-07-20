@@ -52,6 +52,7 @@ dependencies {
 
 	// AWS S3
 	implementation 'software.amazon.awssdk:s3:2.25.60'
+	implementation 'com.anthropic:anthropic-java:2.2.0'
 }
 tasks.named('test') {
 	useJUnitPlatform()

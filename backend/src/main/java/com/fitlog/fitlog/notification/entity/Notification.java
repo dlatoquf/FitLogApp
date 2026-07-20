@@ -35,6 +35,12 @@ public class Notification {
     @Column(name = "target_id")
     private Long targetId;
 
+    @Column(name = "target_date")
+    private String targetDate;
+
+    @Column(name = "member_id")
+    private Long memberId;
+
     // Getters & Setters
     public Long getNotificationId() { return notificationId; }
     public User getUser() { return user; }
@@ -51,4 +57,8 @@ public class Notification {
     public void setTargetType(String targetType) { this.targetType = targetType; }
     public Long getTargetId() { return targetId; }
     public void setTargetId(Long targetId) { this.targetId = targetId; }
+    public String getTargetDate() { return targetDate; }
+    public void setTargetDate(String targetDate) { this.targetDate = targetDate; }
+    public Long getMemberId() { return memberId; }
+    public void setMemberId(Long memberId) { this.memberId = memberId; }
 }

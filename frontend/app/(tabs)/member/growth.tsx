@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
+import { uploadToS3 } from "../../../utils/s3Upload";
 
 // 날짜+시간 포맷 헬퍼
 const formatDateTime = (dateStr: string | null | undefined): string => {
@@ -45,6 +48,7 @@ interface BodyLog {
   bodyFatMass?: number;
   bodyFat?: number;
   muscleMass?: number;
+  inbodyImageUrl?: string;
 }
 
 export default function MemberGrowthScreen() {
@@ -56,6 +60,10 @@ export default function MemberGrowthScreen() {
   const [bodyFatMass, setBodyFatMass] = useState("");
   const [muscleMass, setMuscleMass]   = useState("");
   const [saving, setSaving]           = useState(false);
+  const [inbodyUploading, setInbodyUploading] = useState(false);
+  const [pendingInbodyUrl, setPendingInbodyUrl] = useState<string | null>(null);
+
+  const [expandedImages, setExpandedImages] = useState<Set<number>>(new Set());
 
   const [editingLog, setEditingLog] = useState<{ id: number; date: string; weight: string; bodyFatMass: string; muscleMass: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
@@ -86,12 +94,73 @@ export default function MemberGrowthScreen() {
           ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10
           : l.bodyFat,
         muscleMass: l.muscleMass,
+        inbodyImageUrl: l.inbodyImageUrl,
       })));
     } catch {
       setBodyLogs([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const mapLog = (l: any): BodyLog => ({
+    id: l.id,
+    date: l.logDate || l.date || l.createdAt,
+    weight: l.weight,
+    bodyFatMass: l.bodyFatMass,
+    bodyFat: l.bodyFatMass && l.weight
+      ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10
+      : l.bodyFat,
+    muscleMass: l.muscleMass,
+    inbodyImageUrl: l.inbodyImageUrl,
+  });
+
+  const handleInbodyPick = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("권한 필요", "사진 접근 권한이 필요해요.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    setInbodyUploading(true);
+    try {
+      const jwt = await AsyncStorage.getItem("jwt");
+      if (!jwt) throw new Error("로그인이 필요해요.");
+      const asset = result.assets[0];
+      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const contentType = ext === "png" ? "image/png" : "image/jpeg";
+
+      // S3 업로드
+      const imageUrl = await uploadToS3(asset.uri, contentType, "inbody", jwt);
+
+      // Claude 분석
+      const analyzeRes = await fetch(`${API_URL}/api/bodylog/analyze-inbody`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ imageUrl }),
+      });
+      if (!analyzeRes.ok) {
+        const errBody = await analyzeRes.json().catch(() => ({}));
+        throw new Error(errBody.error ?? "AI 분석에 실패했어요.");
+      }
+      const analyzed = await analyzeRes.json();
+
+      setPendingInbodyUrl(imageUrl);
+      if (analyzed.weight != null) setWeight(String(analyzed.weight));
+      if (analyzed.muscleMass != null) setMuscleMass(String(analyzed.muscleMass));
+      if (analyzed.bodyFatMass != null) setBodyFatMass(String(analyzed.bodyFatMass));
+
+      Alert.alert("인바디 분석 완료", "수치가 자동으로 입력됐어요. 확인 후 저장해주세요.");
+    } catch (e: any) {
+      Alert.alert("오류", e.message ?? "인바디 분석에 실패했어요.");
+    } finally {
+      setInbodyUploading(false);
     }
   };
 
@@ -108,24 +177,14 @@ export default function MemberGrowthScreen() {
           bodyFatMass: bodyFatMass ? parseFloat(bodyFatMass) : null,
           bodyFat: autoBodyFat,
           muscleMass: muscleMass ? parseFloat(muscleMass) : null,
+          inbodyImageUrl: pendingInbodyUrl ?? undefined,
         }),
       });
       if (!res.ok) throw new Error("저장 실패");
       const data = await res.json();
-      // 재조회 없이 응답에서 바로 목록 업데이트
-      if (data.logs) {
-        setBodyLogs(data.logs.map((l: any) => ({
-          id: l.id,
-          date: l.logDate || l.date || l.createdAt,
-          weight: l.weight,
-          bodyFatMass: l.bodyFatMass,
-          bodyFat: l.bodyFatMass && l.weight
-            ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10
-            : l.bodyFat,
-          muscleMass: l.muscleMass,
-        })));
-      }
+      if (data.logs) setBodyLogs(data.logs.map(mapLog));
       setWeight(""); setBodyFatMass(""); setMuscleMass("");
+      setPendingInbodyUrl(null);
       Alert.alert("완료", "바디로그가 저장됐어요!");
     } catch (e: any) { Alert.alert("오류", e.message); }
     finally { setSaving(false); }
@@ -140,12 +199,7 @@ export default function MemberGrowthScreen() {
       });
       if (!res.ok) throw new Error("삭제 실패");
       const data = await res.json();
-      if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
-        id: l.id, date: l.logDate || l.date || l.createdAt,
-        weight: l.weight, bodyFatMass: l.bodyFatMass,
-        bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
-        muscleMass: l.muscleMass,
-      })));
+      if (data.logs) setBodyLogs(data.logs.map(mapLog));
     } catch { Alert.alert("오류", "삭제에 실패했어요."); }
   };
 
@@ -170,16 +224,20 @@ export default function MemberGrowthScreen() {
       });
       if (!res.ok) throw new Error("수정 실패");
       const data = await res.json();
-      if (data.logs) setBodyLogs(data.logs.map((l: any) => ({
-        id: l.id, date: l.logDate || l.date || l.createdAt,
-        weight: l.weight, bodyFatMass: l.bodyFatMass,
-        bodyFat: l.bodyFatMass && l.weight ? Math.round((l.bodyFatMass / l.weight) * 1000) / 10 : l.bodyFat,
-        muscleMass: l.muscleMass,
-      })));
+      if (data.logs) setBodyLogs(data.logs.map(mapLog));
       setEditingLog(null);
       Alert.alert("완료", "바디로그가 수정됐어요!");
     } catch (e: any) { Alert.alert("오류", e.message); }
     finally { setEditSaving(false); }
+  };
+
+  const toggleImage = (id: number) => {
+    setExpandedImages(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   useFocusEffect(useCallback(() => { fetchBodyLogs(); }, []));
@@ -264,7 +322,6 @@ export default function MemberGrowthScreen() {
               height: chartH,
             }}
           >
-            {/* 그리드 라인 */}
             {Array.from({ length: TOTAL_SLOTS }).map((_, i) => (
               <View
                 key={i}
@@ -279,7 +336,6 @@ export default function MemberGrowthScreen() {
               />
             ))}
 
-            {/* 라인 */}
             {points.map((p, i) => {
               if (i >= points.length - 1) return null;
 
@@ -306,7 +362,6 @@ export default function MemberGrowthScreen() {
               );
             })}
 
-            {/* 포인트 + 수치 */}
             {points.map((p, i) => (
               <View key={i}>
                 <View
@@ -347,7 +402,6 @@ export default function MemberGrowthScreen() {
             ))}
           </View>
 
-          {/* x축 날짜 라벨 */}
           <View
             style={{
               position: "absolute",
@@ -399,7 +453,30 @@ export default function MemberGrowthScreen() {
 
       {/* 오늘 기록 입력 */}
       <View style={{ backgroundColor: Colors.bgSub, borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: Colors.border }}>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 12 }}>오늘 기록</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text }}>오늘 기록</Text>
+          {/* 인바디 사진 분석 버튼 — 결제 연동 후 활성화 예정
+          <TouchableOpacity
+            onPress={handleInbodyPick}
+            disabled={inbodyUploading}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.green + "18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: Colors.green + "40" }}
+          >
+            {inbodyUploading
+              ? <ActivityIndicator size="small" color={Colors.green} />
+              : <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.green }}>인바디</Text>
+            }
+          </TouchableOpacity>
+          */}
+        </View>
+
+        {/* 인바디 첨부 표시 — 결제 연동 후 활성화 예정
+        {pendingInbodyUrl && (
+          <View style={{ backgroundColor: Colors.greenLight, borderRadius: 8, padding: 8, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ fontSize: 11, color: Colors.green, fontWeight: "600" }}>✅ 인바디 사진이 첨부됩니다</Text>
+          </View>
+        )}
+        */}
+
         <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
           {[
             { label: "몸무게", value: weight, setter: setWeight, unit: "kg", placeholder: "0.0" },
@@ -423,7 +500,6 @@ export default function MemberGrowthScreen() {
           ))}
         </View>
 
-        {/* 체지방률 자동계산 표시 */}
         {autoBodyFat !== null && (
           <View style={{ backgroundColor: Colors.greenLight, borderRadius: 8, padding: 8, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "700" }}>
@@ -510,6 +586,8 @@ export default function MemberGrowthScreen() {
               return diff > 0 ? `↑${diff}` : `↓${Math.abs(diff)}`;
             };
 
+            const isExpanded = log.id != null && expandedImages.has(log.id);
+
             return (
               <View
                 key={`${log.date}-${i}`}
@@ -526,6 +604,14 @@ export default function MemberGrowthScreen() {
                   <Text style={{ fontSize: 11, color: Colors.textMuted }}>{formatDateTime(log.date)}</Text>
                   {log.id && (
                     <View style={{ flexDirection: "row", gap: 8 }}>
+                      {log.inbodyImageUrl && (
+                        <TouchableOpacity
+                          onPress={() => toggleImage(log.id!)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: Colors.green + "18", borderRadius: 6, borderWidth: 1, borderColor: Colors.green + "40" }}
+                        >
+                          <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "600" }}>{isExpanded ? "사진 닫기" : "사진"}</Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         onPress={() => setEditingLog({ id: log.id!, date: String(log.date ?? "").slice(0, 10), weight: String(log.weight ?? ""), bodyFatMass: String(log.bodyFatMass ?? ""), muscleMass: String(log.muscleMass ?? "") })}
                         style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: Colors.bgSub, borderRadius: 6, borderWidth: 1, borderColor: Colors.border }}
@@ -620,6 +706,17 @@ export default function MemberGrowthScreen() {
                     </View>
                   ))}
                 </View>
+
+                {/* 인바디 사진 접고 펼치기 */}
+                {log.inbodyImageUrl && isExpanded && (
+                  <View style={{ marginTop: 12 }}>
+                    <Image
+                      source={{ uri: log.inbodyImageUrl }}
+                      style={{ width: "100%", height: 280, borderRadius: 8 }}
+                      contentFit="contain"
+                    />
+                  </View>
+                )}
               </View>
             );
           })

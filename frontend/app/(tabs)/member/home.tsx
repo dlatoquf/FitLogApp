@@ -327,7 +327,7 @@ export default function MemberHomeScreen() {
       ? Math.round((lastBodyLog.muscleMass - prevBodyLog.muscleMass) * 10) / 10
       : null;
 
-  // 현재 시간이 수업 종료시간을 지나면 홈의 "이번 주 내 수업"에서 숨김
+  // 종료시간이 지난 수업 제외
   const now = new Date();
   const activeThisWeek = thisWeek.filter((s) => {
     const end = new Date(`${s.date}T${String(s.endTime).slice(0, 5)}:00`);
@@ -677,7 +677,7 @@ export default function MemberHomeScreen() {
             <Text
               style={{ fontSize: 14, fontWeight: "700", color: Colors.textSub }}
             >
-              이번 주 내 수업
+              확정된 수업
             </Text>
             {activeThisWeek.length > 0 && (
               <Text
@@ -691,7 +691,7 @@ export default function MemberHomeScreen() {
             <Text
               style={{ fontSize: 13, color: Colors.textMuted, marginTop: 4 }}
             >
-              이번 주 확정된 수업이 없어요
+              확정된 수업이 없어요
             </Text>
           ) : (
             activeThisWeek.map((s) => (

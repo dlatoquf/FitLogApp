@@ -329,8 +329,6 @@ export default function TrainerHomeScreen() {
   const [payNewPhone, setPayNewPhone] = useState("");
 
   // 온보딩 팝업
-  const [onboardingVisible, setOnboardingVisible] = useState(false);
-  const [onboardingIndex, setOnboardingIndex] = useState(0);
 
   // 월별 매출 네비게이션
   const [revenueMonthOffset, setRevenueMonthOffset] = useState(0); // 0 = 이번 달
@@ -526,7 +524,8 @@ export default function TrainerHomeScreen() {
   // ── 초대 버튼 핸들러 ──────────────────────────────────────────────────────
   const handleInvitePress = () => {
     const plan = (data?.plan ?? "FREE").toUpperCase();
-    if (plan === "FREE" && (data?.totalMembers ?? 0) >= 5) {
+    const isInTrial = !!data?.trialEndDate && new Date(data.trialEndDate) > new Date();
+    if (plan === "FREE" && !isInTrial && (data?.totalMembers ?? 0) >= 5) {
       setPaymentVisible(true);
     } else {
       setInviteVisible(true);
@@ -609,10 +608,29 @@ export default function TrainerHomeScreen() {
       setLoading(false);
       setRefreshing(false);
       if (!isRefresh) {
-        AsyncStorage.getItem("onboardingShown").then((shown) => {
-          if (!shown) {
-            setOnboardingIndex(0);
-            setOnboardingVisible(true);
+        AsyncStorage.getItem("firstLogin").then(async (flag) => {
+          if (flag === "1") {
+            await AsyncStorage.removeItem("firstLogin");
+            await AsyncStorage.setItem("firstGoalSaved", "1");
+            setGoalSessionsInput("");
+            setGoalRevenueInput("");
+            setGoalModalMode("both");
+            setGoalModal(true);
+          } else {
+            // 기존 가입자인데 목표 미설정 시에도 팝업
+            setData((prev) => {
+              if (prev && prev.goalSessions == null && prev.goalRevenue == null) {
+                AsyncStorage.getItem("goalNudgeDismissed").then((dismissed) => {
+                  if (!dismissed) {
+                    setGoalSessionsInput("");
+                    setGoalRevenueInput("");
+                    setGoalModalMode("both");
+                    setGoalModal(true);
+                  }
+                });
+              }
+              return prev;
+            });
           }
         });
       }
@@ -640,6 +658,13 @@ export default function TrainerHomeScreen() {
       });
       if (!res.ok) throw new Error("저장 실패");
       setGoalModal(false);
+      const isFirstGoal = await AsyncStorage.getItem("firstGoalSaved");
+      if (isFirstGoal === "1") {
+        await AsyncStorage.removeItem("firstGoalSaved");
+        await AsyncStorage.setItem("showMemberWelcome", "1");
+        router.replace("/(tabs)/trainer/members" as any);
+        return;
+      }
       if (pendingPayAfterGoal) {
         setPendingPayAfterGoal(false);
         openPayModal();
@@ -653,8 +678,10 @@ export default function TrainerHomeScreen() {
   };
 
   const openPayModal = async () => {
+    const isInTrial = !!data?.trialEndDate && new Date(data.trialEndDate) > new Date();
     if (
       (data?.plan ?? "FREE").toUpperCase() === "FREE" &&
+      !isInTrial &&
       (data?.totalMembers ?? 0) >= 5
     ) {
       setPaymentVisible(true);
@@ -916,7 +943,6 @@ export default function TrainerHomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setOnboardingIndex(0);
       fetchHome();
     }, []),
   );
@@ -1110,7 +1136,7 @@ export default function TrainerHomeScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 4,
-                backgroundColor: (data?.plan ?? "FREE").toUpperCase() === "FREE" && (data?.totalMembers ?? 0) >= 5 ? "#F3F4F6" : Colors.bgSub,
+                backgroundColor: (data?.plan ?? "FREE").toUpperCase() === "FREE" && !(!!data?.trialEndDate && new Date(data.trialEndDate) > new Date()) && (data?.totalMembers ?? 0) >= 5 ? "#F3F4F6" : Colors.bgSub,
                 borderRadius: 20,
                 paddingHorizontal: 12,
                 paddingVertical: 8,
@@ -1118,7 +1144,7 @@ export default function TrainerHomeScreen() {
                 borderColor: Colors.border,
               }}
             >
-              {(data?.plan ?? "FREE").toUpperCase() === "FREE" && (data?.totalMembers ?? 0) >= 5 && (
+              {(data?.plan ?? "FREE").toUpperCase() === "FREE" && !(!!data?.trialEndDate && new Date(data.trialEndDate) > new Date()) && (data?.totalMembers ?? 0) >= 5 && (
                 <Text style={{ fontSize: 12 }}>🔒</Text>
               )}
               <Text style={{ fontSize: 12, color: Colors.textSub, fontWeight: "700" }}>
@@ -2445,7 +2471,7 @@ export default function TrainerHomeScreen() {
               </TouchableOpacity>
             </View>
             <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 24 }}>
-              매달 초기화돼요
+              매달 1일에 자동으로 초기화돼요
             </Text>
 
             {/* 목표 수업 수 */}
@@ -2959,9 +2985,12 @@ export default function TrainerHomeScreen() {
                       padding: 14,
                       fontSize: 15,
                       color: Colors.text,
-                      marginBottom: 14,
+                      marginBottom: 4,
                     }}
                   />
+                  <Text style={{ fontSize: 11, color: Colors.textMuted, marginBottom: 14 }}>
+                    * 회원 연동 시 전화번호가 일치해야 자동 매칭되므로 정확하게 입력해주세요.
+                  </Text>
                 </>
               )}
 
@@ -3779,59 +3808,11 @@ export default function TrainerHomeScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* 온보딩 팝업 */}
-      <Modal visible={onboardingVisible} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", paddingHorizontal: 16 }}>
-          <View style={{ width: "100%", borderRadius: 20, overflow: "hidden", backgroundColor: "#fff" }}>
-            <Image
-              source={OB_IMAGES[onboardingIndex]}
-              style={{ width: "100%", height: Math.min(Dimensions.get("window").width * (1350 / 1080), Dimensions.get("window").height * 0.58) }}
-              resizeMode="cover"
-            />
-            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, gap: 8 }}>
-              <View style={{ flexDirection: "row", gap: 5 }}>
-                {OB_IMAGES.map((_, i) => (
-                  <View key={i} style={{ width: i === onboardingIndex ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: i === onboardingIndex ? Colors.green : "#D1D5DB" }} />
-                ))}
-              </View>
-              <View style={{ flex: 1 }} />
-              {onboardingIndex < OB_IMAGES.length - 1 ? (
-                <>
-                  <TouchableOpacity onPress={() => { AsyncStorage.setItem("onboardingShown", "1"); setOnboardingVisible(false); setOnboardingIndex(0); }} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
-                    <Text style={{ fontSize: 13, color: "#aaa", fontWeight: "600" }}>건너뛰기</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setOnboardingIndex(onboardingIndex + 1)}
-                    style={{ paddingVertical: 9, paddingHorizontal: 22, borderRadius: 20, backgroundColor: Colors.green }}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>다음</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => { AsyncStorage.setItem("onboardingShown", "1"); setOnboardingVisible(false); setOnboardingIndex(0); }}
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: 20, backgroundColor: Colors.green, alignItems: "center" }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>시작하기</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
 
     </>
   );
 }
 
-const OB_IMAGES = [
-  require("../../../assets/images/onboarding1.png"),
-  require("../../../assets/images/onboarding2.png"),
-  require("../../../assets/images/onboarding3.png"),
-  require("../../../assets/images/onboarding4.png"),
-  require("../../../assets/images/onboarding5.png"),
-  require("../../../assets/images/onboarding6.png"),
-];
 
 function SummaryCard({
   value,

@@ -36,6 +36,9 @@ public class ManualBodyLog {
 
     private String memo;
 
+    @Column(name = "inbody_image_url")
+    private String inbodyImageUrl;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,6 +57,8 @@ public class ManualBodyLog {
     public void setMuscleMass(Double muscleMass) { this.muscleMass = muscleMass; }
     public String getMemo() { return memo; }
     public void setMemo(String memo) { this.memo = memo; }
+    public String getInbodyImageUrl() { return inbodyImageUrl; }
+    public void setInbodyImageUrl(String inbodyImageUrl) { this.inbodyImageUrl = inbodyImageUrl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

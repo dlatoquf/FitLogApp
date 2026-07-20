@@ -116,6 +116,7 @@ export default function MemberNotificationsScreen() {
     };
 
     const handleNotificationPress = async (n: Noti) => {
+        console.log("[Notif Press Member]", JSON.stringify({ type: n.type, targetType: n.targetType, targetId: n.targetId, targetDate: n.targetDate }));
         await markOneRead(n.notificationId);
         if (n.type === "WORKOUT_LOG" || n.type === "FEEDBACK" || n.targetType === "WORKOUT_LOG") {
             const date = n.targetDate ?? undefined;

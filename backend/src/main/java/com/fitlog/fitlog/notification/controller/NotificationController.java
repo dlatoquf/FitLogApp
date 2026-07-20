@@ -66,6 +66,9 @@ public class NotificationController {
                     map.put("createdAt", n.getCreatedAt());
                     map.put("targetType", n.getTargetType());
                     map.put("targetId", n.getTargetId());
+                    // DB에 저장된 targetDate/memberId 우선 사용
+                    if (n.getTargetDate() != null) map.put("targetDate", n.getTargetDate());
+                    if (n.getMemberId() != null) map.put("memberId", n.getMemberId());
                     // 날짜·회원 연계 화면 이동을 위한 추가 필드
                     if (n.getTargetId() != null) {
                         if ("DIET_FEEDBACK".equals(n.getTargetType())) {

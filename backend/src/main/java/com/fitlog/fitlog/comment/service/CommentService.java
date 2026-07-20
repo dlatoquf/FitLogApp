@@ -52,7 +52,8 @@ public class CommentService {
 
     public List<CommentResponse> getComments(String targetType, Long targetId, String date, Long trainerId, Long memberId) {
         List<Comment> comments;
-        if ("DIET_DAY".equals(targetType) && date != null && trainerId != null && memberId != null) {
+        if ("DIET_DAY".equals(targetType)) {
+            if (date == null || trainerId == null || memberId == null) return java.util.Collections.emptyList();
             comments = commentRepository.findDietDayComments(targetType, trainerId, memberId, LocalDate.parse(date));
         } else {
             comments = commentRepository.findByTargetTypeAndTargetIdAndDeletedAtIsNullOrderByCreatedAtAsc(targetType, targetId);

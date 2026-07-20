@@ -19,10 +19,12 @@ import { API_URL } from "../../constants/api";
 import { saveFcmToken } from "../../utils/fcm";
 
 // 카카오 로그인 라이브러리가 없는 환경을 위한 조건부 import
-let loginWithKakaoAccount: (() => Promise<any>) | null = null;
+let kakaoLogin: ((opts?: { useKakaoAccountLogin?: boolean }) => Promise<any>) | null = null;
+let isKakaoTalkLoginAvailable: (() => Promise<boolean>) | null = null;
 try {
-  loginWithKakaoAccount =
-    require("@react-native-seoul/kakao-login").loginWithKakaoAccount;
+  const kakaoUser = require("@react-native-kakao/user");
+  kakaoLogin = kakaoUser.login;
+  isKakaoTalkLoginAvailable = kakaoUser.isKakaoTalkLoginAvailable;
 } catch {
   // 라이브러리 없을 경우 무시
 }
@@ -122,7 +124,7 @@ export default function LoginScreen() {
   // 카카오 로그인 버튼 핸들러
   // ─────────────────────────────────────────────
   const handleKakaoLogin = async () => {
-    if (!loginWithKakaoAccount) {
+    if (!kakaoLogin) {
       Alert.alert(
         "개발 모드",
         "카카오 로그인 라이브러리가 없습니다.\n테스트용으로 이동합니다.",
@@ -143,11 +145,21 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // 1. 카카오 SDK 로그인
-      console.log("[카카오] loginWithKakaoAccount 호출 시작");
+      // 1. 카카오 SDK 로그인 (카카오톡 앱 우선, 없으면 웹뷰 fallback)
       let kakaoResult: any;
       try {
-        kakaoResult = await loginWithKakaoAccount();
+        const talkAvailable = isKakaoTalkLoginAvailable
+          ? await isKakaoTalkLoginAvailable()
+          : false;
+        console.log("[카카오] 카카오톡 앱 사용 가능:", talkAvailable);
+
+        if (talkAvailable) {
+          console.log("[카카오] 카카오톡 앱으로 로그인");
+          kakaoResult = await kakaoLogin!();
+        } else {
+          console.log("[카카오] 웹뷰로 로그인");
+          kakaoResult = await kakaoLogin!({ useKakaoAccountLogin: true });
+        }
         console.log("[카카오] SDK 결과:", JSON.stringify(kakaoResult));
       } catch (kakaoErr: any) {
         console.log(

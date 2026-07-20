@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "Body_Logs")
+@Table(name = "body_logs")
 public class BodyLog {
 
     @Id
@@ -33,6 +33,9 @@ public class BodyLog {
 
     private String memo;
 
+    @Column(name = "inbody_image_url")
+    private String inbodyImageUrl;
+
     @Column(name = "log_date", nullable = false)
     private LocalDate logDate;
 
@@ -57,4 +60,6 @@ public class BodyLog {
     public void setMuscleMass(Double muscleMass) { this.muscleMass = muscleMass; }
     public void setMemo(String memo) { this.memo = memo; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getInbodyImageUrl() { return inbodyImageUrl; }
+    public void setInbodyImageUrl(String inbodyImageUrl) { this.inbodyImageUrl = inbodyImageUrl; }
 }

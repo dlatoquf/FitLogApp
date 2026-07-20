@@ -119,7 +119,7 @@ public class ScheduleService {
             if (s.getNote() != null) map.put("note", s.getNote());
 
             if (s.getMember() != null) {
-                map.put("memberName", s.getMember().getUser().getName());
+                map.put("memberName", s.getMember().getCachedName() != null ? s.getMember().getCachedName() : s.getMember().getUser().getName());
                 map.put("memberId", s.getMember().getId());
                 map.put("ptRemaining", s.getMember().getPtRemaining());
                 map.put("ptTotal",     s.getMember().getPtTotal());
@@ -170,7 +170,7 @@ public class ScheduleService {
             map.put("sessionType", s.getSessionType());
             if (s.getNote() != null) map.put("note", s.getNote());
             if (s.getMember() != null) {
-                map.put("memberName",  s.getMember().getUser().getName());
+                map.put("memberName",  s.getMember().getCachedName() != null ? s.getMember().getCachedName() : s.getMember().getUser().getName());
                 map.put("memberId",    s.getMember().getId());
                 map.put("isManual",    false);
                 map.put("ptRemaining", s.getMember().getPtRemaining());
@@ -297,7 +297,7 @@ public class ScheduleService {
                     .orElseThrow(() -> new RuntimeException("회원 없음"));
             schedule.setMember(member);
             schedule.setManualMember(null);
-            schedule.setMemberName(member.getUser().getName());
+            schedule.setMemberName(member.getCachedName() != null ? member.getCachedName() : member.getUser().getName());
             scheduleRepository.save(schedule);
 
             if (member.getNotifSchedule()) {
@@ -340,34 +340,30 @@ public class ScheduleService {
         ManualMember manualMember = schedule.getManualMember();
         boolean wasNoShow = "NO_SHOW".equals(schedule.getStatusStr());
 
-        schedule.setStatus(Schedule.Status.OPEN);
-        schedule.setMember(null);
-        schedule.setManualMember(null);
-        scheduleRepository.save(schedule);
-
-        if (member != null) {
-            // 노쇼 취소 시 PT 복구
-            if (wasNoShow && member.getPtRemaining() != null) {
-                member.setPtRemaining(member.getPtRemaining() + 1);
-                member.setPtEndedAt(null);
-                memberRepository.save(member);
-            }
-            // FCM 알림
-            if (member.getNotifSchedule()) {
-                notificationService.sendNotification(
-                        member.getUser(),
-                        "SCHEDULE_CANCEL",
-                        schedule.getDate() + " " + schedule.getStartTime().toString().substring(0, 5) + " 수업이 취소됐어요.",
-                        "SCHEDULE",
-                        scheduleId
-                );
-            }
+        // 노쇼 취소 시 PT 복구
+        if (member != null && wasNoShow && member.getPtRemaining() != null) {
+            member.setPtRemaining(member.getPtRemaining() + 1);
+            member.setPtEndedAt(null);
+            memberRepository.save(member);
         }
-        // 미연동 회원 노쇼 취소 시 PT 복구
         if (manualMember != null && wasNoShow && manualMember.getPtRemaining() != null) {
             manualMember.setPtRemaining(manualMember.getPtRemaining() + 1);
             manualMember.setPtEndedAt(null);
             manualMemberRepository.save(manualMember);
+        }
+
+        // 슬롯 삭제 (OPEN으로 되돌리지 않음)
+        scheduleRepository.delete(schedule);
+
+        // FCM 알림
+        if (member != null && member.getNotifSchedule()) {
+            notificationService.sendNotification(
+                    member.getUser(),
+                    "SCHEDULE_CANCEL",
+                    schedule.getDate() + " " + schedule.getStartTime().toString().substring(0, 5) + " 수업이 취소됐어요.",
+                    "SCHEDULE",
+                    scheduleId
+            );
         }
     }
 
@@ -420,7 +416,7 @@ public class ScheduleService {
                     Map<String, Object> m = new HashMap<>();
                     m.put("scheduleId", s.getId());
                     m.put("memberId", s.getMember() != null ? s.getMember().getId() : null);
-                    m.put("memberName", s.getMember() != null ? s.getMember().getUser().getName() : "미정");
+                    m.put("memberName", s.getMember() != null ? (s.getMember().getCachedName() != null ? s.getMember().getCachedName() : s.getMember().getUser().getName()) : "미정");
                     m.put("startTime", s.getStartTime());
                     m.put("endTime", s.getEndTime());
                     m.put("status", s.getStatusStr());

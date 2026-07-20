@@ -169,7 +169,11 @@ public class WorkoutLogController {
             );
         }
 
-        return ResponseEntity.ok(Map.of("message", "운동 로그가 저장됐어요.", "workoutId", log.getWorkoutId()));
+        return ResponseEntity.ok(Map.of(
+                "message", "운동 로그가 저장됐어요.",
+                "workoutId", log.getWorkoutId(),
+                "ptRemaining", member.getPtRemaining() != null ? member.getPtRemaining() : -1
+        ));
     }
 
     // ── 트레이너: 미연동 회원 운동 로그 저장 ────────────────────────────────
@@ -185,7 +189,14 @@ public class WorkoutLogController {
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
 
         ManualMember mm = manualMemberRepository.findById(manualMemberId)
-                .orElseThrow(() -> new RuntimeException("미연동 회원을 찾을 수 없습니다."));
+                .orElseGet(() -> {
+                    memberRepository.findByFormerManualMemberId(manualMemberId).ifPresent(linked -> {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.GONE,
+                                "{\"linkedMemberId\":" + linked.getId() + "}");
+                    });
+                    throw new RuntimeException("미연동 회원을 찾을 수 없습니다.");
+                });
 
         WorkoutLog log = new WorkoutLog();
         log.setManualMember(mm);
@@ -267,7 +278,7 @@ public class WorkoutLogController {
         return ResponseEntity.ok(Map.of(
                 "message", "운동 로그가 저장됐어요.",
                 "workoutId", log.getWorkoutId(),
-                // 전화번호 있으면 프론트에서 알림 버튼 표시
+                "ptRemaining", mm.getPtRemaining() != null ? mm.getPtRemaining() : -1,
                 "hasPhone", mm.getPhone() != null && !mm.getPhone().isBlank()
         ));
     }
@@ -391,7 +402,7 @@ public class WorkoutLogController {
 
         Trainer trainer = member.getTrainer();
         if (trainer != null && trainer.getUser() != null && trainer.getNotifPersonalWorkout()) {
-            String memberName = member.getUser() != null ? member.getUser().getName() : "회원";
+            String memberName = member.getCachedName() != null ? member.getCachedName() : (member.getUser() != null ? member.getUser().getName() : "회원");
             String notiContent = memberName + " 회원이 " + log.getLogDate() + " 개인 운동 로그를 등록했어요.";
             notificationService.sendNotification(
                     trainer.getUser(),
@@ -758,7 +769,7 @@ public class WorkoutLogController {
             WorkoutLog log = logs.get(i);
             String memberName = null;
             if (log.getMember() != null && log.getMember().getUser() != null) {
-                memberName = log.getMember().getUser().getName();
+                memberName = log.getMember().getCachedName() != null ? log.getMember().getCachedName() : log.getMember().getUser().getName();
             } else if (log.getMember() != null) {
                 memberName = "회원";
             }

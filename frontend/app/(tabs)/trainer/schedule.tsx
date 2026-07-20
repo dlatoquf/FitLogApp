@@ -225,6 +225,7 @@ export default function TrainerScheduleScreen() {
   const [personalNote, setPersonalNote] = useState("");
   const [ptNote, setPtNote] = useState("");
   const [plan, setPlan] = useState<"FREE" | "PRO">("FREE");
+  const [isInTrial, setIsInTrial] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const paymentPanY = useRef(new Animated.Value(0)).current;
   const [editingNoteSlotId, setEditingNoteSlotId] = useState<number | null>(null);
@@ -510,8 +511,9 @@ export default function TrainerScheduleScreen() {
       if (homeRes.ok) {
         const homeData = await homeRes.json();
         // trialEndDate가 미래면 무료체험 중 → FREE, 과거거나 없으면 plan 값 사용
-        const isInTrial = homeData.trialEndDate && new Date(homeData.trialEndDate) > new Date();
-        if (isInTrial) {
+        const trialActive = homeData.trialEndDate && new Date(homeData.trialEndDate) > new Date();
+        setIsInTrial(!!trialActive);
+        if (trialActive) {
           setPlan("FREE");
         } else {
           const p = (homeData?.effectivePlan ?? homeData?.plan ?? "FREE").toUpperCase();
@@ -527,10 +529,11 @@ export default function TrainerScheduleScreen() {
               ptTotal: m.ptTotal ?? 0,
               connected: m.connected !== false,
               moved: m.moved === true,
+              ptEndedAt: m.ptEndedAt ?? null,
               isManual: false,
             }))
-            // 연결해제·타 트레이너 이동·PT 미등록 제외 (잔여 0은 FREE 계산을 위해 유지)
-            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0)
+            // 연결해제·타 트레이너 이동·PT 미등록·비활성(ptEndedAt 있거나 INACTIVE) 제외
+            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0 && !m.ptEndedAt)
         : [];
       const manual = manualRes.ok
         ? (await manualRes.json())
@@ -540,9 +543,10 @@ export default function TrainerScheduleScreen() {
               ptRemaining: m.ptRemaining ?? 0,
               ptTotal: m.ptTotal ?? 0,
               isManual: true,
+              inactive: m.isActive === false,
             }))
-            // PT 미등록 제외 (잔여 0은 FREE 계산을 위해 유지)
-            .filter((m: any) => m.ptTotal > 0)
+            // PT 미등록·비활성 제외 (잔여 0은 FREE 계산을 위해 유지)
+            .filter((m: any) => m.ptTotal > 0 && !m.inactive)
         : [];
       setMembers([...linked, ...manual].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     } catch (e) {
@@ -2646,7 +2650,7 @@ export default function TrainerScheduleScreen() {
                   />
                 </View>
                 {/* FREE 5명 제한 안내 */}
-                {plan === "FREE" && (
+                {plan === "FREE" && !isInTrial && (
                   <TouchableOpacity onPress={() => { setAddModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
                     <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
@@ -2664,7 +2668,7 @@ export default function TrainerScheduleScreen() {
                         return m.name.includes(memberSearchQuery);
                       });
                     // FREE 플랜: 잔여 적은 순 5명만 unlock (0 포함 전체 기준)
-                    const freeUnlockedIds = plan === "FREE"
+                    const freeUnlockedIds = (plan === "FREE" && !isInTrial)
                       ? new Set([...members].sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0)).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
                       : null;
                     return filtered.map((m: any, idx: number, arr: any[]) => {
@@ -3170,7 +3174,7 @@ export default function TrainerScheduleScreen() {
                   />
                 </View>
                 {/* FREE 5명 제한 안내 */}
-                {plan === "FREE" && (
+                {plan === "FREE" && !isInTrial && (
                   <TouchableOpacity onPress={() => { setManualModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
                     <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
@@ -3190,9 +3194,16 @@ export default function TrainerScheduleScreen() {
                         return m.name.includes(memberSearchQuery);
                       })
                       .sort((a: any, b: any) => a.name.localeCompare(b.name, "ko"));
-                    const freeUnlockedIds = plan === "FREE"
+                    const freeUnlockedIds = (plan === "FREE" && !isInTrial)
                       ? new Set([...members].sort((a: any, b: any) => (a.ptRemaining ?? 0) - (b.ptRemaining ?? 0)).slice(0, 5).map((m: any) => `${m.isManual ? "manual" : "linked"}-${m.id}`))
                       : null;
+                    if (filtered.length === 0) {
+                      return (
+                        <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                          <Text style={{ fontSize: 14, color: Colors.textMuted }}>회원이 없습니다</Text>
+                        </View>
+                      );
+                    }
                     return filtered.map((m: any, idx: number, arr: any[]) => {
                       const key = `${m.isManual ? "manual" : "linked"}-${m.id}`;
                       const locked = freeUnlockedIds !== null && !freeUnlockedIds.has(key);

@@ -86,6 +86,7 @@ public class TrainerPlanController {
         trainerRepository.findByUserId(userId).ifPresent(trainer -> {
             trainer.setPlan(plan);
             trainer.setProExpiresAt(proExpiresAt);
+            if ("PRO".equals(plan)) trainer.setTrialEndDate(null);
             trainerRepository.save(trainer);
             System.out.println("플랜 업데이트: userId=" + userId + " → " + plan + " (만료일: " + proExpiresAt + ")");
         });

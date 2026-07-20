@@ -42,6 +42,7 @@ public class NotificationService {
         notification.setContent(content);
         notification.setTargetType(targetType);
         notification.setTargetId(targetId);
+        if (date != null) notification.setTargetDate(date);
         notificationRepository.save(notification);
 
         if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {

@@ -48,6 +48,14 @@ public class Member {
     // PT 잔여 0회가 된 날짜 — 7일 후 자동 INACTIVE 전환 기준
     private java.time.LocalDate ptEndedAt;
 
+    // 연동 전 미연동 회원 ID (연동 시 저장 — 트레이너가 구 ID로 요청 시 리다이렉트용)
+    @Column(name = "former_manual_member_id")
+    private Long formerManualMemberId;
+
+    // 연동 시점에 저장한 이름 (user 탈퇴 후 개인정보 삭제돼도 트레이너 화면에 이름 표시용)
+    @Column(name = "cached_name")
+    private String cachedName;
+
     @Column(name = "notif_feedback")
     private Boolean notifFeedback = true;
 
@@ -106,6 +114,10 @@ public class Member {
     public void setPreviousTrainerId(Long previousTrainerId) { this.previousTrainerId = previousTrainerId; }
     public java.time.LocalDate getPtEndedAt() { return ptEndedAt; }
     public void setPtEndedAt(java.time.LocalDate ptEndedAt) { this.ptEndedAt = ptEndedAt; }
+    public Long getFormerManualMemberId() { return formerManualMemberId; }
+    public void setFormerManualMemberId(Long formerManualMemberId) { this.formerManualMemberId = formerManualMemberId; }
+    public String getCachedName() { return cachedName; }
+    public void setCachedName(String cachedName) { this.cachedName = cachedName; }
 
     public Boolean getNotifFeedback() { return notifFeedback == null || notifFeedback; }
     public Boolean getNotifSchedule() { return notifSchedule == null || notifSchedule; }

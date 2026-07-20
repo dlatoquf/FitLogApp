@@ -1,0 +1,73 @@
+카테고리,단계 / 트리거,처리 방식,DB 변경 (테이블.컬럼),관련 데이터 처리
+[연동 회원] members 테이블,,,,
+,PT 수업 완료 (수동 - 트레이너),수업 완료 시 pt_remaining -1 / 0이 되면 pt_ended_at = today,"members.pt_remaining 감소
+members.pt_ended_at = today (0 될 때)","schedules.status = COMPLETED
+모든 기록 보존"
+,노쇼 처리 (수동 - 트레이너),노쇼 처리 시 pt_remaining -1,"members.pt_remaining 감소
+members.pt_ended_at = today (0 될 때)","schedules.status = NO_SHOW
+모든 기록 보존"
+,PT 만료 7일 후 비활성화 (자동 - 03:30 PtExpiredScheduler),"pt_ended_at ≤ (today - 7일) 조건 조회
+PtExpiredScheduler","members.status = INACTIVE
+members.disconnected_at = today","모든 데이터 그대로 보존
+트레이너 화면에 'PT 종료' 목록 노출"
+,트레이너가 직접 연결 해제 (수동 - 트레이너),POST /api/trainer/members/{id}/disconnect,"members.status = INACTIVE
+members.disconnected_at = today
+(trainer_id는 유지)","schedules: 미래 일정 삭제 / 완료된 것은 member 참조 해제
+PT계약 / 운동로그 보존"
+,트레이너가 즉시 비활성화 (수동 - 트레이너),POST /api/trainer/members/{id}/deactivate-now,"members.status = INACTIVE
+members.pt_ended_at = today - 7일 (스케줄러가 바로 대상에 포함되도록)","데이터 보존"
+,트레이너가 복귀 처리 (수동 - 트레이너),"POST /api/trainer/members/{id}/reactivate
+INACTIVE 상태일 때만 가능","members.status = ACTIVE
+members.disconnected_at = null
+members.pt_ended_at = null","데이터 그대로 복구"
+,"INACTIVE 90일 후 자유 회원 전환 ★변경됨 (자동 - 04:00 InactiveMemberCleanupScheduler)","disconnected_at ≤ (today - 90일) 조건
+InactiveMemberCleanupScheduler","members.trainer_id = null
+members.status = ACTIVE
+members.disconnected_at = null
+members.pt_remaining = 0
+members.pt_total = 0
+members.pt_ended_at = null","운동로그 보존 / 바디로그 보존 / 식단 보존
+회원이 앱에서 모든 기록 그대로 열람 가능
+새 트레이너와 재연동 가능
+★기존: 전부 삭제 → 변경: 데이터 보존"
+,트레이너 이동 (수동 - 회원),새 트레이너 코드 입력,"members.trainer_id = 새 트레이너
+members.previous_trainer_id = 기존 트레이너
+members.disconnected_at = today","이동 후 90일: previous_trainer_id = null (참조만 해제)"
+,,,,
+[미연동 회원] manual_members 테이블,,,,
+,PT 만료 7일 후 비활성화 (자동 - 03:30 PtExpiredScheduler),"pt_ended_at ≤ (today - 7일) 조건
+PtExpiredScheduler",manual_members.is_active = false,"모든 데이터 보존
+트레이너 화면에 'PT 종료' 목록 노출"
+,트레이너가 직접 비활성화 (수동 - 트레이너),POST /api/trainer/manual-members/{id}/deactivate,"manual_members.is_active = false
+manual_members.pt_ended_at = today","데이터 보존"
+,"is_active=false + 90일 후 완전 삭제 (자동 - 04:30 ManualMemberCleanupScheduler)","pt_ended_at ≤ (today - 90일) AND is_active=false 조건
+ManualMemberCleanupScheduler",manual_members 행 자체 삭제,"pt_contracts: 이름 보존 후 manual_member = null (기록 유지)
+schedules: 이름 보존 후 참조 해제 (기록 유지)
+workout_logs: 삭제
+member_memos: 삭제
+manual_body_logs: 삭제"
+,연동 완료 (수동 - 회원),"회원 앱에서 트레이너 코드 입력
+전화번호(1순위) 또는 이름(2순위)으로 manual_member 매칭",별도 DB 변경 없음 (linked member로 전환),"매칭된 manual_member의 pt_remaining / pt_total을 linked member에 복사"
+,,,,
+[회원 탈퇴] users + members 테이블,,,,
+,탈퇴 즉시 (수동 - 회원),"MemberDeleteService.deleteMemberAccount()
+미래 수업 신청 취소 / 슬롯 복구","members.status = INACTIVE
+members.disconnected_at = today
+users.deleted_at = now","운동 / 식단 / 바디로그 전부 보존"
+,탈퇴 30일 후 개인정보 삭제 (자동 - 03:00 DeletedMemberCleanupScheduler),"MemberDeleteService.hardDeleteMember()
+users.deleted_at ≤ (now - 30일) 조건","users.kakao_id = null
+users.email = 'deleted_{id}@fitlog.deleted'
+users.fcm_token = null
+members.cached_name에 이름 백업","운동로그 / PT계약 / 스케줄 기록 트레이너가 계속 조회 가능"
+,,,,
+[트레이너 탈퇴] 즉시 처리,,,,
+,연동 회원 연결 해제,TrainerDeleteService.deleteTrainerAccount(),members.trainer_id = null,"회원 계정 / 데이터 유지"
+,스케줄 전체 삭제,TrainerDeleteService.deleteTrainerAccount(),"schedules 전체 삭제
+schedule_requests 전체 삭제",삭제
+,PT 계약 기록 보존,TrainerDeleteService.deleteTrainerAccount(),pt_contracts.trainer_id = null (기록 유지),보존
+,운동 로그 보존,TrainerDeleteService.deleteTrainerAccount(),workout_logs.trainer_id = null (기록 유지),보존
+,식단 피드백 삭제,TrainerDeleteService.deleteTrainerAccount(),"diet_photo_feedbacks 삭제
+diet_day_feedbacks 삭제",삭제
+,알림 삭제,TrainerDeleteService.deleteTrainerAccount(),notifications 전체 삭제,삭제
+,트레이너 / 유저 계정 삭제,TrainerDeleteService.deleteTrainerAccount(),"trainers 행 삭제
+users 행 삭제",삭제

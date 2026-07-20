@@ -69,7 +69,10 @@ public class DietPhotoController {
         List<DietPhoto> photos = dietPhotoRepository.findByMemberAndDateOrderBySortOrderAscCreatedAtAsc(member, localDate);
         Optional<DietDayFeedback> feedback = dayFeedbackRepository.findByMemberAndDate(member, localDate);
 
-        return ResponseEntity.ok(buildDayResponse(photos, feedback.orElse(null)));
+        Map<String, Object> response = buildDayResponse(photos, feedback.orElse(null));
+        response.put("memberId", member.getId());
+        if (member.getTrainer() != null) response.put("trainerId", member.getTrainer().getId());
+        return ResponseEntity.ok(response);
     }
 
     // ── 트레이너: 회원 날짜별 사진 조회 ────────────────────────────────────────
@@ -121,7 +124,7 @@ public class DietPhotoController {
                     notificationService.sendNotification(
                         trainer.getUser(),
                         "DIET_PHOTO",
-                        member.getUser().getName() + "님이 " + saved.getDate() + " 식단 로그를 등록했어요.",
+                        (member.getCachedName() != null ? member.getCachedName() : member.getUser().getName()) + "님이 " + saved.getDate() + " 식단 로그를 등록했어요.",
                         "MEMBER",
                         member.getId()
                     );

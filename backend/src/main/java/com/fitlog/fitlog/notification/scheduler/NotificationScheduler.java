@@ -187,7 +187,7 @@ public class NotificationScheduler {
     }
 
     // ─────────────────────────────────────────────────────────
-    // 5. 매일 오전 9시(KST) – 무료 체험 D-3 / D-1 알림
+    // 5. 매일 오전 9시(KST) – 무료 체험 D-3 / D-1 알림 (비활성화)
     // ─────────────────────────────────────────────────────────
     @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
     public void sendTrialExpiryWarning() {

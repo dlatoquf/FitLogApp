@@ -71,8 +71,9 @@ public class MissionService {
         // 트레이너 알림 발송 (설정이 켜진 경우)
         Trainer trainer = mission.getTrainer();
         if (trainer != null && trainer.getNotifMissionDone() && trainer.getUser() != null) {
-            String memberName = mission.getMember().getUser() != null
-                    ? mission.getMember().getUser().getName() : "회원";
+            String memberName = mission.getMember().getCachedName() != null
+                    ? mission.getMember().getCachedName()
+                    : (mission.getMember().getUser() != null ? mission.getMember().getUser().getName() : "회원");
             notificationService.sendNotification(
                     trainer.getUser(),
                     "MISSION_DONE",

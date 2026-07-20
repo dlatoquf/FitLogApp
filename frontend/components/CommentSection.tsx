@@ -55,9 +55,11 @@ export default function CommentSection({ targetType, targetId, date, trainerId, 
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
+    setComments([]);
+    setLoading(true);
     loadMyUserId();
     fetchComments();
-  }, [targetType, targetId]);
+  }, [targetType, targetId, date]);
 
 
   const loadMyUserId = async () => {

@@ -2,12 +2,22 @@ package com.fitlog.fitlog.admin;
 
 import com.fitlog.fitlog.auth.entity.User;
 import com.fitlog.fitlog.auth.repository.UserRepository;
+import com.fitlog.fitlog.bodylog.entity.BodyLog;
+import com.fitlog.fitlog.bodylog.repository.BodyLogRepository;
+import com.fitlog.fitlog.comment.entity.Comment;
+import com.fitlog.fitlog.comment.repository.CommentRepository;
+import com.fitlog.fitlog.diet.entity.DietPhoto;
+import com.fitlog.fitlog.diet.repository.DietPhotoRepository;
 import com.fitlog.fitlog.member.entity.Member;
 import com.fitlog.fitlog.member.entity.PtContract;
 import com.fitlog.fitlog.member.repository.MemberRepository;
 import com.fitlog.fitlog.member.repository.PtContractRepository;
+import com.fitlog.fitlog.schedule.entity.Schedule;
+import com.fitlog.fitlog.schedule.repository.ScheduleRepository;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
+import com.fitlog.fitlog.workout.entity.WorkoutLog;
+import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -24,15 +34,30 @@ public class AdminController {
     private final TrainerRepository trainerRepository;
     private final MemberRepository memberRepository;
     private final PtContractRepository ptContractRepository;
+    private final WorkoutLogRepository workoutLogRepository;
+    private final DietPhotoRepository dietPhotoRepository;
+    private final BodyLogRepository bodyLogRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final CommentRepository commentRepository;
 
     public AdminController(UserRepository userRepository,
                            TrainerRepository trainerRepository,
                            MemberRepository memberRepository,
-                           PtContractRepository ptContractRepository) {
+                           PtContractRepository ptContractRepository,
+                           WorkoutLogRepository workoutLogRepository,
+                           DietPhotoRepository dietPhotoRepository,
+                           BodyLogRepository bodyLogRepository,
+                           ScheduleRepository scheduleRepository,
+                           CommentRepository commentRepository) {
         this.userRepository = userRepository;
         this.trainerRepository = trainerRepository;
         this.memberRepository = memberRepository;
         this.ptContractRepository = ptContractRepository;
+        this.workoutLogRepository = workoutLogRepository;
+        this.dietPhotoRepository = dietPhotoRepository;
+        this.bodyLogRepository = bodyLogRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.commentRepository = commentRepository;
     }
 
     private boolean auth(String pw) {
@@ -127,6 +152,125 @@ public class AdminController {
                     ? c.getPaymentDate().toString()
                     : (c.getCreatedAt() != null ? c.getCreatedAt().toLocalDate().toString() : "-"));
             item.put("status", c.getStatus());
+            result.add(item);
+        }
+        result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/workout-logs")
+    public ResponseEntity<?> getWorkoutLogs(@RequestParam String pw) {
+        if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
+        List<WorkoutLog> logs = workoutLogRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (WorkoutLog w : logs) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", w.getWorkoutId());
+            item.put("memberName", w.getMember() != null && w.getMember().getUser() != null
+                    ? w.getMember().getUser().getName()
+                    : (w.getManualMember() != null ? w.getManualMember().getName() : "-"));
+            item.put("trainerName", w.getTrainer() != null && w.getTrainer().getUser() != null
+                    ? w.getTrainer().getUser().getName() : "-");
+            item.put("logDate", w.getLogDate() != null ? w.getLogDate().toString() : "-");
+            item.put("workoutType", w.getWorkoutType());
+            item.put("conditionScore", w.getConditionScore());
+            item.put("memo", w.getMemo());
+            item.put("createdAt", w.getCreatedAt() != null ? w.getCreatedAt().toLocalDate().toString() : "-");
+            result.add(item);
+        }
+        result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/diet-photos")
+    public ResponseEntity<?> getDietPhotos(@RequestParam String pw) {
+        if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
+        List<DietPhoto> photos = dietPhotoRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (DietPhoto d : photos) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", d.getId());
+            item.put("memberName", d.getMember() != null && d.getMember().getUser() != null
+                    ? d.getMember().getUser().getName() : "-");
+            item.put("date", d.getDate() != null ? d.getDate().toString() : "-");
+            item.put("label", d.getLabel());
+            item.put("photoUrl", d.getPhotoUrl());
+            result.add(item);
+        }
+        result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/body-logs")
+    public ResponseEntity<?> getBodyLogs(@RequestParam String pw) {
+        if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
+        List<BodyLog> logs = bodyLogRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (BodyLog b : logs) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", b.getId());
+            item.put("memberName", b.getMember() != null && b.getMember().getUser() != null
+                    ? b.getMember().getUser().getName() : "-");
+            item.put("logDate", b.getLogDate() != null ? b.getLogDate().toString() : "-");
+            item.put("weight", b.getWeight());
+            item.put("bodyFat", b.getBodyFat());
+            item.put("muscleMass", b.getMuscleMass());
+            item.put("memo", b.getMemo());
+            item.put("createdAt", b.getCreatedAt() != null ? b.getCreatedAt().toLocalDate().toString() : "-");
+            result.add(item);
+        }
+        result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/schedules")
+    public ResponseEntity<?> getSchedules(@RequestParam String pw) {
+        if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
+        List<Schedule> schedules = scheduleRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Schedule s : schedules) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", s.getId());
+            item.put("trainerName", s.getTrainer() != null && s.getTrainer().getUser() != null
+                    ? s.getTrainer().getUser().getName() : "-");
+            String mName = s.getMember() != null && s.getMember().getUser() != null
+                    ? s.getMember().getUser().getName()
+                    : (s.getManualMember() != null ? s.getManualMember().getName()
+                    : (s.getMemberName() != null ? s.getMemberName() : "-"));
+            item.put("memberName", mName);
+            item.put("date", s.getDate() != null ? s.getDate().toString() : "-");
+            item.put("startTime", s.getStartTime() != null ? s.getStartTime().toString() : "-");
+            item.put("endTime", s.getEndTime() != null ? s.getEndTime().toString() : "-");
+            item.put("status", s.getStatus());
+            item.put("sessionType", s.getSessionType());
+            item.put("note", s.getNote());
+            result.add(item);
+        }
+        result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional(readOnly = true)
+    @GetMapping("/comments")
+    public ResponseEntity<?> getComments(@RequestParam String pw) {
+        if (!auth(pw)) return ResponseEntity.status(401).body(Map.of("error", "인증 실패"));
+        List<Comment> comments = commentRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Comment c : comments) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", c.getId());
+            item.put("authorName", c.getAuthor() != null ? c.getAuthor().getName() : "-");
+            item.put("authorRole", c.getAuthorRole());
+            item.put("targetType", c.getTargetType());
+            item.put("targetId", c.getTargetId());
+            item.put("targetDate", c.getTargetDate() != null ? c.getTargetDate().toString() : "-");
+            item.put("content", c.getContent());
+            item.put("createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toLocalDate().toString() : "-");
+            item.put("deleted", c.getDeletedAt() != null);
             result.add(item);
         }
         result.sort(Comparator.comparingLong(m -> -((Long) m.get("id"))));

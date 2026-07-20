@@ -106,6 +106,7 @@ public class ManualMemberController {
     }
 
     // 미연동 회원 추가 (신규 등록 시 결제정보 있으면 PtContract도 생성)
+    @org.springframework.transaction.annotation.Transactional
     @PostMapping
     public ResponseEntity<ManualMember> create(
             @RequestHeader("Authorization") String authorization,
@@ -463,6 +464,22 @@ public class ManualMemberController {
         m.setName(newName.trim());
         manualMemberRepository.save(m);
         return ResponseEntity.ok(Map.of("message", "이름이 수정됐어요.", "name", m.getName()));
+    }
+
+    @PatchMapping("/{id}/phone")
+    public ResponseEntity<Map<String, Object>> updatePhone(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Trainer trainer = getTrainerFromAuth(authorization);
+        ManualMember m = manualMemberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다."));
+        if (!m.getTrainer().getId().equals(trainer.getId()))
+            return ResponseEntity.status(403).body(Map.of("message", "접근 권한이 없습니다."));
+        String phone = body.get("phone");
+        m.setPhone(phone != null && !phone.isBlank() ? formatPhone(phone.trim()) : null);
+        manualMemberRepository.save(m);
+        return ResponseEntity.ok(Map.of("message", "전화번호가 수정됐어요."));
     }
 
     private Trainer getTrainerFromAuth(String authorization) {

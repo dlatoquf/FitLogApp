@@ -13,12 +13,9 @@ import java.util.List;
 public class InactiveMemberCleanupScheduler {
 
     private final MemberRepository memberRepository;
-    private final MemberDataCleanupService memberDataCleanupService;
 
-    public InactiveMemberCleanupScheduler(MemberRepository memberRepository,
-                                          MemberDataCleanupService memberDataCleanupService) {
+    public InactiveMemberCleanupScheduler(MemberRepository memberRepository) {
         this.memberRepository = memberRepository;
-        this.memberDataCleanupService = memberDataCleanupService;
     }
 
     // 매일 새벽 4시 — 비활성화(INACTIVE) 후 90일 경과 회원 데이터 정리
@@ -27,14 +24,17 @@ public class InactiveMemberCleanupScheduler {
     public void cleanupInactiveMembers() {
         LocalDate cutoff = LocalDate.now().minusDays(90);
 
-        // 1. 비활성화 90일 경과 → 데이터 정리 후 트레이너 목록에서 완전히 제거
+        // 1. 비활성화 90일 경과 → 트레이너 연결만 해제 (데이터 보존)
         List<Member> inactiveExpired = memberRepository.findInactiveMembersToCleanup(cutoff);
         for (Member member : inactiveExpired) {
-            memberDataCleanupService.cleanupMemberData(member);
             member.setTrainer(null);
             member.setDisconnectedAt(null);
+            member.setStatus(Member.Status.ACTIVE);
+            member.setPtRemaining(0);
+            member.setPtTotal(0);
+            member.setPtEndedAt(null);
             memberRepository.save(member);
-            System.out.println("비활성화 90일 경과 정리: 회원ID=" + member.getId());
+            System.out.println("비활성화 90일 경과 트레이너 연결 해제: 회원ID=" + member.getId());
         }
 
         // 2. 트레이너 이동 회원 90일 경과 → 이전 트레이너 참조 해제

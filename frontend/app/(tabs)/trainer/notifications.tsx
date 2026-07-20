@@ -52,7 +52,7 @@ const TABS: { key: TabKey; label: string }[] = [
 const TAB_TYPES: Record<TabKey, string[]> = {
     전체:        [],
     수업:        ["SCHEDULE_REQUEST", "INCOMPLETE_SESSION", "SCHEDULE_COMPLETE"],
-    "기록/피드백": ["WORKOUT_LOG", "MISSION_DONE", "DIET_PHOTO"],
+    "기록/피드백": ["WORKOUT_LOG", "MISSION_DONE", "DIET_PHOTO", "DIET_FEEDBACK"],
     "회원/공지":  ["NEW_MEMBER", "MEMBER_DELETED", "MEMBER_DISCONNECT", "BIRTHDAY_TODAY", "BIRTHDAY_WEEK", "GENERAL"],
 };
 
@@ -118,13 +118,20 @@ export default function TrainerNotificationsScreen() {
     };
 
     const handleNotificationPress = async (n: Noti) => {
+        console.log("[Notif Press Trainer]", JSON.stringify({ type: n.type, targetType: n.targetType, targetId: n.targetId, memberId: n.memberId, targetDate: n.targetDate }));
         await markOneRead(n.notificationId);
         if (n.type === "NEW_MEMBER" || n.type === "MEMBER_DELETED" || n.type === "MEMBER_DISCONNECT") {
             router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any); return;
         }
-        if (n.type === "DIET_PHOTO") {
+        if (n.type === "DIET_PHOTO" || n.type === "DIET_FEEDBACK") {
+            const id = n.memberId ?? n.targetId;
             const dateParam = n.targetDate ? `&date=${n.targetDate}` : "";
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&initialTab=1${dateParam}` as any); return;
+            if (id) {
+                router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=1${dateParam}` as any);
+            } else {
+                router.push("/(tabs)/trainer/members" as any);
+            }
+            return;
         }
         if (n.type === "WORKOUT_LOG") {
             const id = n.memberId ?? n.targetId;

@@ -23,15 +23,22 @@ public class MemberResponse {
     private String disconnectedAt;   // 연결 해제일 (이전 트레이너 기록 열람 기준일)
     private String ptEndedAt;        // PT 잔여 0회가 된 날짜 (7일 유예 기준)
     private String latestMemo;
+    private boolean deleted;  // 탈퇴 회원 여부
 
     public MemberResponse(Member member) {
         this.id = member.getId();
 
         if (member.getUser() != null) {
+            String userName = member.getUser().getName();
+            String displayName = member.getCachedName() != null
+                    ? member.getCachedName()
+                    : ((userName != null && !userName.equals("탈퇴한 회원")) ? userName : null);
             this.user = new UserInfo(
                     member.getUser().getId(),
-                    member.getUser().getName()
+                    displayName
             );
+        } else if (member.getCachedName() != null) {
+            this.user = new UserInfo(null, member.getCachedName());
         }
 
         this.ptRemaining = member.getPtRemaining();
@@ -54,6 +61,7 @@ public class MemberResponse {
                 ? member.getDisconnectedAt().toString() : null;
         this.ptEndedAt = member.getPtEndedAt() != null
                 ? member.getPtEndedAt().toString() : null;
+        this.deleted = member.getUser() != null && member.getUser().getDeletedAt() != null;
     }
 
     public Long getId() { return id; }
@@ -75,6 +83,7 @@ public class MemberResponse {
     public String getPtEndedAt() { return ptEndedAt; }
     public String getLatestMemo() { return latestMemo; }
     public void setLatestMemo(String latestMemo) { this.latestMemo = latestMemo; }
+    public boolean isDeleted() { return deleted; }
 
     public static class UserInfo {
         private Long id;

@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CommentSection from "../../../components/CommentSection";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { ResizeMode, Video } from "expo-av";
@@ -21,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Colors } from "../../../constants/Colors";
 import { ANALYTICS_URL, API_URL } from "../../../constants/api";
 
@@ -184,6 +186,7 @@ export default function WorkoutScreen() {
   const [historyAllLogs, setHistoryAllLogs] = useState<any[]>([]);
   // 클로저 문제 방지용 ref
   const historyAllLogsRef = useRef<any[]>([]);
+  const mainScrollRef = useRef<ScrollView>(null);
   // 최근 운동일 목록 (날짜별 탭 빠른 선택용)
   const [historyRecentDates, setHistoryRecentDates] = useState<string[]>([]);
 
@@ -1170,7 +1173,8 @@ export default function WorkoutScreen() {
 
   return (
     <>
-      <ScrollView
+      <KeyboardAwareScrollView
+        ref={mainScrollRef}
         style={{ flex: 1, backgroundColor: "#fff" }}
         contentContainerStyle={{
           padding: 20,
@@ -1468,9 +1472,14 @@ export default function WorkoutScreen() {
               </Text>
             </View>
 
-            {dayPt.map((log) =>
-              renderWorkoutCard(log, Colors.green, "PT 수업 완료"),
-            )}
+            {dayPt.map((log) => (
+              <View key={`pt-wrap-${log.workoutId}`}>
+                {renderWorkoutCard(log, Colors.green, "PT 수업 완료")}
+                {trainerPlan && log.workoutId && (
+                  <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
+                )}
+              </View>
+            ))}
           </View>
         )}
 
@@ -1500,16 +1509,21 @@ export default function WorkoutScreen() {
               </Text>
             </View>
 
-            {dayFitLogs.map((log) =>
-              renderWorkoutCard(
-                log,
-                Colors.blue,
-                "개인 운동 완료",
-                selectedDate === toDateKey(new Date())
-                  ? () => startEditPersonalLog(log)
-                  : undefined,
-              ),
-            )}
+            {dayFitLogs.map((log) => (
+              <View key={`fit-wrap-${log.workoutId}`}>
+                {renderWorkoutCard(
+                  log,
+                  Colors.blue,
+                  "개인 운동 완료",
+                  selectedDate === toDateKey(new Date())
+                    ? () => startEditPersonalLog(log)
+                    : undefined,
+                )}
+                {trainerPlan && log.workoutId && (
+                  <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
+                )}
+              </View>
+            ))}
           </View>
         )}
 
@@ -1532,7 +1546,7 @@ export default function WorkoutScreen() {
             )}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* 개인운동 입력폼 모달 (Bottom Sheet) */}
       <Modal
@@ -2552,13 +2566,18 @@ export default function WorkoutScreen() {
                       ? true
                       : log.workoutType === historyDateFilter,
                   )
-                  .map((log) =>
-                    renderWorkoutCard(
-                      log,
-                      log.workoutType === "PT" ? Colors.green : Colors.blue,
-                      log.workoutType === "PT" ? "PT 수업 완료" : "개인 운동",
-                    ),
-                  )}
+                  .map((log) => (
+                    <View key={`hist-wrap-${log.workoutId}`}>
+                      {renderWorkoutCard(
+                        log,
+                        log.workoutType === "PT" ? Colors.green : Colors.blue,
+                        log.workoutType === "PT" ? "PT 수업 완료" : "개인 운동",
+                      )}
+                      {trainerPlan && log.workoutId && log.workoutType === "PT" && (
+                        <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
+                      )}
+                    </View>
+                  ))}
 
                 {/* 필터 적용 후 결과 없을 때 */}
                 {!historyDateLoading &&

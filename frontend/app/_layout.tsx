@@ -52,16 +52,25 @@ async function initFCM() {
 }
 
 function navigateByType(type: string, date?: string, targetId?: string) {
+  console.log("[Notif] navigateByType:", { type, date, targetId });
   try {
     AsyncStorage.getItem("role").then((role) => {
       const isTrainer = role === "TRAINER";
       if (type === "SCHEDULE_CONFIRM" || type === "SCHEDULE_CANCEL" || type === "PT_ADD" || type === "PT_EXPIRY") {
         router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/home");
       } else if (type === "DIET_FEEDBACK") {
-        router.push(date
-          ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any)
-          : "/(tabs)/member/diet"
-        );
+        if (isTrainer) {
+          if (targetId) {
+            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
+          } else {
+            router.push("/(tabs)/trainer/members" as any);
+          }
+        } else {
+          router.push(date
+            ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any)
+            : "/(tabs)/member/diet"
+          );
+        }
       } else if (type === "DIET_PHOTO") {
         if (targetId) {
           router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
@@ -251,8 +260,9 @@ export default function RootLayout() {
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
       const targetId = remoteMessage.data?.targetId as string | undefined;
+      console.log("[Notif Background]", JSON.stringify({ type, date, targetId }));
       markAllNotificationsRead();
-      if (type) navigateByType(type, date, targetId);
+      if (type) setInitialNotif({ type, date, targetId });
     });
 
     messaging().getInitialNotification().then((remoteMessage) => {
@@ -260,6 +270,7 @@ export default function RootLayout() {
       const type = remoteMessage.data?.type as string | undefined;
       const date = remoteMessage.data?.date as string | undefined;
       const targetId = remoteMessage.data?.targetId as string | undefined;
+      console.log("[Notif InitialNotification]", JSON.stringify({ type, date, targetId }));
       markAllNotificationsRead();
       if (type) setInitialNotif({ type, date, targetId });
     });

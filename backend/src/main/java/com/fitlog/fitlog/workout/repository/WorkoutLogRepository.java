@@ -45,6 +45,10 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     @Query("SELECT w FROM WorkoutLog w LEFT JOIN FETCH w.sets WHERE w.trainer = :trainer ORDER BY w.logDate ASC")
     List<WorkoutLog> findAllByTrainer(@Param("trainer") com.fitlog.fitlog.trainer.entity.Trainer trainer);
 
+    // 댓글 알림용 — member.user, trainer.user까지 한 번에 fetch
+    @Query("SELECT w FROM WorkoutLog w LEFT JOIN FETCH w.member m LEFT JOIN FETCH m.user LEFT JOIN FETCH w.trainer t LEFT JOIN FETCH t.user WHERE w.workoutId = :id")
+    java.util.Optional<WorkoutLog> findByIdWithUsers(@Param("id") Long id);
+
     // OT→PT 전환 시 세션 수 카운트
     long countByManualMember(ManualMember mm);
 

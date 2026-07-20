@@ -96,6 +96,7 @@ export default function TrainerMembersScreen() {
   const [adding, setAdding] = useState(false);
   const [editNameTarget, setEditNameTarget] = useState<DisplayMember | null>(null);
   const [editNameInput, setEditNameInput] = useState("");
+  const [editPhoneInput, setEditPhoneInput] = useState("");
   const [editNameLoading, setEditNameLoading] = useState(false);
 
   const getTodayStr = () => {
@@ -264,26 +265,39 @@ export default function TrainerMembersScreen() {
     setEditNameLoading(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
-      const url = editNameTarget.isLinked
+      const nameUrl = editNameTarget.isLinked
         ? `${API_URL}/api/trainer/members/${editNameTarget.id}/name`
         : `${API_URL}/api/trainer/manual-members/${editNameTarget.id}/name`;
-      const res = await fetch(url, {
-        method: editNameTarget.isLinked ? "PATCH" : "PATCH",
+      const nameRes = await fetch(nameUrl, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ name: editNameInput.trim() }),
       });
-      if (res.ok) {
-        setAllMembers((prev) =>
-          prev.map((m) => m.key === editNameTarget.key ? { ...m, name: editNameInput.trim() } : m)
-        );
-        setEditNameTarget(null);
-        setEditNameInput("");
-      } else {
-        const data = await res.json().catch(() => ({}));
+      if (!nameRes.ok) {
+        const data = await nameRes.json().catch(() => ({}));
         Alert.alert("오류", data.message ?? "이름 수정에 실패했어요.");
+        return;
       }
+
+      // 미연동 회원은 전화번호도 수정
+      if (!editNameTarget.isLinked && editPhoneInput.trim()) {
+        await fetch(`${API_URL}/api/trainer/manual-members/${editNameTarget.id}/phone`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify({ phone: editPhoneInput.trim() }),
+        });
+      }
+
+      setAllMembers((prev) =>
+        prev.map((m) => m.key === editNameTarget.key
+          ? { ...m, name: editNameInput.trim(), phone: editPhoneInput.trim() || m.phone }
+          : m)
+      );
+      setEditNameTarget(null);
+      setEditNameInput("");
+      setEditPhoneInput("");
     } catch {
-      Alert.alert("오류", "이름 수정에 실패했어요.");
+      Alert.alert("오류", "회원정보 수정에 실패했어요.");
     } finally {
       setEditNameLoading(false);
     }
@@ -878,6 +892,7 @@ export default function TrainerMembersScreen() {
                             if (locked) return;
                             setEditNameTarget(m);
                             setEditNameInput(m.name);
+                            setEditPhoneInput(m.phone ?? "");
                           }}
                           activeOpacity={1}
                         >
@@ -2225,6 +2240,9 @@ export default function TrainerMembersScreen() {
                 maxLength={13}
                 style={inputStyle}
               />
+              <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4, marginBottom: 2 }}>
+                * 회원 연동 시 전화번호가 일치해야 자동 매칭되므로 정확하게 입력해주세요.
+              </Text>
 
               {/* 구분선 */}
               <View
@@ -2359,25 +2377,26 @@ export default function TrainerMembersScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── 이름 수정 모달 ──────────────────────────────────────────── */}
+      {/* ── 회원정보 수정 모달 ──────────────────────────────────────────── */}
       <Modal
         visible={!!editNameTarget}
         transparent
         animationType="fade"
-        onRequestClose={() => { setEditNameTarget(null); setEditNameInput(""); }}
+        onRequestClose={() => { setEditNameTarget(null); setEditNameInput(""); setEditPhoneInput(""); }}
       >
         <TouchableOpacity
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" }}
           activeOpacity={1}
-          onPress={() => { setEditNameTarget(null); setEditNameInput(""); }}
+          onPress={() => { setEditNameTarget(null); setEditNameInput(""); setEditPhoneInput(""); }}
         >
           <TouchableOpacity activeOpacity={1} style={{ width: "85%", backgroundColor: "#fff", borderRadius: 16, padding: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>이름 수정</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 4 }}>회원정보 수정</Text>
             <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 16 }}>{editNameTarget?.name}</Text>
+            <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 6 }}>이름</Text>
             <TextInput
               value={editNameInput}
               onChangeText={setEditNameInput}
-              placeholder="새 이름 입력"
+              placeholder="이름"
               placeholderTextColor={Colors.textMuted}
               style={{
                 backgroundColor: Colors.bgSub,
@@ -2387,13 +2406,43 @@ export default function TrainerMembersScreen() {
                 padding: 12,
                 fontSize: 15,
                 color: Colors.text,
-                marginBottom: 16,
+                marginBottom: 12,
               }}
               autoFocus
             />
+            {!editNameTarget?.isLinked && (
+              <>
+                <Text style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 6 }}>전화번호</Text>
+                <TextInput
+                  value={editPhoneInput}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/[^0-9]/g, "");
+                    let formatted = digits;
+                    if (digits.length >= 8) formatted = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+                    else if (digits.length >= 4) formatted = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                    setEditPhoneInput(formatted);
+                  }}
+                  placeholder="010-0000-0000"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="phone-pad"
+                  maxLength={13}
+                  style={{
+                    backgroundColor: Colors.bgSub,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    padding: 12,
+                    fontSize: 15,
+                    color: Colors.text,
+                    marginBottom: 16,
+                  }}
+                />
+              </>
+            )}
+            {!!editNameTarget?.isLinked && <View style={{ marginBottom: 16 }} />}
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                onPress={() => { setEditNameTarget(null); setEditNameInput(""); }}
+                onPress={() => { setEditNameTarget(null); setEditNameInput(""); setEditPhoneInput(""); }}
                 style={{ flex: 1, padding: 13, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: "center" }}
               >
                 <Text style={{ color: Colors.textMuted, fontWeight: "600" }}>취소</Text>

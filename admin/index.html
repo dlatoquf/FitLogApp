@@ -16,6 +16,8 @@
       --muted: #7b82a8;
       --red: #ff5c5c;
       --blue: #5c9dff;
+      --orange: #ff9944;
+      --purple: #a78bfa;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -51,14 +53,18 @@
     .sidebar {
       position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
       background: var(--surface); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; z-index: 10;
+      display: flex; flex-direction: column; z-index: 10; overflow-y: auto;
     }
     .sidebar-logo {
       padding: 24px 20px 20px; font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
     .sidebar-logo span { color: var(--green); }
     .nav { flex: 1; padding: 12px 0; }
+    .nav-group-label {
+      padding: 14px 20px 6px; font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
     .nav-item {
       display: flex; align-items: center; gap: 10px;
       padding: 11px 20px; font-size: 14px; font-weight: 500; color: var(--muted);
@@ -67,7 +73,7 @@
     .nav-item:hover { color: var(--text); background: var(--surface2); }
     .nav-item.active { color: var(--green); background: rgba(0,200,150,0.08); border-right: 2px solid var(--green); }
     .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-    .sidebar-footer { padding: 16px 20px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
+    .sidebar-footer { padding: 16px 20px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); flex-shrink: 0; }
 
     .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
     .page-header { margin-bottom: 24px; }
@@ -113,6 +119,7 @@
     tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:hover td { background: rgba(255,255,255,0.02); }
+    .td-truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .badge {
       display: inline-block; padding: 3px 9px; border-radius: 20px;
@@ -123,6 +130,10 @@
     .badge-null    { background: rgba(123,130,168,0.15); color: var(--muted); }
     .badge-active  { background: rgba(0,200,150,0.15); color: var(--green); }
     .badge-deleted { background: rgba(255,92,92,0.15); color: var(--red); }
+    .badge-confirmed { background: rgba(0,200,150,0.15); color: var(--green); }
+    .badge-open    { background: rgba(92,157,255,0.15); color: var(--blue); }
+    .badge-completed { background: rgba(123,130,168,0.15); color: var(--muted); }
+    .badge-cancelled { background: rgba(255,92,92,0.15); color: var(--red); }
 
     .loading, .empty {
       text-align: center; padding: 60px; color: var(--muted); font-size: 14px;
@@ -160,8 +171,8 @@
     }
     .mobile-tabs::-webkit-scrollbar { display: none; }
     .mobile-tab {
-      flex: 1; min-width: 70px; padding: 10px 4px; text-align: center;
-      font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer;
+      flex: 0 0 auto; min-width: 64px; padding: 10px 4px; text-align: center;
+      font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer;
       border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s;
     }
     .mobile-tab.active { color: var(--green); border-bottom-color: var(--green); }
@@ -172,7 +183,7 @@
       .mobile-topbar { display: block; }
       .main { margin-left: 0; padding: 16px 14px; padding-top: 96px; }
       .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      table { min-width: 480px; }
+      table { min-width: 500px; }
       .stat-card { min-width: 100px; padding: 14px 16px; }
       .stat-value { font-size: 22px; }
       .page-title { font-size: 18px; }
@@ -198,35 +209,49 @@
   <div class="mobile-topbar">
     <div class="mobile-topbar-logo">Fit<span>Log</span> <span style="font-size:11px;color:var(--muted);font-weight:500;">Admin</span></div>
     <div class="mobile-tabs">
-      <div class="mobile-tab active" onclick="switchTab('users', this)" data-tab="users">
-        <span class="mobile-tab-icon">👤</span>유저
-      </div>
-      <div class="mobile-tab" onclick="switchTab('trainers', this)" data-tab="trainers">
-        <span class="mobile-tab-icon">🏋️</span>트레이너
-      </div>
-      <div class="mobile-tab" onclick="switchTab('members', this)" data-tab="members">
-        <span class="mobile-tab-icon">🙋</span>회원
-      </div>
-      <div class="mobile-tab" onclick="switchTab('payments', this)" data-tab="payments">
-        <span class="mobile-tab-icon">💳</span>PT결제
-      </div>
+      <div class="mobile-tab active" onclick="switchTab('users')" data-tab="users"><span class="mobile-tab-icon">👤</span>유저</div>
+      <div class="mobile-tab" onclick="switchTab('trainers')" data-tab="trainers"><span class="mobile-tab-icon">🏋️</span>트레이너</div>
+      <div class="mobile-tab" onclick="switchTab('members')" data-tab="members"><span class="mobile-tab-icon">🙋</span>회원</div>
+      <div class="mobile-tab" onclick="switchTab('payments')" data-tab="payments"><span class="mobile-tab-icon">💳</span>PT결제</div>
+      <div class="mobile-tab" onclick="switchTab('schedules')" data-tab="schedules"><span class="mobile-tab-icon">📅</span>스케줄</div>
+      <div class="mobile-tab" onclick="switchTab('workout-logs')" data-tab="workout-logs"><span class="mobile-tab-icon">💪</span>운동로그</div>
+      <div class="mobile-tab" onclick="switchTab('diet-photos')" data-tab="diet-photos"><span class="mobile-tab-icon">🥗</span>식단</div>
+      <div class="mobile-tab" onclick="switchTab('body-logs')" data-tab="body-logs"><span class="mobile-tab-icon">⚖️</span>바디로그</div>
+      <div class="mobile-tab" onclick="switchTab('comments')" data-tab="comments"><span class="mobile-tab-icon">💬</span>댓글</div>
     </div>
   </div>
 
   <aside class="sidebar">
     <div class="sidebar-logo">Fit<span>Log</span></div>
     <nav class="nav">
-      <div class="nav-item active" onclick="switchTab('users', this)">
+      <div class="nav-group-label">유저 관리</div>
+      <div class="nav-item active" data-tab="users" onclick="switchTab('users')">
         <span class="nav-icon">👤</span><span>유저</span>
       </div>
-      <div class="nav-item" onclick="switchTab('trainers', this)">
+      <div class="nav-item" data-tab="trainers" onclick="switchTab('trainers')">
         <span class="nav-icon">🏋️</span><span>트레이너</span>
       </div>
-      <div class="nav-item" onclick="switchTab('members', this)">
+      <div class="nav-item" data-tab="members" onclick="switchTab('members')">
         <span class="nav-icon">🙋</span><span>회원</span>
       </div>
-      <div class="nav-item" onclick="switchTab('payments', this)">
+      <div class="nav-item" data-tab="payments" onclick="switchTab('payments')">
         <span class="nav-icon">💳</span><span>PT 결제</span>
+      </div>
+      <div class="nav-group-label">활동 데이터</div>
+      <div class="nav-item" data-tab="schedules" onclick="switchTab('schedules')">
+        <span class="nav-icon">📅</span><span>스케줄</span>
+      </div>
+      <div class="nav-item" data-tab="workout-logs" onclick="switchTab('workout-logs')">
+        <span class="nav-icon">💪</span><span>운동 로그</span>
+      </div>
+      <div class="nav-item" data-tab="diet-photos" onclick="switchTab('diet-photos')">
+        <span class="nav-icon">🥗</span><span>식단</span>
+      </div>
+      <div class="nav-item" data-tab="body-logs" onclick="switchTab('body-logs')">
+        <span class="nav-icon">⚖️</span><span>바디로그</span>
+      </div>
+      <div class="nav-item" data-tab="comments" onclick="switchTab('comments')">
+        <span class="nav-icon">💬</span><span>댓글</span>
       </div>
     </nav>
     <div class="sidebar-footer" id="last-updated"></div>
@@ -239,8 +264,8 @@
     </div>
     <div class="stats" id="stats-area"></div>
     <div class="toolbar">
-      <input class="search-input" id="search-input" type="text" placeholder="이름 또는 이메일 검색..." oninput="renderTable()" />
-      <button class="refresh-btn" onclick="loadData()">↻ 새로고침</button>
+      <input class="search-input" id="search-input" type="text" placeholder="검색..." oninput="onSearch()" />
+      <button class="refresh-btn" onclick="loadCurrentTab()">↻ 새로고침</button>
     </div>
     <div class="table-wrap">
       <div id="table-area"><div class="loading">불러오는 중...</div></div>
@@ -255,13 +280,20 @@
   let pw = '';
   let currentTab = 'users';
   let currentPage = 1;
-  let allData = { users: [], trainers: [], members: [], payments: [] };
+
+  // 탭별 캐시된 데이터
+  const cache = {};
 
   const tabMeta = {
-    users:    { title: '유저', sub: '전체 가입 유저 목록' },
-    trainers: { title: '트레이너', sub: '등록된 트레이너 목록' },
-    members:  { title: '회원', sub: '등록된 회원 목록' },
-    payments: { title: 'PT 결제내역', sub: '전체 결제 및 위약금 내역' },
+    'users':        { title: '유저', sub: '전체 가입 유저 목록', endpoint: 'users' },
+    'trainers':     { title: '트레이너', sub: '등록된 트레이너 목록', endpoint: 'trainers' },
+    'members':      { title: '회원', sub: '등록된 회원 목록', endpoint: 'members' },
+    'payments':     { title: 'PT 결제내역', sub: '전체 결제 내역', endpoint: 'payments' },
+    'schedules':    { title: '스케줄', sub: '전체 PT 스케줄', endpoint: 'schedules' },
+    'workout-logs': { title: '운동 로그', sub: '전체 운동 기록', endpoint: 'workout-logs' },
+    'diet-photos':  { title: '식단', sub: '전체 식단 사진', endpoint: 'diet-photos' },
+    'body-logs':    { title: '바디로그', sub: '전체 바디로그 기록', endpoint: 'body-logs' },
+    'comments':     { title: '댓글', sub: '전체 댓글 목록', endpoint: 'comments' },
   };
 
   document.getElementById('pw-input').addEventListener('keydown', e => {
@@ -274,43 +306,47 @@
       pw = input;
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('admin-screen').style.display = 'block';
-      loadData();
+      loadCurrentTab();
     } else {
       document.getElementById('login-error').textContent = '비밀번호가 틀렸습니다.';
     }
   }
 
-  function switchTab(tab, el) {
+  function switchTab(tab) {
     currentTab = tab;
     currentPage = 1;
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    el.closest('.nav-item, .mobile-tab').classList.add('active');
+
     document.querySelectorAll('.nav-item').forEach(n => {
-      if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(`'${tab}'`)) n.classList.add('active');
+      n.classList.toggle('active', n.dataset.tab === tab);
     });
     document.querySelectorAll('.mobile-tab').forEach(n => {
       n.classList.toggle('active', n.dataset.tab === tab);
     });
-    document.getElementById('page-title').textContent = tabMeta[tab].title;
-    document.getElementById('page-sub').textContent = tabMeta[tab].sub;
+
+    const meta = tabMeta[tab];
+    document.getElementById('page-title').textContent = meta.title;
+    document.getElementById('page-sub').textContent = meta.sub;
     document.getElementById('search-input').value = '';
-    renderStats();
-    renderTable();
+    document.getElementById('search-input').placeholder = '검색...';
+
+    if (cache[tab]) {
+      renderStats();
+      renderTable();
+    } else {
+      loadCurrentTab();
+    }
   }
 
-  async function loadData() {
+  async function loadCurrentTab() {
+    const tab = currentTab;
+    const meta = tabMeta[tab];
     document.getElementById('table-area').innerHTML = '<div class="loading">불러오는 중...</div>';
+    document.getElementById('stats-area').innerHTML = '';
+    document.getElementById('pagination').innerHTML = '';
     try {
-      const [users, trainers, members, payments] = await Promise.all([
-        fetch(`${API}/api/admin/users?pw=${pw}`).then(r => r.json()),
-        fetch(`${API}/api/admin/trainers?pw=${pw}`).then(r => r.json()),
-        fetch(`${API}/api/admin/members?pw=${pw}`).then(r => r.json()),
-        fetch(`${API}/api/admin/payments?pw=${pw}`).then(r => r.json()),
-      ]);
-      allData = { users, trainers, members, payments };
+      const data = await fetch(`${API}/api/admin/${meta.endpoint}?pw=${pw}`).then(r => r.json());
+      cache[tab] = Array.isArray(data) ? data : [];
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
-      document.getElementById('page-title').textContent = tabMeta[currentTab].title;
-      document.getElementById('page-sub').textContent = tabMeta[currentTab].sub;
       renderStats();
       renderTable();
     } catch {
@@ -318,22 +354,41 @@
     }
   }
 
+  function onSearch() {
+    currentPage = 1;
+    renderTable();
+  }
+
   function renderStats() {
     const el = document.getElementById('stats-area');
+    const data = cache[currentTab] || [];
     if (currentTab === 'users') {
-      const t = allData.users.filter(u => u.role === 'TRAINER').length;
-      const m = allData.users.filter(u => u.role === 'MEMBER').length;
-      const n = allData.users.filter(u => !u.role).length;
-      el.innerHTML = stat('전체', allData.users.length) + stat('트레이너', t) + stat('회원', m) + stat('미설정', n);
+      const t = data.filter(u => u.role === 'TRAINER').length;
+      const m = data.filter(u => u.role === 'MEMBER').length;
+      el.innerHTML = stat('전체', data.length) + stat('트레이너', t) + stat('회원', m);
     } else if (currentTab === 'trainers') {
-      const totalMembers = allData.trainers.reduce((s, t) => s + (t.memberCount || 0), 0);
-      el.innerHTML = stat('전체 트레이너', allData.trainers.length) + stat('총 회원 수', totalMembers);
+      const totalMembers = data.reduce((s, t) => s + (t.memberCount || 0), 0);
+      el.innerHTML = stat('전체 트레이너', data.length) + stat('총 회원 수', totalMembers);
     } else if (currentTab === 'members') {
-      const active = allData.members.filter(m => m.status === 'ACTIVE').length;
-      el.innerHTML = stat('전체 회원', allData.members.length) + stat('활성', active);
+      const active = data.filter(m => m.status === 'ACTIVE').length;
+      el.innerHTML = stat('전체 회원', data.length) + stat('활성', active);
     } else if (currentTab === 'payments') {
-      const total = allData.payments.reduce((s, p) => s + (p.amount || 0), 0);
-      el.innerHTML = stat('결제 건수', allData.payments.length) + stat('총 매출', total.toLocaleString() + '원');
+      const total = data.reduce((s, p) => s + (p.amount || 0), 0);
+      el.innerHTML = stat('결제 건수', data.length) + stat('총 매출', total.toLocaleString() + '원');
+    } else if (currentTab === 'schedules') {
+      const confirmed = data.filter(s => s.status === 'CONFIRMED').length;
+      el.innerHTML = stat('전체 스케줄', data.length) + stat('확정', confirmed);
+    } else if (currentTab === 'workout-logs') {
+      el.innerHTML = stat('전체 운동로그', data.length);
+    } else if (currentTab === 'diet-photos') {
+      el.innerHTML = stat('전체 식단 사진', data.length);
+    } else if (currentTab === 'body-logs') {
+      el.innerHTML = stat('전체 바디로그', data.length);
+    } else if (currentTab === 'comments') {
+      const deleted = data.filter(c => c.deleted).length;
+      el.innerHTML = stat('전체 댓글', data.length) + stat('삭제됨', deleted);
+    } else {
+      el.innerHTML = stat('전체', data.length);
     }
   }
 
@@ -344,75 +399,166 @@
   function renderTable() {
     const q = document.getElementById('search-input').value.toLowerCase();
     const el = document.getElementById('table-area');
+    const data = cache[currentTab] || [];
 
+    let filtered;
     if (currentTab === 'users') {
-      const filtered = (Array.isArray(allData.users) ? allData.users : []).filter(u => match(u.name, u.email, q));
-      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
-      const { items, total, totalPages } = paginate(filtered);
-      el.innerHTML = `<table><thead><tr>
+      filtered = data.filter(u => match(u.name, u.email, q));
+    } else if (currentTab === 'trainers') {
+      filtered = data.filter(t => match(t.name, t.email, q) || (t.gymName||'').toLowerCase().includes(q));
+    } else if (currentTab === 'members') {
+      filtered = data.filter(m => match(m.name, m.email, q) || (m.trainerName||'').toLowerCase().includes(q));
+    } else if (currentTab === 'payments') {
+      filtered = data.filter(p => match(p.memberName, p.trainerName, q));
+    } else if (currentTab === 'schedules') {
+      filtered = data.filter(s => match(s.memberName, s.trainerName, q) || (s.date||'').includes(q));
+    } else if (currentTab === 'workout-logs') {
+      filtered = data.filter(w => match(w.memberName, w.trainerName, q) || (w.logDate||'').includes(q));
+    } else if (currentTab === 'diet-photos') {
+      filtered = data.filter(d => (d.memberName||'').toLowerCase().includes(q) || (d.date||'').includes(q) || (d.label||'').toLowerCase().includes(q));
+    } else if (currentTab === 'body-logs') {
+      filtered = data.filter(b => (b.memberName||'').toLowerCase().includes(q) || (b.logDate||'').includes(q));
+    } else if (currentTab === 'comments') {
+      filtered = data.filter(c => (c.authorName||'').toLowerCase().includes(q) || (c.content||'').toLowerCase().includes(q) || (c.targetType||'').toLowerCase().includes(q));
+    } else {
+      filtered = data;
+    }
+
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty">데이터 없음</div>';
+      renderPagination(0, 1);
+      return;
+    }
+
+    const { items, total, totalPages } = paginate(filtered);
+    el.innerHTML = buildTable(items);
+    renderPagination(total, totalPages);
+  }
+
+  function buildTable(items) {
+    if (currentTab === 'users') {
+      return `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th>상태</th>
       </tr></thead><tbody>${items.map(u => `<tr>
         <td style="color:var(--muted)">${u.id}</td>
-        <td><b>${u.name || '-'}</b></td>
-        <td style="color:var(--muted)">${u.email || '-'}</td>
-        <td><span class="badge ${u.role === 'TRAINER' ? 'badge-trainer' : u.role === 'MEMBER' ? 'badge-member' : 'badge-null'}">${u.role || '미설정'}</span></td>
-        <td style="color:var(--muted)">${u.createdAt || '-'}</td>
-        <td><span class="badge ${u.deleted ? 'badge-deleted' : 'badge-active'}">${u.deleted ? '삭제됨' : '정상'}</span></td>
+        <td><b>${u.name||'-'}</b></td>
+        <td style="color:var(--muted)">${u.email||'-'}</td>
+        <td><span class="badge ${u.role==='TRAINER'?'badge-trainer':u.role==='MEMBER'?'badge-member':'badge-null'}">${u.role||'미설정'}</span></td>
+        <td style="color:var(--muted)">${u.createdAt||'-'}</td>
+        <td><span class="badge ${u.deleted?'badge-deleted':'badge-active'}">${u.deleted?'삭제됨':'정상'}</span></td>
       </tr>`).join('')}</tbody></table>`;
-      renderPagination(total, totalPages);
 
     } else if (currentTab === 'trainers') {
-      const filtered = (Array.isArray(allData.trainers) ? allData.trainers : []).filter(t => match(t.name, t.email, q));
-      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
-      const { items, total, totalPages } = paginate(filtered);
-      el.innerHTML = `<table><thead><tr>
+      return `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>헬스장</th><th>트레이너 코드</th><th>회원 수</th><th>플랜</th>
       </tr></thead><tbody>${items.map(t => `<tr>
         <td style="color:var(--muted)">${t.id}</td>
-        <td><b>${t.name || '-'}</b></td>
-        <td style="color:var(--muted)">${t.email || '-'}</td>
-        <td>${t.gymName || '-'}</td>
-        <td><span class="badge badge-trainer">${t.trainerCode || '-'}</span></td>
+        <td><b>${t.name||'-'}</b></td>
+        <td style="color:var(--muted)">${t.email||'-'}</td>
+        <td>${t.gymName||'-'}</td>
+        <td><span class="badge badge-trainer">${t.trainerCode||'-'}</span></td>
         <td>${t.memberCount}</td>
-        <td>${t.plan || '-'}</td>
+        <td><span class="badge ${t.plan==='PRO'?'badge-trainer':'badge-null'}">${t.plan||'-'}</span></td>
       </tr>`).join('')}</tbody></table>`;
-      renderPagination(total, totalPages);
 
     } else if (currentTab === 'members') {
-      const filtered = (Array.isArray(allData.members) ? allData.members : []).filter(m => match(m.name, m.email, q) || (m.trainerName||'').toLowerCase().includes(q));
-      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
-      const { items, total, totalPages } = paginate(filtered);
-      el.innerHTML = `<table><thead><tr>
+      return `<table><thead><tr>
         <th>ID</th><th>이름</th><th>이메일</th><th>트레이너</th><th>잔여 PT</th><th>전체 PT</th><th>상태</th>
       </tr></thead><tbody>${items.map(m => `<tr>
         <td style="color:var(--muted)">${m.id}</td>
-        <td><b>${m.name || '-'}</b></td>
-        <td style="color:var(--muted)">${m.email || '-'}</td>
-        <td>${m.trainerName || '-'}</td>
-        <td>${m.ptRemaining ?? '-'}</td>
-        <td>${m.ptTotal ?? '-'}</td>
-        <td><span class="badge ${m.status === 'ACTIVE' ? 'badge-active' : 'badge-deleted'}">${m.status || '-'}</span></td>
+        <td><b>${m.name||'-'}</b></td>
+        <td style="color:var(--muted)">${m.email||'-'}</td>
+        <td>${m.trainerName||'-'}</td>
+        <td>${m.ptRemaining??'-'}</td>
+        <td>${m.ptTotal??'-'}</td>
+        <td><span class="badge ${m.status==='ACTIVE'?'badge-active':'badge-deleted'}">${m.status||'-'}</span></td>
       </tr>`).join('')}</tbody></table>`;
-      renderPagination(total, totalPages);
 
     } else if (currentTab === 'payments') {
-      const filtered = (Array.isArray(allData.payments) ? allData.payments : []).filter(p => match(p.memberName, p.trainerName, q));
-      if (!filtered.length) { el.innerHTML = '<div class="empty">데이터 없음</div>'; renderPagination(0,1); return; }
-      const { items, total, totalPages } = paginate(filtered);
-      el.innerHTML = `<table><thead><tr>
+      return `<table><thead><tr>
         <th>ID</th><th>트레이너</th><th>회원</th><th>금액</th><th>횟수</th><th>메모</th><th>결제일</th><th>상태</th>
       </tr></thead><tbody>${items.map(p => `<tr>
         <td style="color:var(--muted)">${p.id}</td>
-        <td>${p.trainerName || '-'}</td>
-        <td><b>${p.memberName || '-'}</b></td>
+        <td>${p.trainerName||'-'}</td>
+        <td><b>${p.memberName||'-'}</b></td>
         <td><b style="color:var(--green)">${(p.amount||0).toLocaleString()}원</b></td>
         <td>${p.sessions}회</td>
-        <td style="color:var(--muted)">${p.memo || '-'}</td>
-        <td style="color:var(--muted)">${p.paidAt || '-'}</td>
-        <td>${p.status || '-'}</td>
+        <td style="color:var(--muted)" class="td-truncate">${p.memo||'-'}</td>
+        <td style="color:var(--muted)">${p.paidAt||'-'}</td>
+        <td>${p.status||'-'}</td>
       </tr>`).join('')}</tbody></table>`;
-      renderPagination(total, totalPages);
+
+    } else if (currentTab === 'schedules') {
+      return `<table><thead><tr>
+        <th>ID</th><th>트레이너</th><th>회원</th><th>날짜</th><th>시간</th><th>유형</th><th>상태</th><th>메모</th>
+      </tr></thead><tbody>${items.map(s => {
+        const badgeCls = s.status==='CONFIRMED'?'badge-confirmed':s.status==='OPEN'?'badge-open':s.status==='COMPLETED'?'badge-completed':'badge-cancelled';
+        return `<tr>
+        <td style="color:var(--muted)">${s.id}</td>
+        <td>${s.trainerName||'-'}</td>
+        <td><b>${s.memberName||'-'}</b></td>
+        <td style="color:var(--muted)">${s.date||'-'}</td>
+        <td style="color:var(--muted)">${s.startTime||'-'} ~ ${s.endTime||'-'}</td>
+        <td>${s.sessionType||'-'}</td>
+        <td><span class="badge ${badgeCls}">${s.status||'-'}</span></td>
+        <td style="color:var(--muted)" class="td-truncate">${s.note||'-'}</td>
+      </tr>`;
+      }).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'workout-logs') {
+      return `<table><thead><tr>
+        <th>ID</th><th>트레이너</th><th>회원</th><th>날짜</th><th>유형</th><th>컨디션</th><th>메모</th><th>등록일</th>
+      </tr></thead><tbody>${items.map(w => `<tr>
+        <td style="color:var(--muted)">${w.id}</td>
+        <td>${w.trainerName||'-'}</td>
+        <td><b>${w.memberName||'-'}</b></td>
+        <td style="color:var(--muted)">${w.logDate||'-'}</td>
+        <td>${w.workoutType||'-'}</td>
+        <td>${w.conditionScore??'-'}</td>
+        <td style="color:var(--muted)" class="td-truncate">${w.memo||'-'}</td>
+        <td style="color:var(--muted)">${w.createdAt||'-'}</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'diet-photos') {
+      return `<table><thead><tr>
+        <th>ID</th><th>회원</th><th>날짜</th><th>식단 구분</th><th>사진 URL</th>
+      </tr></thead><tbody>${items.map(d => `<tr>
+        <td style="color:var(--muted)">${d.id}</td>
+        <td><b>${d.memberName||'-'}</b></td>
+        <td style="color:var(--muted)">${d.date||'-'}</td>
+        <td>${d.label||'-'}</td>
+        <td style="color:var(--muted)" class="td-truncate"><a href="${d.photoUrl||''}" target="_blank" style="color:var(--blue)">보기</a></td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'body-logs') {
+      return `<table><thead><tr>
+        <th>ID</th><th>회원</th><th>날짜</th><th>체중(kg)</th><th>체지방률(%)</th><th>근육량(kg)</th><th>메모</th><th>등록일</th>
+      </tr></thead><tbody>${items.map(b => `<tr>
+        <td style="color:var(--muted)">${b.id}</td>
+        <td><b>${b.memberName||'-'}</b></td>
+        <td style="color:var(--muted)">${b.logDate||'-'}</td>
+        <td>${b.weight??'-'}</td>
+        <td>${b.bodyFat??'-'}</td>
+        <td>${b.muscleMass??'-'}</td>
+        <td style="color:var(--muted)" class="td-truncate">${b.memo||'-'}</td>
+        <td style="color:var(--muted)">${b.createdAt||'-'}</td>
+      </tr>`).join('')}</tbody></table>`;
+
+    } else if (currentTab === 'comments') {
+      return `<table><thead><tr>
+        <th>ID</th><th>작성자</th><th>역할</th><th>대상 유형</th><th>날짜</th><th>내용</th><th>등록일</th><th>상태</th>
+      </tr></thead><tbody>${items.map(c => `<tr>
+        <td style="color:var(--muted)">${c.id}</td>
+        <td><b>${c.authorName||'-'}</b></td>
+        <td><span class="badge ${c.authorRole==='TRAINER'?'badge-trainer':'badge-member'}">${c.authorRole||'-'}</span></td>
+        <td>${c.targetType||'-'}</td>
+        <td style="color:var(--muted)">${c.targetDate||'-'}</td>
+        <td class="td-truncate">${c.content||'-'}</td>
+        <td style="color:var(--muted)">${c.createdAt||'-'}</td>
+        <td><span class="badge ${c.deleted?'badge-deleted':'badge-active'}">${c.deleted?'삭제됨':'정상'}</span></td>
+      </tr>`).join('')}</tbody></table>`;
     }
+    return '<div class="empty">알 수 없는 탭</div>';
   }
 
   function match(a, b, q) {
