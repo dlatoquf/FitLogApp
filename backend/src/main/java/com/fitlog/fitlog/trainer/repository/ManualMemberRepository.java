@@ -23,6 +23,10 @@ public interface ManualMemberRepository extends JpaRepository<ManualMember, Long
            "AND NOT (m.ptRemaining = 0 AND m.ptEndedAt IS NOT NULL AND m.ptEndedAt <= :cutoff)")
     long countNonOtByTrainer(@Param("trainer") Trainer trainer, @Param("cutoff") java.time.LocalDate cutoff);
 
+    // OT 회원 수
+    @Query("SELECT COUNT(m) FROM ManualMember m WHERE m.trainer = :trainer AND m.memo = 'OT' AND m.active = true AND m.ptEndedAt IS NULL")
+    long countOtByTrainer(@Param("trainer") Trainer trainer);
+
     // 전체 미연동 회원 수 (OT 포함)
     long countByTrainer(Trainer trainer);
 

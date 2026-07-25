@@ -109,10 +109,18 @@ public class WorkoutSuggestionController {
                 })
                 .collect(Collectors.toList());
 
+        // 해당 운동명의 가장 최근 메모 (null 아닌 것)
+        String latestMemo = recentSets.stream()
+                .filter(s -> s.getMemo() != null && !s.getMemo().isBlank())
+                .max(Comparator.comparing(s -> s.getWorkoutLog().getLogDate()))
+                .map(WorkoutSet::getMemo)
+                .orElse(null);
+
         Map<String, Object> result = new HashMap<>();
         result.put("exerciseName", mostUsedName);
         result.put("date", latestDate.get().toString());
         result.put("sets", latestSets);
+        if (latestMemo != null) result.put("latestMemo", latestMemo);
 
         return ResponseEntity.ok(result);
     }

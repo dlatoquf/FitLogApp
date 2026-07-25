@@ -1986,7 +1986,8 @@ export default function TrainerHomeScreen() {
               );
             })
         ) : (
-          <View
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/trainer/schedule" as any)}
             style={{
               backgroundColor: Colors.bgSub,
               borderRadius: 12,
@@ -1994,13 +1995,18 @@ export default function TrainerHomeScreen() {
               alignItems: "center",
               borderWidth: 1,
               borderColor: Colors.border,
+              borderStyle: "dashed",
               marginBottom: 8,
+              gap: 8,
             }}
           >
             <Text style={{ fontSize: 14, color: Colors.textMuted }}>
               오늘 예정된 PT가 없어요
             </Text>
-          </View>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.green }}>
+              + 일정 추가
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
 
@@ -3639,7 +3645,10 @@ export default function TrainerHomeScreen() {
                   marginBottom: 20,
                 }}
               >
-                PRO 플랜으로 업그레이드
+                PRO에서는 회원 수 제한 없이 관리할 수 있습니다.
+              </Text>
+              <Text style={{ fontSize: 14, color: Colors.textSub, marginBottom: 14 }}>
+                1개월 무료 체험을 시작해보세요.
               </Text>
 
               <View

@@ -120,43 +120,44 @@ export default function TrainerNotificationsScreen() {
     const handleNotificationPress = async (n: Noti) => {
         console.log("[Notif Press Trainer]", JSON.stringify({ type: n.type, targetType: n.targetType, targetId: n.targetId, memberId: n.memberId, targetDate: n.targetDate }));
         await markOneRead(n.notificationId);
+        const from = "notifications";
         if (n.type === "NEW_MEMBER" || n.type === "MEMBER_DELETED" || n.type === "MEMBER_DISCONNECT") {
-            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}` as any); return;
+            router.push(`/(tabs)/trainer/member-detail?id=${n.targetId}&from=${from}` as any); return;
         }
         if (n.type === "DIET_PHOTO" || n.type === "DIET_FEEDBACK") {
             const id = n.memberId ?? n.targetId;
             const dateParam = n.targetDate ? `&date=${n.targetDate}` : "";
             if (id) {
-                router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=1${dateParam}` as any);
+                router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=1${dateParam}&from=${from}` as any);
             } else {
-                router.push("/(tabs)/trainer/members" as any);
+                router.push({ pathname: "/(tabs)/trainer/members", params: { from } } as any);
             }
             return;
         }
         if (n.type === "WORKOUT_LOG") {
             const id = n.memberId ?? n.targetId;
             const dateParam = n.targetDate ? `&date=${n.targetDate}` : "";
-            router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=0${dateParam}` as any); return;
+            router.push(`/(tabs)/trainer/member-detail?id=${id}&initialTab=0${dateParam}&from=${from}` as any); return;
         }
         if (n.type === "MISSION_DONE") {
             const id = n.memberId ?? n.targetId;
-            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}` as any); return;
+            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}&from=${from}` as any); return;
         }
         if (n.type === "SCHEDULE_REQUEST") {
-            router.push("/(tabs)/trainer/schedule?tab=NEXT" as any); return;
+            router.push({ pathname: "/(tabs)/trainer/schedule", params: { tab: "NEXT", from } } as any); return;
         }
         if (n.type === "BIRTHDAY_TODAY" || n.type === "BIRTHDAY_WEEK") {
             const id = n.memberId ?? n.targetId;
-            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}` as any); return;
+            if (id) router.push(`/(tabs)/trainer/member-detail?id=${id}&from=${from}` as any); return;
         }
         if (n.type === "INCOMPLETE_SESSION") {
             const date = n.targetDate ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-            router.push(`/(tabs)/trainer/schedule?date=${date}&mode=week` as any); return;
+            router.push({ pathname: "/(tabs)/trainer/schedule", params: { date, mode: "week", from } } as any); return;
         }
         if (n.type === "GENERAL") {
-            router.push("/(tabs)/trainer/more"); return;
+            router.push({ pathname: "/(tabs)/trainer/more", params: { from } } as any); return;
         }
-        router.push("/(tabs)/trainer/home");
+        router.push({ pathname: "/(tabs)/trainer/home", params: { from } } as any);
     };
 
     useFocusEffect(useCallback(() => {

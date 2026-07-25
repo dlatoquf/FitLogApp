@@ -16,7 +16,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "7",
+      "buildNumber": "1",
       "bundleIdentifier": "com.anonymous.FitLogApp",
       "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {

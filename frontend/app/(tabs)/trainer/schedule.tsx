@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -152,7 +152,8 @@ function RescheduleTimeFlatList({ timeOptions, selectedTimeStr, selectedIdx, ITE
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
 export default function TrainerScheduleScreen() {
-  const { date: paramDate, mode: paramMode } = useLocalSearchParams<{ date?: string; mode?: string }>();
+  const { date: paramDate, mode: paramMode, from: fromParam } = useLocalSearchParams<{ date?: string; mode?: string; from?: string }>();
+  const fromNotifications = fromParam === "notifications";
   const today = new Date();
 
   // 알림 딥링크: date 파라미터로 해당 날짜 주간으로 이동
@@ -520,8 +521,9 @@ export default function TrainerScheduleScreen() {
           setPlan(p === "PRO" ? "PRO" : "FREE");
         }
       }
-      const linked = linkedRes.ok
-        ? (await linkedRes.json())
+      const linkedData = linkedRes.ok ? await linkedRes.json() : [];
+      const manualData = manualRes.ok ? await manualRes.json() : [];
+      const linked = linkedData
             .map((m: any) => ({
               id: m.id,
               name: m.user?.name ?? "-",
@@ -532,11 +534,8 @@ export default function TrainerScheduleScreen() {
               ptEndedAt: m.ptEndedAt ?? null,
               isManual: false,
             }))
-            // 연결해제·타 트레이너 이동·PT 미등록·비활성(ptEndedAt 있거나 INACTIVE) 제외
-            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0 && !m.ptEndedAt)
-        : [];
-      const manual = manualRes.ok
-        ? (await manualRes.json())
+            .filter((m: any) => m.connected && !m.moved && m.ptTotal > 0 && !m.ptEndedAt);
+      const manual = manualData
             .map((m: any) => ({
               id: m.id,
               name: m.name ?? "-",
@@ -545,9 +544,7 @@ export default function TrainerScheduleScreen() {
               isManual: true,
               inactive: m.isActive === false,
             }))
-            // PT 미등록·비활성 제외 (잔여 0은 FREE 계산을 위해 유지)
-            .filter((m: any) => m.ptTotal > 0 && !m.inactive)
-        : [];
+            .filter((m: any) => m.ptTotal > 0 && !m.inactive);
       setMembers([...linked, ...manual].sort((a, b) => a.name.localeCompare(b.name, "ko")));
     } catch (e) {
       console.error("fetchMembers error:", e);
@@ -1721,6 +1718,15 @@ export default function TrainerScheduleScreen() {
       >
         {/* ── 헤더 ─────────────────────────────────────────────────────────── */}
         <View style={{ marginBottom: 16 }}>
+          {fromNotifications && (
+            <TouchableOpacity
+              onPress={() => router.push("/(tabs)/trainer/notifications" as any)}
+              style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 4 }}
+            >
+              <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>‹</Text>
+              <Text style={{ fontSize: 15, color: Colors.green, fontWeight: "600" }}>알림</Text>
+            </TouchableOpacity>
+          )}
           <Text style={{ fontSize: 24, fontWeight: "800", color: Colors.text }}>
             일정
           </Text>
@@ -2651,9 +2657,9 @@ export default function TrainerScheduleScreen() {
                 </View>
                 {/* FREE 5명 제한 안내 */}
                 {plan === "FREE" && !isInTrial && (
-                  <TouchableOpacity onPress={() => { setAddModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFF3E0", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, gap: 6 }}>
-                    <Text style={{ fontSize: 12, color: "#F97316" }}>🔒 FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요.</Text>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#F97316" }}>PRO ›</Text>
+                  <TouchableOpacity onPress={() => { setAddModal(false); setTimeout(() => setPaymentVisible(true), 350); }} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.greenLight, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10, borderWidth: 1, borderColor: Colors.green + "44" }}>
+                    <Text style={{ fontSize: 12, color: Colors.green, fontWeight: "600", flex: 1 }}>FREE 플랜은 잔여횟수 적은 순 5명만 수업 추가 가능해요</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.green, marginLeft: 8 }}>PRO →</Text>
                   </TouchableOpacity>
                 )}
                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -3606,7 +3612,8 @@ export default function TrainerScheduleScreen() {
               }}
             >
               <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 20 }}>PRO 플랜으로 업그레이드</Text>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>PRO에서는 회원 수 제한 없이 관리할 수 있습니다.</Text>
+              <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 20 }}>1개월 무료 체험을 시작해보세요.</Text>
               <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>

@@ -164,10 +164,9 @@ public class Trainer {
     public java.time.LocalDate getProExpiresAt() { return proExpiresAt; }
     public void setProExpiresAt(java.time.LocalDate proExpiresAt) { this.proExpiresAt = proExpiresAt; }
 
-    /** 무료 체험 또는 구독 중(취소 후 만료일 이전 포함)이면 true */
+    /** 구독 중(취소 후 만료일 이전 포함)이면 true */
     public boolean isProEffective() {
         if ("PRO".equals(plan)) return true;
-        if (trialEndDate != null && !java.time.LocalDate.now().isAfter(trialEndDate)) return true;
         if (proExpiresAt != null && !java.time.LocalDate.now().isAfter(proExpiresAt)) return true;
         return false;
     }

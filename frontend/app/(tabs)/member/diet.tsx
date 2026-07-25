@@ -3,7 +3,7 @@ import CommentSection from "../../../components/CommentSection";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -65,7 +65,8 @@ const getWeekDates = (offset: number): Date[] => {
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 export default function MemberDietScreen() {
   const insets = useSafeAreaInsets();
-  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const { date: dateParam, from: fromParam } = useLocalSearchParams<{ date?: string; from?: string }>();
+  const fromNotifications = fromParam === "notifications";
   const scrollRef = useRef<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [weekOffset, setWeekOffset] = useState(0);
@@ -332,6 +333,15 @@ export default function MemberDietScreen() {
         }
       >
         {/* 헤더 */}
+        {fromNotifications && (
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/member/notifications" as any)}
+            style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 4 }}
+          >
+            <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>‹</Text>
+            <Text style={{ fontSize: 15, color: Colors.green, fontWeight: "600" }}>알림</Text>
+          </TouchableOpacity>
+        )}
         <Text
           style={{
             fontSize: 24,

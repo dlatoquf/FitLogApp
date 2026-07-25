@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import CommentSection from "../../../components/CommentSection";
+import OuwanCard from "../../../components/OuwanCard";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { ResizeMode, Video } from "expo-av";
@@ -71,7 +72,8 @@ interface WorkoutLog {
 }
 
 export default function WorkoutScreen() {
-  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const { date: dateParam, from: fromParam } = useLocalSearchParams<{ date?: string; from?: string }>();
+  const fromNotifications = fromParam === "notifications";
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const today = toDateKey(new Date());
@@ -96,6 +98,7 @@ export default function WorkoutScreen() {
   }, [dateParam]);
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [ouwanVisible, setOuwanVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingWorkoutId, setEditingWorkoutId] = useState<number | null>(null);
   const [exercises, setExercises] = useState<
@@ -433,7 +436,7 @@ export default function WorkoutScreen() {
 
   // 이전 기록 상태
   const [suggestions, setSuggestions] = useState<{
-    [key: number]: { date: string; sets: any[] } | null;
+    [key: number]: { date: string; sets: any[]; latestMemo?: string } | null;
   }>({});
   const [nameSelected, setNameSelected] = useState<{ [key: number]: boolean }>(
     {},
@@ -450,7 +453,7 @@ export default function WorkoutScreen() {
       return;
     }
 
-    const applySuggestion = (value: { date: string; sets: any[] } | null) => {
+    const applySuggestion = (value: { date: string; sets: any[]; latestMemo?: string } | null) => {
       if (suggestionRequestRef.current[idx] !== normalizedName) return;
       setSuggestions((prev) => ({ ...prev, [idx]: value }));
     };
@@ -506,7 +509,8 @@ export default function WorkoutScreen() {
               .trim()
               .toLowerCase() === normalizedName,
         );
-        applySuggestion({ date: found[0].date, sets: lastEx?.sets ?? [] });
+        const latestMemo = lastEx?.memo?.trim() || undefined;
+        applySuggestion({ date: found[0].date, sets: lastEx?.sets ?? [], latestMemo });
       } else {
         applySuggestion(null);
       }
@@ -525,6 +529,42 @@ export default function WorkoutScreen() {
       setSuggestions({});
       setPersonalBodyParts([]);
       setPersonalCondition(null);
+    }
+  };
+
+  const openPersonalForm = async () => {
+    if (showAddModal) {
+      resetPersonalForm();
+      return;
+    }
+    Keyboard.dismiss();
+    const draftKey = `personal_draft_${selectedDate}`;
+    const draft = await AsyncStorage.getItem(draftKey);
+    if (draft && !editingWorkoutId) {
+      Alert.alert("임시저장된 내용이 있어요", "이어서 작성할까요?", [
+        {
+          text: "새로 작성",
+          style: "destructive",
+          onPress: () => {
+            AsyncStorage.removeItem(draftKey);
+            setShowAddModal(true);
+          },
+        },
+        {
+          text: "불러오기",
+          onPress: () => {
+            try {
+              const parsed = JSON.parse(draft);
+              if (parsed.exercises) setExercises(parsed.exercises);
+              if (parsed.personalBodyParts) setPersonalBodyParts(parsed.personalBodyParts);
+              if (parsed.personalCondition !== undefined) setPersonalCondition(parsed.personalCondition);
+            } catch {}
+            setShowAddModal(true);
+          },
+        },
+      ]);
+    } else {
+      setShowAddModal(true);
     }
   };
 
@@ -1190,6 +1230,15 @@ export default function WorkoutScreen() {
         }
       >
         {/* 헤더 */}
+        {fromNotifications && (
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/member/notifications" as any)}
+            style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 4 }}
+          >
+            <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>‹</Text>
+            <Text style={{ fontSize: 15, color: Colors.green, fontWeight: "600" }}>알림</Text>
+          </TouchableOpacity>
+        )}
         <Text
           style={{
             fontSize: 24,
@@ -1411,37 +1460,29 @@ export default function WorkoutScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          {isToday && (
-            <TouchableOpacity
-              onPress={() => {
-                if (showAddModal) resetPersonalForm();
-                else {
-                  Keyboard.dismiss();
-                  setShowAddModal(true);
-                }
-              }}
+          <TouchableOpacity
+            onPress={openPersonalForm}
+            style={{
+              backgroundColor: showAddModal
+                ? Colors.border
+                : Colors.blue + "22",
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderWidth: 1,
+              borderColor: showAddModal ? Colors.border : Colors.blue + "55",
+            }}
+          >
+            <Text
               style={{
-                backgroundColor: showAddModal
-                  ? Colors.border
-                  : Colors.blue + "22",
-                borderRadius: 8,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderWidth: 1,
-                borderColor: showAddModal ? Colors.border : Colors.blue + "55",
+                fontSize: 12,
+                fontWeight: "700",
+                color: showAddModal ? Colors.textSub : Colors.blue,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "700",
-                  color: showAddModal ? Colors.textSub : Colors.blue,
-                }}
-              >
-                {showAddModal ? "접기" : "+ 개인운동 등록"}
-              </Text>
-            </TouchableOpacity>
-          )}
+              {showAddModal ? "접기" : "+ 개인운동 등록"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* 개인운동 입력폼은 하단 모달에서 표시 */}
@@ -1515,9 +1556,7 @@ export default function WorkoutScreen() {
                   log,
                   Colors.blue,
                   "개인 운동 완료",
-                  selectedDate === toDateKey(new Date())
-                    ? () => startEditPersonalLog(log)
-                    : undefined,
+                  () => startEditPersonalLog(log),
                 )}
                 {trainerPlan && log.workoutId && (
                   <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
@@ -1527,30 +1566,67 @@ export default function WorkoutScreen() {
           </View>
         )}
 
+        {/* 오운완 인증샷 버튼 — 운동 기록 있을 때만 */}
+        {(dayPt.length > 0 || dayFitLogs.length > 0) && (
+          <TouchableOpacity
+            onPress={() => setOuwanVisible(true)}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 12,
+              marginBottom: 4,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: "#fff",
+              borderWidth: 1,
+              borderColor: Colors.green + "55",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.green }}>
+              오운완 인증샷 만들기
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {dayPt.length === 0 && dayFitLogs.length === 0 && (
           <View style={{ alignItems: "center", paddingVertical: 40 }}>
             <Text style={{ fontSize: 32, marginBottom: 8 }}>🏋️</Text>
             <Text style={{ fontSize: 14, color: Colors.textMuted }}>
               이날 운동 기록이 없어요
             </Text>
-            {isToday && (
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textMuted,
-                  marginTop: 4,
-                }}
-              >
-                + 개인운동 버튼으로 기록해보세요!
-              </Text>
-            )}
+            <Text
+              style={{
+                fontSize: 13,
+                color: Colors.textMuted,
+                marginTop: 4,
+              }}
+            >
+              + 개인운동 버튼으로 기록해보세요!
+            </Text>
           </View>
         )}
       </KeyboardAwareScrollView>
 
+      {/* 오운완 인증샷 모달 */}
+      <OuwanCard
+        visible={ouwanVisible}
+        onClose={() => setOuwanVisible(false)}
+        date={selectedDate}
+        exercises={[
+          ...dayPt.flatMap((log: any) =>
+            (log.exercises ?? []).map((ex: any) => ex.name ?? ex.exerciseName ?? "")
+          ),
+          ...dayFitLogs.flatMap((log: any) =>
+            (log.exercises ?? []).map((ex: any) => ex.name ?? ex.exerciseName ?? "")
+          ),
+        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)}
+        sessionType={dayPt.length > 0 ? "PT" : "개인운동"}
+      />
+
       {/* 개인운동 입력폼 모달 (Bottom Sheet) */}
       <Modal
-        visible={showAddModal && isToday}
+        visible={showAddModal}
         transparent
         animationType="slide"
         onRequestClose={() => resetPersonalForm()}
@@ -2195,6 +2271,32 @@ export default function WorkoutScreen() {
                       color: Colors.text,
                     }}
                   />
+                  {suggestions[ei]?.latestMemo && !ex.memo && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const u = [...exercises];
+                        u[ei].memo = suggestions[ei]!.latestMemo!;
+                        setExercises(u);
+                      }}
+                      style={{
+                        marginTop: 4,
+                        backgroundColor: Colors.bgSub,
+                        borderWidth: 1,
+                        borderColor: Colors.border,
+                        borderRadius: 6,
+                        paddingHorizontal: 8,
+                        paddingVertical: 5,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, color: Colors.textMuted }}>최근</Text>
+                      <Text style={{ fontSize: 11, color: Colors.textSub, flex: 1 }} numberOfLines={1}>
+                        {suggestions[ei]!.latestMemo}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
 
@@ -2230,27 +2332,59 @@ export default function WorkoutScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={savePersonalLog}
-                disabled={saving}
-                style={{
-                  backgroundColor: Colors.blue,
-                  borderRadius: 12,
-                  padding: 14,
-                  alignItems: "center",
-                  opacity: saving ? 0.6 : 1,
-                }}
-              >
-                <Text
-                  style={{ fontSize: 15, fontWeight: "900", color: "#fff" }}
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                {!editingWorkoutId && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const draftKey = `personal_draft_${selectedDate}`;
+                      const draft = {
+                        exercises,
+                        personalBodyParts,
+                        personalCondition,
+                      };
+                      await AsyncStorage.setItem(draftKey, JSON.stringify(draft));
+                      Alert.alert("임시저장 완료", "나중에 이어서 작성할 수 있어요.", [
+                        { text: "확인", onPress: () => resetPersonalForm(true) },
+                      ]);
+                    }}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: Colors.blue,
+                      borderRadius: 12,
+                      padding: 14,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.blue }}>
+                      임시저장
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={savePersonalLog}
+                  disabled={saving}
+                  style={{
+                    flex: editingWorkoutId ? undefined : 2,
+                    backgroundColor: Colors.blue,
+                    borderRadius: 12,
+                    padding: 14,
+                    alignItems: "center",
+                    opacity: saving ? 0.6 : 1,
+                    ...(editingWorkoutId ? { alignSelf: "stretch" as const, width: "100%" } : {}),
+                  }}
                 >
-                  {saving
-                    ? "저장 중..."
-                    : editingWorkoutId
-                      ? "개인운동 수정 완료"
-                      : "개인운동 등록"}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={{ fontSize: 15, fontWeight: "900", color: "#fff" }}
+                  >
+                    {saving
+                      ? "저장 중..."
+                      : editingWorkoutId
+                        ? "개인운동 수정 완료"
+                        : "개인운동 등록"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>

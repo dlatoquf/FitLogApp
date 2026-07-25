@@ -168,10 +168,12 @@ public class MemberHomeController {
         if (trainer == null)
             return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "유효하지 않은 트레이너 코드예요."));
 
-        long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
-        boolean isFree = "FREE".equals(trainer.getPlan());
+        java.time.LocalDate cutoff = java.time.LocalDate.now().minusDays(7);
+        long totalCount = memberRepository.countByTrainer(trainer, cutoff)
+                + manualMemberRepository.countNonOtByTrainer(trainer, cutoff);
+        boolean isFree = !trainer.isProEffective();
 
-        if (isFree && memberCount >= 3) {
+        if (isFree && totalCount >= 5) {
             return ResponseEntity.ok(Map.of(
                     "valid", false,
                     "full", true,
@@ -207,10 +209,12 @@ public class MemberHomeController {
         if (trainer == null)
             return ResponseEntity.badRequest().body(Map.of("message", "유효하지 않은 트레이너 코드예요."));
 
-        // 무료 플랜 5명 제한 (PRO 또는 체험 중이면 무제한)
+        // 무료 플랜 5명 제한 (연동 + 수동 PT, OT 제외)
         if (!trainer.isProEffective()) {
-            long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
-            if (memberCount >= 5) {
+            java.time.LocalDate cutoff2 = java.time.LocalDate.now().minusDays(7);
+            long totalCount2 = memberRepository.countByTrainer(trainer, cutoff2)
+                    + manualMemberRepository.countNonOtByTrainer(trainer, cutoff2);
+            if (totalCount2 >= 5) {
                 return ResponseEntity.badRequest().body(
                         Map.of("message", "해당 트레이너는 무료 플랜으로 최대 5명까지 연결 가능합니다.")
                 );
@@ -362,9 +366,10 @@ public class MemberHomeController {
         if (trainer == null)
             return ResponseEntity.badRequest().body(Map.of("message", "유효하지 않은 트레이너 코드예요."));
 
-        long memberCount = memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
-        boolean isFree = "FREE".equals(trainer.getPlan());
-        if (isFree && memberCount >= 3)
+        java.time.LocalDate vc = java.time.LocalDate.now().minusDays(7);
+        long vcTotal = memberRepository.countByTrainer(trainer, vc)
+                + manualMemberRepository.countNonOtByTrainer(trainer, vc);
+        if (!trainer.isProEffective() && vcTotal >= 5)
             return ResponseEntity.badRequest().body(Map.of("message", "이 트레이너는 현재 무료 플랜 회원이 가득 찼어요."));
 
         return ResponseEntity.ok(Map.of(

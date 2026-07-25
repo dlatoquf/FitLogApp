@@ -804,6 +804,13 @@ export default function TrainerMembersScreen() {
             </View>
           ))}
         </View>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, marginBottom: 4, paddingHorizontal: 2 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
+          <Text style={{ fontSize: 11, color: Colors.textMuted, marginHorizontal: 8 }}>
+            회원을 눌러 모든 기록을 남겨봐요
+          </Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
+        </View>
 
         {/* 회원 목록 */}
         {displayed.length === 0 ? (
@@ -1886,7 +1893,10 @@ export default function TrainerMembersScreen() {
                   marginBottom: 20,
                 }}
               >
-                PRO 플랜으로 업그레이드
+                PRO에서는 회원 수 제한 없이 관리할 수 있습니다.
+              </Text>
+              <Text style={{ fontSize: 14, color: Colors.textSub, marginBottom: 20 }}>
+                1개월 무료 체험을 시작해보세요.
               </Text>
               <View
                 style={{

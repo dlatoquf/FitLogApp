@@ -70,11 +70,6 @@ public class ProfileService {
         // 제휴 코드 처리
         applyAffiliateCode(trainer, req.getAffiliateCode());
 
-        // 최초 등록 시 1개월 무료 체험 부여
-        if (isNew && trainer.getTrialEndDate() == null) {
-            trainer.setTrialEndDate(java.time.LocalDate.now().plusMonths(1));
-        }
-
         Trainer saved = trainerRepository.save(trainer);
 
         // 슬롯 생성은 트레이너가 스케줄 탭에서 직접 offset 선택 후 진행

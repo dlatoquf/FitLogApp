@@ -27,7 +27,8 @@ public class TrainerHomeResponse {
     // 오늘 노쇼
     private int noShowCount;
 
-    public TrainerHomeResponse(Long trainerId, String trainerName, int totalMembers, int todaySchedules,
+    public TrainerHomeResponse(Long trainerId, String trainerName, int totalMembers,
+                               int todaySchedules,
                                int attendanceRate, List<TodayPt> todayPtList, String plan,
                                String trainerCode, Integer goalSessions, Long goalRevenue,
                                int monthSessions, long monthRevenue,

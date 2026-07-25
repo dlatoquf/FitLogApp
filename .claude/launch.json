@@ -14,10 +14,10 @@
       "port": 8889
     },
     {
-      "name": "fitlog-web",
+      "name": "fitlog-landing",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8890", "--directory", "/Users/imsaebyeol/Desktop/FitLog_Web"],
-      "port": 8890
+      "runtimeArgs": ["-m", "http.server", "8891", "--directory", "landing"],
+      "port": 8891
     }
   ]
 }

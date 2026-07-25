@@ -118,32 +118,33 @@ export default function MemberNotificationsScreen() {
     const handleNotificationPress = async (n: Noti) => {
         console.log("[Notif Press Member]", JSON.stringify({ type: n.type, targetType: n.targetType, targetId: n.targetId, targetDate: n.targetDate }));
         await markOneRead(n.notificationId);
+        const from = "notifications";
         if (n.type === "WORKOUT_LOG" || n.type === "FEEDBACK" || n.targetType === "WORKOUT_LOG") {
             const date = n.targetDate ?? undefined;
-            router.push(date ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any) : "/(tabs)/member/workout");
+            router.push(date ? ({ pathname: "/(tabs)/member/workout", params: { date, from } } as any) : ({ pathname: "/(tabs)/member/workout", params: { from } } as any));
             return;
         }
         if (n.type === "DIET_FEEDBACK" || n.targetType === "DIET_FEEDBACK") {
             const date = n.targetDate ?? undefined;
-            router.push(date ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any) : "/(tabs)/member/diet");
+            router.push(date ? ({ pathname: "/(tabs)/member/diet", params: { date, from } } as any) : ({ pathname: "/(tabs)/member/diet", params: { from } } as any));
             return;
         }
         if (n.type === "SCHEDULE_CONFIRM" || n.type === "SCHEDULE_CANCEL" || n.type === "SCHEDULE_REMINDER" || n.type === "SCHEDULE_CHANGE") {
-            router.push("/(tabs)/member/home"); return;
+            router.push({ pathname: "/(tabs)/member/home", params: { from } } as any); return;
         }
         if (n.type === "SCHEDULE_OPEN" || n.targetType === "SCHEDULE_OPEN") {
-            router.push({ pathname: "/(tabs)/member/home", params: { openSchedule: "true" } }); return;
+            router.push({ pathname: "/(tabs)/member/home", params: { openSchedule: "true", from } } as any); return;
         }
         if (n.type === "PT_ADD" || n.targetType === "PT") {
-            router.push("/(tabs)/member/home"); return;
+            router.push({ pathname: "/(tabs)/member/home", params: { from } } as any); return;
         }
         if (n.type === "BODY_LOG" || n.targetType === "BODY_LOG") {
-            router.push("/(tabs)/member/growth" as any); return;
+            router.push({ pathname: "/(tabs)/member/growth", params: { from } } as any); return;
         }
         if (n.type === "GENERAL") {
-            router.push("/(tabs)/member/notices" as any); return;
+            router.push({ pathname: "/(tabs)/member/notices", params: { from } } as any); return;
         }
-        router.push("/(tabs)/member/home");
+        router.push({ pathname: "/(tabs)/member/home", params: { from } } as any);
     };
 
     useFocusEffect(useCallback(() => {

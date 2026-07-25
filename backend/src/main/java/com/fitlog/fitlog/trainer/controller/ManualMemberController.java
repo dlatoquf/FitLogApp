@@ -115,12 +115,13 @@ public class ManualMemberController {
         Trainer trainer = trainerRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("트레이너 정보가 없습니다."));
 
-        // 무료 플랜 5명 제한 (OT 회원은 제외, PT 회원 기준)
         boolean isOtNew = "OT".equals(body.get("memo"));
+
+        // 무료 플랜 5명 제한 (연동 + 수동 PT, OT 제외)
         if (!isOtNew && !trainer.isProEffective()) {
-            long nonOtCount = manualMemberRepository.countNonOtByTrainer(trainer, java.time.LocalDate.now().minusDays(7))
+            long totalCount = manualMemberRepository.countNonOtByTrainer(trainer, java.time.LocalDate.now().minusDays(7))
                     + memberRepository.countByTrainer(trainer, java.time.LocalDate.now().minusDays(7));
-            if (nonOtCount >= 5) {
+            if (totalCount >= 5) {
                 return ResponseEntity.status(403).body(null);
             }
         }
@@ -128,10 +129,9 @@ public class ManualMemberController {
         // OT 회원 매칭: 동일 트레이너의 OT 회원 중 전화번호(우선) 또는 이름이 일치하면 PT로 전환
         String incomingPhone = body.get("phone") != null ? ((String) body.get("phone")).trim() : null;
         String incomingName  = body.get("name")  != null ? ((String) body.get("name")).trim()  : null;
-        boolean isNewOtMember = "OT".equals(body.get("memo")); // isOtNew와 동일 — 아래 로직에서 사용
 
         // OT 중복 방지: 동일 전화번호/이름의 OT 회원이 이미 존재하면 그대로 반환 (2회차 OT 지원)
-        if (isNewOtMember) {
+        if (isOtNew) {
             java.util.Optional<ManualMember> existingOt = java.util.Optional.empty();
             if (incomingPhone != null && !incomingPhone.isBlank()) {
                 existingOt = manualMemberRepository.findByTrainerAndMemoAndPhone(trainer, "OT", incomingPhone);
@@ -150,7 +150,7 @@ public class ManualMemberController {
             }
         }
 
-        if (!isNewOtMember && (incomingPhone != null || incomingName != null)) {
+        if (!isOtNew && (incomingPhone != null || incomingName != null)) {
             java.util.Optional<ManualMember> otMatch = java.util.Optional.empty();
             if (incomingPhone != null && !incomingPhone.isBlank()) {
                 // 1차: 포맷 그대로 매칭 (010-0000-0000)

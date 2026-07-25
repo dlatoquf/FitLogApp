@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -65,6 +65,8 @@ const formatTime = (time?: string) => {
 };
 
 export default function MemberHomeScreen() {
+  const { from: fromParam } = useLocalSearchParams<{ from?: string }>();
+  const fromNotifications = fromParam === "notifications";
   const [data, setData] = useState<MemberHomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -361,6 +363,15 @@ export default function MemberHomeScreen() {
           }}
         >
           <View>
+            {fromNotifications && (
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/member/notifications" as any)}
+                style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 4 }}
+              >
+                <Text style={{ fontSize: 18, color: Colors.green, fontWeight: "700" }}>‹</Text>
+                <Text style={{ fontSize: 15, color: Colors.green, fontWeight: "600" }}>알림</Text>
+              </TouchableOpacity>
+            )}
             <Text
               style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 2 }}
             >
