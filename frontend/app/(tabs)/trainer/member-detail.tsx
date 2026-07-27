@@ -1356,8 +1356,8 @@ export default function MemberDetailScreen() {
       const ex = (log.exercises ?? []).find(
         (e: any) => String(e.name ?? "").trim().toLowerCase() === normalized
       );
-      if (ex?.memo?.trim()) {
-        setMemoSuggestions((p) => ({ ...p, [idx]: ex.memo.trim() }));
+      if ((ex as any)?.memo?.trim()) {
+        setMemoSuggestions((p) => ({ ...p, [idx]: (ex as any).memo.trim() }));
         return;
       }
     }

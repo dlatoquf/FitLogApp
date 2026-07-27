@@ -171,7 +171,7 @@ export default function FitLogWriteScreen() {
         throw new Error(text || "저장 실패");
       }
 
-      const memberName = members.find((m) => m.id === selectedMemberId)?.name ?? "회원";
+      const memberName = members.find((m) => m.id === selectedMemberId)?.user.name ?? "회원";
       uploadWorkoutLog({
         memberName,
         date,

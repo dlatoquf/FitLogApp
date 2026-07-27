@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import CommentSection from "../../../components/CommentSection";
 import OuwanCard from "../../../components/OuwanCard";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ResizeMode, Video } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
@@ -72,6 +72,7 @@ interface WorkoutLog {
 }
 
 export default function WorkoutScreen() {
+  const router = useRouter();
   const { date: dateParam, from: fromParam } = useLocalSearchParams<{ date?: string; from?: string }>();
   const fromNotifications = fromParam === "notifications";
   const [loading, setLoading] = useState(true);
@@ -189,7 +190,7 @@ export default function WorkoutScreen() {
   const [historyAllLogs, setHistoryAllLogs] = useState<any[]>([]);
   // 클로저 문제 방지용 ref
   const historyAllLogsRef = useRef<any[]>([]);
-  const mainScrollRef = useRef<ScrollView>(null);
+  const mainScrollRef = useRef<any>(null);
   // 최근 운동일 목록 (날짜별 탭 빠른 선택용)
   const [historyRecentDates, setHistoryRecentDates] = useState<string[]>([]);
 

@@ -3,7 +3,7 @@
     "name": "FitLog",
     "slug": "FitLogApp",
     "displayName": "FitLog",
-    "version": "2.2.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "splash": {
