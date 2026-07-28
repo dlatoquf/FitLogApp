@@ -1,11 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -15,8 +16,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Application from "expo-application";
 import { Colors } from "../../../constants/Colors";
-import { API_URL } from "../../../constants/api";
+import { API_URL, APP_STORE_URL, PLAY_STORE_URL } from "../../../constants/api";
 import { getWeekDates, toDateKey } from "../../../hooks/useApi";
 
 interface ThisWeekSchedule {
@@ -290,6 +292,38 @@ export default function MemberHomeScreen() {
     useCallback(() => {
       setActiveTab("공지");
       fetchHome();
+    }, []),
+  );
+
+  const updateChecked = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (updateChecked.current) return;
+      updateChecked.current = true;
+      (async () => {
+        try {
+          const CURRENT_VERSION = Application.nativeApplicationVersion ?? "0.0.0";
+          const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
+          const json = await res.json();
+          const latest = json.results?.[0]?.version;
+          const parseVer = (v: string) => v.split(".").map(Number);
+          const isNewer = (a: string, b: string) => {
+            const [a1, a2, a3] = parseVer(a);
+            const [b1, b2, b3] = parseVer(b);
+            return a1 > b1 || (a1 === b1 && a2 > b2) || (a1 === b1 && a2 === b2 && a3 > b3);
+          };
+          if (latest && isNewer(latest, CURRENT_VERSION)) {
+            Alert.alert(
+              "업데이트 안내",
+              `새 버전(${latest})이 출시됐어요!\n업데이트 후 이용해주세요.`,
+              [
+                { text: "나중에" },
+                { text: "업데이트", onPress: () => Linking.openURL(Platform.OS === "android" ? PLAY_STORE_URL : APP_STORE_URL) },
+              ],
+            );
+          }
+        } catch {}
+      })();
     }, []),
   );
 

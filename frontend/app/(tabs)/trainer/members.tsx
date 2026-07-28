@@ -1893,10 +1893,10 @@ export default function TrainerMembersScreen() {
                   marginBottom: 20,
                 }}
               >
-                PRO에서는 회원 수 제한 없이 관리할 수 있습니다.
+                PRO 플랜으로 업그레이드
               </Text>
               <Text style={{ fontSize: 14, color: Colors.textSub, marginBottom: 20 }}>
-                1개월 무료 체험을 시작해보세요.
+                1개월 무료체험을 시작해보세요.
               </Text>
               <View
                 style={{

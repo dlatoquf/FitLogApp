@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import KakaoShare from "@react-native-kakao/share";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { ResizeMode, Video } from "expo-av";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
@@ -51,6 +51,9 @@ import {
 } from "../../../constants/api";
 import { apiGet, getWeekDates, toDateKey } from "../../../hooks/useApi";
 import { FitLog, Member } from "../../../types";
+
+let _setKeyCounter = Date.now();
+const nextSetKey = () => ++_setKeyCounter;
 
 const SCREEN_W = Dimensions.get("window").width - 72;
 const FULL_W = Dimensions.get("window").width;
@@ -183,6 +186,7 @@ function buildDateGroups(logs: FitLog[]): DateGroup[] {
     }
     const td = typeMap.get(type)!;
     for (const ex of log.exercises ?? []) {
+      if (!ex.name) continue;
       let e = td.exercises.find((e) => e.exercise === ex.name);
       if (!e) {
         e = {
@@ -232,6 +236,7 @@ function buildExGroups(logs: FitLog[]): ExAllGroup[] {
     const date = String(la.date ?? la.logDate ?? "").slice(0, 10);
     const type: "PT" | "개인" = la.workoutType === "PT" ? "PT" : "개인";
     for (const ex of log.exercises ?? []) {
+      if (!ex.name) continue;
       if (!map.has(ex.name)) map.set(ex.name, []);
       const entries = map.get(ex.name)!;
       let e = entries.find((e) => e.date === date && e.type === type);
@@ -1314,15 +1319,20 @@ export default function MemberDetailScreen() {
   // 식단 사진 자연 비율 계산
   useEffect(() => {
     dietPhotos.forEach((photo) => {
-      if (!photo.photoUrl || dietPhotoRatios[photo.id] !== undefined) return;
-      Image.getSize(
-        photo.photoUrl,
-        (w, h) => {
-          if (h > 0)
-            setDietPhotoRatios((prev) => ({ ...prev, [photo.id]: w / h }));
-        },
-        () => setDietPhotoRatios((prev) => ({ ...prev, [photo.id]: 4 / 3 })),
-      );
+      try {
+        if (!photo.photoUrl || dietPhotoRatios[photo.id] !== undefined) return;
+        if (!photo.photoUrl.startsWith("http")) return;
+        Image.getSize(
+          photo.photoUrl,
+          (w, h) => {
+            if (h > 0)
+              setDietPhotoRatios((prev) => ({ ...prev, [photo.id]: w / h }));
+          },
+          () => setDietPhotoRatios((prev) => ({ ...prev, [photo.id]: 4 / 3 })),
+        );
+      } catch {
+        setDietPhotoRatios((prev) => ({ ...prev, [photo.id]: 4 / 3 }));
+      }
     });
   }, [dietPhotos]);
 
@@ -1380,7 +1390,7 @@ export default function MemberDetailScreen() {
   >([
     {
       name: "",
-      sets: [{ setId: undefined, _key: 0, weight: "", reps: "" }],
+      sets: [{ setId: undefined, _key: nextSetKey(), weight: "", reps: "" }],
       memo: "",
       mediaFiles: [],
       existingMediaList: [],
@@ -2132,10 +2142,11 @@ export default function MemberDetailScreen() {
     }
   };
 
-  const fetchFitLogs = async (forceRefresh = false) => {
+  const fetchFitLogs = async (forceRefresh = false, offsetOverride?: number) => {
     // 주 단위 캐시 키
-    const weekStart = getWeekDates(weekOffset)[0];
-    const weekEnd = getWeekDates(weekOffset)[6];
+    const offset = offsetOverride !== undefined ? offsetOverride : weekOffset;
+    const weekStart = getWeekDates(offset)[0];
+    const weekEnd = getWeekDates(offset)[6];
     const weekKey = `${isManual ? "manual" : "linked"}_${memberId}_${toDateKey(weekStart)}_${toDateKey(weekEnd)}`;
 
     // 캐시 있으면 즉시 표시
@@ -2371,8 +2382,10 @@ export default function MemberDetailScreen() {
       }
       // 화면 복귀 시 최신 PT 잔여 등 회원 데이터 갱신
       fetchMember();
-      // 항상 현재 주차 데이터 새로고침 (weekOffset 변경 없어도 stale 캐시 방지)
-      fetchFitLogs(true);
+      // 항상 현재 주차 데이터 새로고침 (stale closure 방지: offset 명시 전달)
+      setFitLogCache({});
+      const focusOffset = notifDate ? calcWeekOffset(parseDateStr(notifDate)) : 0;
+      fetchFitLogs(true, focusOffset);
       fetchFitLogHistory(true);
     }, [initialTab, isManual, memberId, notifDate]),
   );
@@ -2406,6 +2419,30 @@ export default function MemberDetailScreen() {
     })();
   }, []);
 
+  // 뒤로가기 시 미저장 운동 기록 경고
+  const navigation = useNavigation();
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener("beforeRemove", (e: any) => {
+      const hasPtData =
+        exercises.some((ex) => ex.name.trim() || ex.sets.some((s: any) => s.weight || s.reps)) ||
+        ptBodyParts.length > 0 ||
+        ptCondition !== null ||
+        ptLogMemo.trim() ||
+        ptWorkoutFeedback.trim();
+      if (!hasPtData) return;
+      e.preventDefault();
+      Alert.alert(
+        "PT 기록이 저장되지 않았어요",
+        "임시저장 버튼을 눌러 저장하거나, 그냥 나가면 입력한 내용이 사라져요.",
+        [
+          { text: "계속 입력", style: "cancel" },
+          { text: "나가기", style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
+        ],
+      );
+    });
+    return unsubscribe;
+  }, [navigation, exercises, ptBodyParts, ptCondition, ptLogMemo, ptWorkoutFeedback]);
+
   // memberId 바뀌는 즉시 이전 회원 데이터 숨김 (렌더 전에 동기 실행)
   useLayoutEffect(() => {
     setRenderedMemberId(-1);
@@ -2426,7 +2463,7 @@ export default function MemberDetailScreen() {
         setSelectedDate(new Date());
         setWeekOffset(0);
       }
-      resetFitLogForm();
+      resetFitLogForm(true);
       // 회원 변경 시 상태 완전 초기화 (비동기 ref 포함)
       setRenderedMemberId(-1); // 즉시 이전 회원 데이터 숨김
       setMember(null);
@@ -2494,23 +2531,39 @@ export default function MemberDetailScreen() {
     fetchWeekDietDates();
   }, [memberId]);
 
-  const resetFitLogForm = () => {
-    setExercises([
-      {
-        name: "",
-        sets: [{ setId: undefined, _key: Date.now(), weight: "", reps: "" }],
-        memo: "",
-        mediaFiles: [],
-        existingMediaList: [],
-      },
-    ]);
-    setPtBodyParts([]);
-    setPtCondition(null);
-    setPtLogMemo("");
-    setPtWorkoutFeedback("");
-    setPtMissions([""]);
-    setEditingFitLogId(null);
-    setShowFitLogForm(false);
+  const resetFitLogForm = (force = false) => {
+    const doReset = () => {
+      setExercises([
+        {
+          name: "",
+          sets: [{ setId: undefined, _key: nextSetKey(), weight: "", reps: "" }],
+          memo: "",
+          mediaFiles: [],
+          existingMediaList: [],
+        },
+      ]);
+      setPtBodyParts([]);
+      setPtCondition(null);
+      setPtLogMemo("");
+      setPtWorkoutFeedback("");
+      setPtMissions([""]);
+      setEditingFitLogId(null);
+      setShowFitLogForm(false);
+    };
+    if (force || editingFitLogId !== null) { doReset(); return; }
+    const hasData =
+      exercises.some((ex) => ex.name.trim() || ex.sets.some((s: any) => s.weight || s.reps)) ||
+      ptBodyParts.length > 0 || ptCondition !== null ||
+      ptLogMemo.trim() || ptWorkoutFeedback.trim();
+    if (!hasData) { doReset(); return; }
+    Alert.alert(
+      "PT 기록이 저장되지 않았어요",
+      "임시저장 버튼을 눌러 저장하거나, 그냥 나가면 입력한 내용이 사라져요.",
+      [
+        { text: "계속 입력", style: "cancel" },
+        { text: "나가기", style: "destructive", onPress: doReset },
+      ],
+    );
   };
 
   const startEditFitLog = (log: any) => {
@@ -2947,10 +3000,11 @@ export default function MemberDetailScreen() {
         }
       }
       await AsyncStorage.removeItem(`fitlog_draft_${memberId}`);
-      resetFitLogForm();
-      // 캐시 무효화 후 재조회
+      resetFitLogForm(true);
+      // 캐시 무효화 후 재조회 (selectedDate가 포함된 주로 맞춤)
       setFitLogCache({});
       setFitLogHistoryLoaded(false);
+      setWeekOffset(calcWeekOffset(selectedDate));
       await fetchMember();
       fetchFitLogs(true);
       fetchFitLogHistory(true);
@@ -5060,6 +5114,7 @@ export default function MemberDetailScreen() {
                           .catch(() => {});
                       });
                     }
+                    await fetchFitLogHistory();
                     const draftKey = `fitlog_draft_${memberId}`;
                     const draft = await AsyncStorage.getItem(draftKey);
                     if (draft) {
@@ -5144,17 +5199,6 @@ export default function MemberDetailScreen() {
               </View>
             ) : dayFitLogs.length > 0 ? (
               <View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.textSub,
-                    marginBottom: 10,
-                  }}
-                >
-                  이날 운동 기록
-                </Text>
-
                 {/* PT 수업 */}
                 {dayPtLogs.length > 0 && (
                   <View style={{ marginBottom: 14 }}>
@@ -5891,7 +5935,7 @@ export default function MemberDetailScreen() {
         visible={showFitLogForm}
         transparent={false}
         animationType="slide"
-        onRequestClose={resetFitLogForm}
+        onRequestClose={() => resetFitLogForm()}
       >
         <View style={{ flex: 1, backgroundColor: "#fff" }}>
           {/* 헤더 */}
@@ -5911,7 +5955,7 @@ export default function MemberDetailScreen() {
               style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
             >
               <TouchableOpacity
-                onPress={resetFitLogForm}
+                onPress={() => resetFitLogForm()}
                 style={{ padding: 4 }}
               >
                 <Text style={{ fontSize: 22, color: Colors.text }}>←</Text>
@@ -6300,6 +6344,7 @@ export default function MemberDetailScreen() {
                             u[ei].name = name;
                             setExercises(u);
                             setExerciseSuggest(null);
+                            fetchMemoSuggestion(name, ei);
                           }}
                           style={{
                             paddingHorizontal: 12,
@@ -6463,7 +6508,7 @@ export default function MemberDetailScreen() {
                           const u = [...exercises];
                           u[ei].sets.splice(si + 1, 0, {
                             setId: undefined,
-                            _key: Date.now(),
+                            _key: nextSetKey(),
                             weight: "",
                             reps: "",
                           });
@@ -6496,7 +6541,7 @@ export default function MemberDetailScreen() {
                           const u = [...exercises];
                           u[ei].sets.splice(si + 1, 0, {
                             setId: undefined,
-                            _key: Date.now(),
+                            _key: nextSetKey(),
                             weight: s.weight,
                             reps: s.reps,
                           });
@@ -6568,7 +6613,7 @@ export default function MemberDetailScreen() {
                                 while (u[ei].sets.length <= prevIdx) {
                                   u[ei].sets.push({
                                     setId: undefined,
-                                    _key: Date.now(),
+                                    _key: nextSetKey(),
                                     weight: "",
                                     reps: "",
                                   });
@@ -6849,7 +6894,7 @@ export default function MemberDetailScreen() {
                     sets: [
                       {
                         setId: undefined,
-                        _key: Date.now(),
+                        _key: nextSetKey(),
                         weight: "",
                         reps: "",
                       },
@@ -7034,7 +7079,7 @@ export default function MemberDetailScreen() {
                   Alert.alert(
                     "임시저장 완료",
                     "나중에 이어서 작성할 수 있어요.",
-                    [{ text: "확인", onPress: resetFitLogForm }],
+                    [{ text: "확인", onPress: () => resetFitLogForm(true) }],
                   );
                 }}
                 style={{

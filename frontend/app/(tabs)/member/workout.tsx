@@ -521,16 +521,45 @@ export default function WorkoutScreen() {
     }
   };
 
-  const resetPersonalForm = (clear = false) => {
-    setShowAddModal(false);
-    setEditingWorkoutId(null);
+  const hasUnsavedPersonalData = () =>
+    exercises.some(
+      (ex) => ex.name.trim() || ex.sets.some((s) => s.weight || s.reps),
+    ) || personalBodyParts.length > 0 || personalCondition !== null;
 
-    if (clear) {
-      setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
-      setSuggestions({});
-      setPersonalBodyParts([]);
-      setPersonalCondition(null);
+  const resetPersonalForm = (clear = false) => {
+    const doClose = () => {
+      setShowAddModal(false);
+      setEditingWorkoutId(null);
+      if (clear) {
+        setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+        setSuggestions({});
+        setPersonalBodyParts([]);
+        setPersonalCondition(null);
+      }
+    };
+
+    if (!clear && hasUnsavedPersonalData()) {
+      Alert.alert(
+        "운동 기록이 저장되지 않았어요",
+        "저장 버튼을 눌러 저장하거나, 그냥 나가면 입력한 내용이 사라져요.",
+        [
+          { text: "계속 입력", style: "cancel" },
+          {
+            text: "나가기",
+            style: "destructive",
+            onPress: () => {
+              setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+              setSuggestions({});
+              setPersonalBodyParts([]);
+              setPersonalCondition(null);
+              doClose();
+            },
+          },
+        ],
+      );
+      return;
     }
+    doClose();
   };
 
   const openPersonalForm = async () => {

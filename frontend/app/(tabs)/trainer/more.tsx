@@ -613,80 +613,74 @@ export default function TrainerMoreScreen() {
           return plan === "PRO" && !trialEndDate ? (
             <>
               <View style={{
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: Colors.green + "66",
-                backgroundColor: "#fff",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
+                borderRadius: 16,
+                backgroundColor: Colors.green,
+                paddingHorizontal: 18,
+                paddingVertical: 14,
                 marginBottom: 8,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
               }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.green }}>PRO 플랜</Text>
-                  <View style={{ backgroundColor: Colors.green, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#fff" }}>구독 중</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ fontSize: 17, fontWeight: "900", color: "#fff", letterSpacing: -0.3 }}>PRO 플랜</Text>
+                    <View style={{ backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>구독 중</Text>
+                    </View>
                   </View>
+                  <TouchableOpacity
+                    onPress={() =>
+                      Platform.OS === "android"
+                        ? Linking.openURL("https://play.google.com/store/account/subscriptions")
+                        : Linking.openURL("https://apps.apple.com/account/subscriptions")
+                    }
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.18)",
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.85)" }}>구독 취소</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() =>
-                    Platform.OS === "android"
-                      ? Linking.openURL("https://play.google.com/store/account/subscriptions")
-                      : Linking.openURL("https://apps.apple.com/account/subscriptions")
-                  }
-                  style={{
-                    borderWidth: 1,
-                    borderColor: "#ef4444" + "88",
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444" }}>구독 취소</Text>
-                </TouchableOpacity>
+                <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 17 }}>
+                  {Platform.OS === "ios"
+                    ? "매월 자동 갱신 · 결제일 24시간 전까지 Apple ID 설정 > 구독에서 취소 가능"
+                    : "매월 자동 갱신 · 결제일 24시간 전까지 Google Play에서 취소 가능"}
+                </Text>
               </View>
-              <Text style={{ fontSize: 11, color: Colors.textMuted, lineHeight: 17, marginBottom: 12, paddingLeft: 12 }}>
-                {Platform.OS === "ios"
-                  ? "매월 자동 갱신, 결제일 24시간 전까지 Apple ID 설정 > 구독에서 취소 가능합니다.\n환불은 Apple 정책에 따릅니다."
-                  : "매월 자동 갱신, 결제일 24시간 전까지 Google Play에서 취소 가능합니다.\n환불은 Google Play 정책에 따릅니다."}
-              </Text>
+              <View style={{ height: 12 }} />
             </>
           ) : (
             <View style={{
-              borderRadius: 14,
-              borderWidth: 1.5,
-              borderColor: "#FDE047",
-              backgroundColor: "#fff",
-              paddingHorizontal: 16,
-              paddingVertical: 10,
+              borderRadius: 16,
+              backgroundColor: Colors.bgSub,
+              paddingHorizontal: 18,
+              paddingVertical: 14,
               marginBottom: 12,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
             }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }}>무료 플랜</Text>
-                {daysLeft !== null && (
-                  <View style={{ backgroundColor: "#FFF0E6", borderWidth: 1, borderColor: "#F97316", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#EA6C00" }}>
-                      {daysLeft === 0 ? "무료체험 오늘까지" : `무료체험 ${daysLeft}일 남음`}
-                    </Text>
-                  </View>
-                )}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 17, fontWeight: "900", color: Colors.text, letterSpacing: -0.3 }}>무료 플랜</Text>
+                  {daysLeft !== null && (
+                    <View style={{ backgroundColor: "#FFF0E6", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#EA6C00" }}>
+                        {daysLeft === 0 ? "무료체험 오늘까지" : `무료체험 ${daysLeft}일 남음`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => setPaymentVisible(true)}
+                  style={{
+                    backgroundColor: Colors.green,
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>업그레이드</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => setPaymentVisible(true)}
-                style={{
-                  backgroundColor: Colors.green,
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>업그레이드</Text>
-              </TouchableOpacity>
             </View>
           );
         })()}
@@ -1212,6 +1206,9 @@ export default function TrainerMoreScreen() {
                   }}
                 >
                   PRO 플랜으로 업그레이드
+                </Text>
+                <Text style={{ fontSize: 14, color: Colors.textSub, marginBottom: isAffiliated ? 8 : 20 }}>
+                  1개월 무료체험을 시작해보세요.
                 </Text>
                 {isAffiliated && (
                   <Text

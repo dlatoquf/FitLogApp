@@ -3612,8 +3612,8 @@ export default function TrainerScheduleScreen() {
               }}
             >
               <View style={{ width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 99, alignSelf: "center", marginBottom: 20 }} />
-              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>PRO에서는 회원 수 제한 없이 관리할 수 있습니다.</Text>
-              <Text style={{ fontSize: 14, color: Colors.textMuted, marginBottom: 20 }}>1개월 무료 체험을 시작해보세요.</Text>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 6 }}>PRO 플랜으로 업그레이드</Text>
+              <Text style={{ fontSize: 14, color: Colors.textSub, marginBottom: 20 }}>1개월 무료체험을 시작해보세요.</Text>
               <View style={{ borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: Colors.green + "55", backgroundColor: Colors.greenLight, marginBottom: 20 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <Text style={{ fontSize: 18, fontWeight: "900", color: Colors.green }}>PRO</Text>
