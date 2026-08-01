@@ -80,11 +80,9 @@ function CardView({
         </View>
         <View style={{ height: 1, backgroundColor: divColor, marginBottom: 14 }} />
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 22 * fs, fontWeight: "900", color: Colors.green, letterSpacing: -0.5 }}>
-            FitLog{"  "}
-            <Text style={{ fontSize: 14 * fs, fontWeight: "500", color: tcSub, letterSpacing: 1 }}>오운완</Text>
+          <Text style={{ fontSize: 22 * fs, fontFamily: "Montserrat_900Black", color: Colors.green, letterSpacing: -0.5 }}>
+            FitLog
           </Text>
-          <Text style={{ fontSize: 14 * fs, color: tcSub, letterSpacing: 0.5 }}>#오운완 #핏로그</Text>
         </View>
       </View>
     </View>

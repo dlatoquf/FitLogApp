@@ -271,8 +271,14 @@ public class TrainerController {
     @DeleteMapping("/trainer/me")
     public ResponseEntity<Map<String, Object>> deleteMe(
             @RequestHeader("Authorization") String authorization) {
-        trainerDeleteService.deleteTrainerAccount(authorization);
-        return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
+        try {
+            trainerDeleteService.deleteTrainerAccount(authorization);
+            return ResponseEntity.ok(Map.of("success", true, "message", "계정이 삭제됐어요."));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "message", e.getMessage() != null ? e.getMessage() : "계정 삭제 중 오류가 발생했어요."));
+        }
     }
 
     // GET /api/trainer/deleted-members — 7일 이내 삭제된 회원 목록 조회

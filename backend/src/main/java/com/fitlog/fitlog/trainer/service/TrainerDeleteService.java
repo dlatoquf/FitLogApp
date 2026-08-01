@@ -15,6 +15,8 @@ import com.fitlog.fitlog.schedule.repository.ScheduleRequestRepository;
 import com.fitlog.fitlog.trainer.entity.Trainer;
 import com.fitlog.fitlog.trainer.repository.TrainerRepository;
 import com.fitlog.fitlog.workout.repository.WorkoutLogRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,9 @@ public class TrainerDeleteService {
     private final DietDayFeedbackRepository dietDayFeedbackRepository;
     private final NotificationRepository notificationRepository;
     private final PtContractRepository ptContractRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public TrainerDeleteService(JwtService jwtService,
                                 TrainerRepository trainerRepository,
@@ -103,7 +108,12 @@ public class TrainerDeleteService {
         // 9. 트레이너 삭제
         trainerRepository.delete(trainer);
 
-        // 10. 유저 삭제
+        // 10. 레거시 comments 테이블 잔여 데이터 정리 (FK 제약 해제용)
+        entityManager.createNativeQuery("DELETE FROM comments WHERE author_user_id = :userId")
+                .setParameter("userId", user.getId())
+                .executeUpdate();
+
+        // 11. 유저 삭제
         userRepository.delete(user);
     }
 }

@@ -7,6 +7,7 @@ import * as Linking from "expo-linking";
 import { router, Stack, useRootNavigationState } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, AppState, Text, TouchableOpacity } from "react-native";
+import { useFonts, Montserrat_900Black } from "@expo-google-fonts/montserrat";
 import * as Notifications from "expo-notifications";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -169,6 +170,7 @@ function InAppBanner({ title, body, type, date, targetId }: { title: string; bod
 }
 
 export default function RootLayout() {
+  useFonts({ Montserrat_900Black });
   const [banner, setBanner] = useState<{ title: string; body: string; type?: string; date?: string; targetId?: string; key: number } | null>(null);
   const [initialNotif, setInitialNotif] = useState<{ type: string; date?: string; targetId?: string } | null>(null);
   const navigationState = useRootNavigationState();

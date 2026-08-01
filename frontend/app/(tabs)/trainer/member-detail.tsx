@@ -5460,7 +5460,7 @@ export default function MemberDetailScreen() {
                     }}
                   >
                     <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.green }}>
-                      오운완 인증샷 만들기
+                      오늘 운동 인증하기
                     </Text>
                   </TouchableOpacity>
                 )}
