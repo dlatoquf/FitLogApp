@@ -2,6 +2,7 @@ package com.fitlog.fitlog.inquiry.controller;
 
 import com.fitlog.fitlog.inquiry.entity.Inquiry;
 import com.fitlog.fitlog.inquiry.repository.InquiryRepository;
+import com.fitlog.fitlog.notification.service.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,12 +31,14 @@ import java.util.Map;
 public class AdminInquiryController {
 
     private final InquiryRepository inquiryRepository;
+    private final NotificationService notificationService;
 
     @Value("${admin.secret:fitlog-admin-2024}")
     private String adminSecret;
 
-    public AdminInquiryController(InquiryRepository inquiryRepository) {
+    public AdminInquiryController(InquiryRepository inquiryRepository, NotificationService notificationService) {
         this.inquiryRepository = inquiryRepository;
+        this.notificationService = notificationService;
     }
 
     // 전체 문의 목록 조회 (관리자용)
@@ -88,6 +91,14 @@ public class AdminInquiryController {
         inquiry.setStatus("ANSWERED");
         inquiry.setAnsweredAt(LocalDateTime.now());
         inquiryRepository.save(inquiry);
+
+        try {
+            notificationService.sendNotification(
+                    inquiry.getTrainer().getUser(),
+                    "GENERAL",
+                    "문의하신 '" + inquiry.getTitle() + "'에 답변이 등록됐어요."
+            );
+        } catch (Exception ignored) {}
 
         return ResponseEntity.ok(Map.of(
                 "success", true,

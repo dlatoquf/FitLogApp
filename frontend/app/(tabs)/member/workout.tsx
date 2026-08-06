@@ -107,8 +107,9 @@ export default function WorkoutScreen() {
       name: string;
       sets: { weight: string; reps: string }[];
       memo: string;
+      isCardio?: boolean;
     }[]
-  >([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+  >([{ name: "", sets: [{ weight: "", reps: "" }], memo: "", isCardio: false }]);
   const [personalBodyParts, setPersonalBodyParts] = useState<string[]>([]);
   const [personalCondition, setPersonalCondition] = useState<number | null>(
     null,
@@ -339,13 +340,14 @@ export default function WorkoutScreen() {
     allSources.forEach((l: any) => {
       const exercises = l.exercises ?? [];
       const match = exercises.find(
-        (ex: any) => String(ex.name ?? "").trim() === name,
+        (ex: any) => String(ex.name ?? "").trim() === name && !String(ex.memo ?? "").startsWith("##CARDIO##"),
       );
       if (match) {
         logs.push({
           date: l.date,
           sets: match.sets ?? [],
           workoutType: l.workoutType ?? "PERSONAL",
+          feedback: l.feedback ?? null,
         });
       }
     });
@@ -437,7 +439,7 @@ export default function WorkoutScreen() {
 
   // 이전 기록 상태
   const [suggestions, setSuggestions] = useState<{
-    [key: number]: { date: string; sets: any[]; latestMemo?: string } | null;
+    [key: number]: { date: string; sets: any[]; latestMemo?: string; trainerMemo?: string } | null;
   }>({});
   const [nameSelected, setNameSelected] = useState<{ [key: number]: boolean }>(
     {},
@@ -454,7 +456,7 @@ export default function WorkoutScreen() {
       return;
     }
 
-    const applySuggestion = (value: { date: string; sets: any[]; latestMemo?: string } | null) => {
+    const applySuggestion = (value: { date: string; sets: any[]; latestMemo?: string; trainerMemo?: string } | null) => {
       if (suggestionRequestRef.current[idx] !== normalizedName) return;
       setSuggestions((prev) => ({ ...prev, [idx]: value }));
     };
@@ -503,15 +505,51 @@ export default function WorkoutScreen() {
         }
       }
 
+      // 세트 값이 실제로 있는 기록을 찾음 (reps=0인 더미 세트만 있는 기록 제외)
+      const foundWithSets = found.find((l: any) => {
+        const ex = l.exercises.find(
+          (e: any) => String(e.name ?? "").trim().toLowerCase() === normalizedName,
+        );
+        return (ex?.sets ?? []).some((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0);
+      });
+
       if (found.length > 0) {
+        // 메모는 가장 최신 기록에서, 세트는 실제 값 있는 기록에서
         const lastEx = found[0].exercises.find(
           (ex: any) =>
             String(ex.name ?? "")
               .trim()
               .toLowerCase() === normalizedName,
         );
+        const setsEx = foundWithSets
+          ? foundWithSets.exercises.find(
+              (ex: any) => String(ex.name ?? "").trim().toLowerCase() === normalizedName,
+            )
+          : null;
         const latestMemo = lastEx?.memo?.trim() || undefined;
-        applySuggestion({ date: found[0].date, sets: lastEx?.sets ?? [], latestMemo });
+
+        // PT 기록 중 메모 있는 가장 최신 → 트레이너 메모
+        const allCombined = [...workoutLogs, ...allLogsCache.current];
+        let trainerMemo: string | undefined;
+        for (const log of [...allCombined]
+          .filter((l: any) => l.workoutType === "PT")
+          .sort((a: any, b: any) =>
+            String(b.date ?? b.logDate ?? "").localeCompare(String(a.date ?? a.logDate ?? ""))
+          )) {
+          const logDate = String(log.date ?? log.logDate ?? "").slice(0, 10);
+          if (logDate >= selectedDate) continue;
+          const ptEx = (log.exercises ?? []).find(
+            (e: any) => String(e.name ?? "").trim().toLowerCase() === normalizedName
+          );
+          if (ptEx?.memo?.trim()) { trainerMemo = ptEx.memo.trim(); break; }
+        }
+
+        applySuggestion({
+          date: foundWithSets?.date ?? found[0].date,
+          sets: setsEx?.sets ?? [],
+          latestMemo,
+          trainerMemo,
+        });
       } else {
         applySuggestion(null);
       }
@@ -531,7 +569,7 @@ export default function WorkoutScreen() {
       setShowAddModal(false);
       setEditingWorkoutId(null);
       if (clear) {
-        setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+        setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "", isCardio: false }]);
         setSuggestions({});
         setPersonalBodyParts([]);
         setPersonalCondition(null);
@@ -548,7 +586,7 @@ export default function WorkoutScreen() {
             text: "나가기",
             style: "destructive",
             onPress: () => {
-              setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "" }]);
+              setExercises([{ name: "", sets: [{ weight: "", reps: "" }], memo: "", isCardio: false }]);
               setSuggestions({});
               setPersonalBodyParts([]);
               setPersonalCondition(null);
@@ -601,14 +639,20 @@ export default function WorkoutScreen() {
   const startEditPersonalLog = (log: any) => {
     setEditingWorkoutId(log.workoutId ?? log.workout_id ?? log.id ?? null);
     setExercises(
-      (log.exercises ?? []).map((ex: any) => ({
-        name: ex.name ?? "",
-        memo: ex.memo ?? "",
-        sets: (ex.sets ?? []).map((s: any) => ({
-          weight: s.weight != null ? String(s.weight) : "",
-          reps: s.reps != null ? String(s.reps) : "",
-        })),
-      })),
+      (log.exercises ?? []).map((ex: any) => {
+        const rawMemo: string = ex.memo ?? "";
+        const isCardio = rawMemo.startsWith("##CARDIO##");
+        const cleanMemo = isCardio ? rawMemo.replace("##CARDIO##", "").trim() : rawMemo;
+        return {
+          name: ex.name ?? "",
+          memo: cleanMemo,
+          isCardio,
+          sets: (ex.sets ?? []).map((s: any) => ({
+            weight: s.weight != null ? String(s.weight) : "",
+            reps: s.reps != null ? String(s.reps) : "",
+          })),
+        };
+      }),
     );
     setPersonalBodyParts(
       log.painPoints
@@ -628,6 +672,12 @@ export default function WorkoutScreen() {
       Alert.alert("오류", "운동명을 입력해주세요.");
       return;
     }
+    // 유산소: 시간(reps) 필수
+    const invalidCardio = valid.find((ex) => ex.isCardio && !ex.sets[0]?.reps);
+    if (invalidCardio) {
+      Alert.alert("오류", `${invalidCardio.name || "유산소"} 운동의 시간(분)을 입력해주세요.`);
+      return;
+    }
     setSaving(true);
     try {
       const jwt = await AsyncStorage.getItem("jwt");
@@ -642,17 +692,27 @@ export default function WorkoutScreen() {
           personalBodyParts.length > 0
             ? personalBodyParts.join(",")
             : undefined,
-        exercises: valid.map((ex) => ({
-          name: ex.name,
-          memo: ex.memo?.trim() || undefined,
-          sets: ex.sets
-            .filter((s) => s.reps)
-            .map((s, i) => ({
-              setNumber: i + 1,
-              weight: s.weight ? Number(s.weight) : null,
-              reps: Number(s.reps),
-            })),
-        })),
+        exercises: valid.map((ex) => {
+          const memoStr = ex.isCardio
+            ? `##CARDIO##${ex.memo?.trim() ? " " + ex.memo.trim() : ""}`
+            : ex.memo?.trim() || undefined;
+          return {
+            name: ex.name,
+            memo: memoStr || undefined,
+            sets: (() => {
+              const filled = ex.sets.filter((s) => s.reps);
+              if (filled.length > 0) {
+                return filled.map((s, i) => ({
+                  setNumber: i + 1,
+                  weight: s.weight ? Number(s.weight) : null,
+                  reps: Number(s.reps),
+                }));
+              }
+              // 세트 없이 운동명만 저장 — 백엔드가 빈 배열을 드롭하므로 더미 세트
+              return [{ setNumber: 1, weight: null, reps: 0 }];
+            })(),
+          };
+        }),
       };
 
       let res = await fetch(url, {
@@ -751,6 +811,7 @@ export default function WorkoutScreen() {
   ) => {
     const exercises = log.exercises ?? [];
     const mediaList = log.mediaList ?? [];
+    const isAllCardio = exercises.length > 0 && exercises.every((ex: any) => String(ex.memo ?? "").startsWith("##CARDIO##"));
     const anyLog = log as any;
     // 컨디션 스코어 기준
     // 4 = 최상 (최고의 컨디션, 모든 세트 완벽 소화)
@@ -884,8 +945,13 @@ export default function WorkoutScreen() {
           </View>
         ) : null}
 
-        {exercises.map((exercise: any, exIdx: number) => {
-          const sets = exercise.sets ?? [];
+        {exercises.filter((exercise: any) => !String(exercise.memo ?? "").startsWith("##CARDIO##")).map((exercise: any, exIdx: number) => {
+          const allSets = exercise.sets ?? [];
+          // reps=0인 더미 세트(운동명만 저장된 경우) 제외
+          const sets = allSets.filter((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0);
+          const rawMemo: string = exercise.memo ?? "";
+          const isCardioEx = rawMemo.startsWith("##CARDIO##");
+          const displayMemo = isCardioEx ? rawMemo.replace("##CARDIO##", "").trim() : rawMemo;
           const mediaList = getExerciseMediaList(exercise);
           const mediaKey = getExerciseMediaKey(log, exercise, exIdx);
           const isMediaOpen = !!expandedExerciseMediaKeys[mediaKey];
@@ -935,6 +1001,30 @@ export default function WorkoutScreen() {
                 ) : null}
               </View>
 
+              {isCardioEx ? (
+                /* 유산소 표시 */
+                <View style={{
+                  backgroundColor: "#FF6B3510",
+                  borderRadius: 8,
+                  padding: 10,
+                  marginTop: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  borderWidth: 1,
+                  borderColor: "#FF6B3530",
+                }}>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: "#FF6B35" }}>
+                    🏃 유산소
+                  </Text>
+                  {sets[0]?.reps ? (
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.text }}>
+                      {sets[0].reps}분
+                      {Number(sets[0]?.weight) > 0 ? ` · ${sets[0].weight}km` : ""}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : sets.length === 0 ? null : (
               <View
                 style={{
                   borderWidth: 1,
@@ -1048,7 +1138,8 @@ export default function WorkoutScreen() {
                   </View>
                 ))}
               </View>
-              {exercise.memo ? (
+              )}
+              {displayMemo ? (
                 <View
                   style={{
                     marginTop: 8,
@@ -1064,7 +1155,7 @@ export default function WorkoutScreen() {
                       fontStyle: "italic",
                     }}
                   >
-                    메모: {exercise.memo}
+                    메모: {displayMemo}
                   </Text>
                 </View>
               ) : null}
@@ -1113,26 +1204,22 @@ export default function WorkoutScreen() {
           );
         })}
 
-        {anyLog.feedback ? (
+        {anyLog.feedback && !isAllCardio ? (
           <View
             style={{
               marginTop: 12,
               paddingTop: 12,
               borderTopWidth: 1,
               borderTopColor: Colors.border,
+              backgroundColor: "#fffbf0",
+              borderRadius: 10,
+              padding: 10,
             }}
           >
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "700",
-                color: Colors.textSub,
-                marginBottom: 4,
-              }}
-            >
-              피드백
+            <Text style={{ fontSize: 11, fontWeight: "800", color: "#8a6500", marginBottom: 3 }}>
+              💬 트레이너 피드백
             </Text>
-            <Text style={{ fontSize: 13, color: Colors.text, lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, color: "#5a4200", lineHeight: 20 }}>
               {anyLog.feedback}
             </Text>
           </View>
@@ -1546,9 +1633,6 @@ export default function WorkoutScreen() {
             {dayPt.map((log) => (
               <View key={`pt-wrap-${log.workoutId}`}>
                 {renderWorkoutCard(log, Colors.green, "PT 수업 완료")}
-                {trainerPlan && log.workoutId && (
-                  <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
-                )}
               </View>
             ))}
           </View>
@@ -1588,13 +1672,19 @@ export default function WorkoutScreen() {
                   "개인 운동 완료",
                   () => startEditPersonalLog(log),
                 )}
-                {trainerPlan && log.workoutId && (
-                  <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
-                )}
               </View>
             ))}
           </View>
         )}
+
+        {/* 댓글 — 하루 전체 하단에 하나만 */}
+        {trainerPlan && (() => {
+          const commentId = dayPt.find(l => l.workoutId)?.workoutId
+            ?? dayFitLogs.find(l => l.workoutId)?.workoutId;
+          return commentId ? (
+            <CommentSection targetType="WORKOUT_LOG" targetId={commentId} />
+          ) : null;
+        })()}
 
         {/* 오운완 인증샷 버튼 — 운동 기록 있을 때만 */}
         {(dayPt.length > 0 || dayFitLogs.length > 0) && (
@@ -1880,6 +1970,46 @@ export default function WorkoutScreen() {
                     borderColor: Colors.border,
                   }}
                 >
+                  {/* 웨이트/유산소 토글 */}
+                  <View style={{ flexDirection: "row", gap: 5, marginBottom: 8 }}>
+                    {[
+                      { label: "웨이트", value: false },
+                      { label: "유산소", value: true },
+                    ].map(({ label, value }) => {
+                      const active = !!ex.isCardio === value;
+                      return (
+                        <TouchableOpacity
+                          key={label}
+                          onPress={() => {
+                            const u = [...exercises];
+                            u[ei].isCardio = value;
+                            // 유산소로 전환 시 세트를 1개로 초기화
+                            if (value && u[ei].sets.length > 1) {
+                              u[ei].sets = [{ weight: "", reps: "" }];
+                            }
+                            setExercises(u);
+                          }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 4,
+                            borderRadius: 20,
+                            backgroundColor: active ? (value ? "#FF6B3520" : Colors.blue + "20") : Colors.bgSub,
+                            borderWidth: 1.5,
+                            borderColor: active ? (value ? "#FF6B35" : Colors.blue) : Colors.border,
+                          }}
+                        >
+                          <Text style={{
+                            fontSize: 11,
+                            fontWeight: "800",
+                            color: active ? (value ? "#FF6B35" : Colors.blue) : Colors.textMuted,
+                          }}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
                   <View
                     style={{
                       flexDirection: "row",
@@ -1900,19 +2030,19 @@ export default function WorkoutScreen() {
                           ...prev,
                           [ei]: false,
                         }));
-                        fetchSuggestion(v, ei);
+                        if (!ex.isCardio) fetchSuggestion(v, ei);
                       }}
                       onSubmitEditing={() =>
                         setNameSelected((prev) => ({ ...prev, [ei]: true }))
                       }
                       returnKeyType="done"
-                      placeholder="운동명"
+                      placeholder={ex.isCardio ? "유산소 종목 (예: 런닝머신)" : "운동명"}
                       placeholderTextColor={Colors.textPlaceholder}
                       style={{
                         flex: 1,
                         backgroundColor: Colors.bgSub,
                         borderWidth: 1,
-                        borderColor: Colors.border,
+                        borderColor: ex.isCardio ? "#FF6B3544" : Colors.border,
                         borderRadius: 9,
                         paddingHorizontal: 9,
                         paddingVertical: 0,
@@ -2037,7 +2167,71 @@ export default function WorkoutScreen() {
                     )}
                   </View>
 
-                  {ex.sets.map((s, si) => (
+                  {ex.isCardio ? (
+                    /* ── 유산소 입력 (시간 + 거리) ── */
+                    <View style={{ gap: 8 }}>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: "#FF6B35", marginBottom: 3 }}>시간 (분)</Text>
+                          <View style={{
+                            height: 36,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: "#FF6B3508",
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: "#FF6B3544",
+                            paddingHorizontal: 10,
+                          }}>
+                            <TextInput
+                              value={ex.sets[0]?.reps ?? ""}
+                              onChangeText={(v) => {
+                                const u = [...exercises];
+                                if (!u[ei].sets[0]) u[ei].sets[0] = { weight: "", reps: "" };
+                                u[ei].sets[0].reps = v;
+                                setExercises(u);
+                              }}
+                              placeholder="0"
+                              placeholderTextColor={Colors.textPlaceholder}
+                              keyboardType="number-pad"
+                              style={{ flex: 1, fontSize: 14, fontWeight: "700", color: Colors.text, paddingVertical: 0 }}
+                            />
+                            <Text style={{ fontSize: 12, color: "#FF6B35", fontWeight: "700" }}>분</Text>
+                          </View>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: "#FF6B35", marginBottom: 3 }}>거리 (선택)</Text>
+                          <View style={{
+                            height: 36,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: "#FF6B3508",
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: "#FF6B3544",
+                            paddingHorizontal: 10,
+                          }}>
+                            <TextInput
+                              value={ex.sets[0]?.weight ?? ""}
+                              onChangeText={(v) => {
+                                const u = [...exercises];
+                                if (!u[ei].sets[0]) u[ei].sets[0] = { weight: "", reps: "" };
+                                u[ei].sets[0].weight = v;
+                                setExercises(u);
+                              }}
+                              placeholder="0"
+                              placeholderTextColor={Colors.textPlaceholder}
+                              keyboardType="decimal-pad"
+                              style={{ flex: 1, fontSize: 14, fontWeight: "700", color: Colors.text, paddingVertical: 0 }}
+                            />
+                            <Text style={{ fontSize: 12, color: "#FF6B35", fontWeight: "700" }}>km</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                  /* ── 웨이트 세트 입력 ── */
+                  ex.sets.map((s, si) => (
                     <View
                       key={`set-${ei}-${si}`}
                       style={{
@@ -2193,9 +2387,10 @@ export default function WorkoutScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                  ))}
+                  ))
+                  )}
 
-                  {suggestions[ei] && (
+                  {suggestions[ei] && suggestions[ei]!.sets.filter((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0).length > 0 && (
                     <View
                       style={{
                         backgroundColor: Colors.blue + "12",
@@ -2224,7 +2419,7 @@ export default function WorkoutScreen() {
                           gap: 5,
                         }}
                       >
-                        {suggestions[ei]!.sets.map(
+                        {suggestions[ei]!.sets.filter((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0).map(
                           (prevSet: any, prevIdx: number) => (
                             <TouchableOpacity
                               key={`prev-${ei}-${prevIdx}`}
@@ -2279,6 +2474,27 @@ export default function WorkoutScreen() {
                     </View>
                   )}
 
+                  {/* 트레이너 메모 */}
+                  {suggestions[ei]?.trainerMemo && (
+                    <View
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: Colors.green + "12",
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        borderWidth: 1,
+                        borderColor: Colors.green + "33",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.green, marginBottom: 3 }}>트레이너 메모</Text>
+                      <Text style={{ fontSize: 11, color: Colors.text }}>
+                        {suggestions[ei]!.trainerMemo}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* 운동별 메모 */}
                   <TextInput
                     value={ex.memo}
@@ -2301,32 +2517,6 @@ export default function WorkoutScreen() {
                       color: Colors.text,
                     }}
                   />
-                  {suggestions[ei]?.latestMemo && !ex.memo && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        const u = [...exercises];
-                        u[ei].memo = suggestions[ei]!.latestMemo!;
-                        setExercises(u);
-                      }}
-                      style={{
-                        marginTop: 4,
-                        backgroundColor: Colors.bgSub,
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        borderRadius: 6,
-                        paddingHorizontal: 8,
-                        paddingVertical: 5,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <Text style={{ fontSize: 10, color: Colors.textMuted }}>최근</Text>
-                      <Text style={{ fontSize: 11, color: Colors.textSub, flex: 1 }} numberOfLines={1}>
-                        {suggestions[ei]!.latestMemo}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               ))}
 
@@ -2338,6 +2528,7 @@ export default function WorkoutScreen() {
                       name: "",
                       sets: [{ weight: "", reps: "" }],
                       memo: "",
+                      isCardio: false,
                     },
                   ])
                 }
@@ -2724,24 +2915,29 @@ export default function WorkoutScreen() {
                     </View>
                   )}
 
-                {historyDateLogs
-                  .filter((log) =>
-                    historyDateFilter === "ALL"
-                      ? true
-                      : log.workoutType === historyDateFilter,
-                  )
-                  .map((log) => (
-                    <View key={`hist-wrap-${log.workoutId}`}>
-                      {renderWorkoutCard(
-                        log,
-                        log.workoutType === "PT" ? Colors.green : Colors.blue,
-                        log.workoutType === "PT" ? "PT 수업 완료" : "개인 운동",
+                {(() => {
+                  const filtered = historyDateLogs.filter((log) =>
+                    historyDateFilter === "ALL" ? true : log.workoutType === historyDateFilter,
+                  );
+                  const commentId = filtered.find(l => l.workoutType === "PT" && l.workoutId)?.workoutId
+                    ?? filtered.find(l => l.workoutId)?.workoutId;
+                  return (
+                    <>
+                      {filtered.map((log) => (
+                        <View key={`hist-wrap-${log.workoutId}`}>
+                          {renderWorkoutCard(
+                            log,
+                            log.workoutType === "PT" ? Colors.green : Colors.blue,
+                            log.workoutType === "PT" ? "PT 수업 완료" : "개인 운동",
+                          )}
+                        </View>
+                      ))}
+                      {trainerPlan && commentId && (
+                        <CommentSection targetType="WORKOUT_LOG" targetId={commentId} />
                       )}
-                      {trainerPlan && log.workoutId && log.workoutType === "PT" && (
-                        <CommentSection targetType="WORKOUT_LOG" targetId={log.workoutId} />
-                      )}
-                    </View>
-                  ))}
+                    </>
+                  );
+                })()}
 
                 {/* 필터 적용 후 결과 없을 때 */}
                 {!historyDateLoading &&
@@ -3226,6 +3422,26 @@ export default function WorkoutScreen() {
                                 </View>
                               ))}
                             </View>
+                            {(item as any).feedback ? (
+                              <View
+                                style={{
+                                  marginTop: 10,
+                                  paddingTop: 10,
+                                  borderTopWidth: 1,
+                                  borderTopColor: Colors.border,
+                                  backgroundColor: "#fffbf0",
+                                  borderRadius: 8,
+                                  padding: 8,
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: "800", color: "#8a6500", marginBottom: 2 }}>
+                                  💬 트레이너 피드백
+                                </Text>
+                                <Text style={{ fontSize: 12, color: "#5a4200", lineHeight: 18 }}>
+                                  {(item as any).feedback}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                         );
                       })}

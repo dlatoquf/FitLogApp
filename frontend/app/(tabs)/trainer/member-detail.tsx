@@ -96,11 +96,11 @@ const COL = {
   condition: 46,
   bodyPart: 72,
   exercise: 100,
-  memo: 110,
+  memo: 210,
   set: 32,
   weight: 54,
   reps: 38,
-  feedback: 130,
+  feedback: 160,
   media: 52,
 };
 const ROW_H = 48;
@@ -187,6 +187,7 @@ function buildDateGroups(logs: FitLog[]): DateGroup[] {
     const td = typeMap.get(type)!;
     for (const ex of log.exercises ?? []) {
       if (!ex.name) continue;
+      if (String((ex as any).memo ?? "").startsWith("##CARDIO##")) continue;
       let e = td.exercises.find((e) => e.exercise === ex.name);
       if (!e) {
         e = {
@@ -237,6 +238,7 @@ function buildExGroups(logs: FitLog[]): ExAllGroup[] {
     const type: "PT" | "개인" = la.workoutType === "PT" ? "PT" : "개인";
     for (const ex of log.exercises ?? []) {
       if (!ex.name) continue;
+      if (String((ex as any).memo ?? "").startsWith("##CARDIO##")) continue;
       if (!map.has(ex.name)) map.set(ex.name, []);
       const entries = map.get(ex.name)!;
       let e = entries.find((e) => e.date === date && e.type === type);
@@ -429,7 +431,6 @@ function HistoryTable({
               { label: "무게", w: COL.weight },
               { label: "횟수", w: COL.reps },
               { label: "메모", w: COL.memo },
-              { label: "피드백", w: COL.feedback },
               { label: "컨디션", w: COL.condition },
               { label: "미디어", w: COL.media },
             ]}
@@ -443,15 +444,23 @@ function HistoryTable({
                 borderBottomColor: "#ccc",
               }}
             >
-              <MergedCell
-                value={dg.date}
-                width={COL.date}
-                height={ROW_H * dg.totalRows}
-                bold
-                center
-                color={Colors.text}
-                bg={di % 2 === 0 ? "#f8f9f8" : "#f2f4f2"}
-              />
+              <View
+                style={{
+                  width: COL.date,
+                  minHeight: ROW_H * dg.totalRows,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 5,
+                  paddingVertical: 6,
+                  borderRightWidth: 1,
+                  borderRightColor: CELL_BORDER,
+                  backgroundColor: di % 2 === 0 ? "#f8f9f8" : "#f2f4f2",
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.text, textAlign: "center" }}>
+                  {dg.date}
+                </Text>
+              </View>
               <View>
                 {dg.typeGroups.map((tg, ti) => (
                   <View
@@ -588,13 +597,6 @@ function HistoryTable({
                       ))}
                     </View>
                     <MergedCell
-                      value={tg.feedback ?? ""}
-                      width={COL.feedback}
-                      height={ROW_H * tg.totalRows}
-                      color={Colors.textMuted}
-                      wrap
-                    />
-                    <MergedCell
                       value={condText(tg.conditionScore)}
                       width={COL.condition}
                       height={ROW_H * tg.totalRows}
@@ -641,6 +643,40 @@ function HistoryTable({
                     </View>
                   </View>
                 ))}
+              {(() => {
+                const feedbacks = dg.typeGroups
+                  .filter((tg) => tg.feedback)
+                  .map((tg) => `[${tg.type}] ${tg.feedback}`)
+                  .join("  /  ");
+                if (!feedbacks) return null;
+                const rightWidth =
+                  COL.type + COL.bodyPart + COL.exercise + COL.set +
+                  COL.weight + COL.reps + COL.memo + COL.condition + COL.media;
+                return (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      borderTopWidth: 1,
+                      borderTopColor: "#d0d0d0",
+                      backgroundColor: "#fffbf0",
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: rightWidth,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        borderRightWidth: 1,
+                        borderRightColor: CELL_BORDER,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, color: "#8a6500", lineHeight: 18 }}>
+                        💬 {feedbacks}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
               </View>
             </View>
           ))}
@@ -699,11 +735,11 @@ function HistoryTable({
                   <View
                     key={ei}
                     style={{
-                      flexDirection: "row",
                       borderBottomWidth: ei < eg.entries.length - 1 ? 1 : 0,
                       borderBottomColor: "#d0d0d0",
                     }}
                   >
+                  <View style={{ flexDirection: "row" }}>
                     <MergedCell
                       value={en.date}
                       width={COL.date}
@@ -846,6 +882,7 @@ function HistoryTable({
                         </Text>
                       )}
                     </View>
+                  </View>
                   </View>
                 ))}
               </View>
@@ -1357,7 +1394,8 @@ export default function MemberDetailScreen() {
   const fetchMemoSuggestion = (exerciseName: string, idx: number) => {
     const normalized = exerciseName.trim().toLowerCase();
     if (!normalized) { setMemoSuggestions((p) => ({ ...p, [idx]: null })); return; }
-    const source = allFitLogs.length > 0 ? allFitLogs : fitLogs;
+    const allSource = allFitLogs.length > 0 ? allFitLogs : fitLogs;
+    const source = allSource.filter((l: any) => l.workoutType === "PT" || l.workoutType === "OT");
     const todayKey = toDateKey(selectedDate);
     for (const log of [...source].sort((a: any, b: any) =>
       String(b.date ?? b.logDate).localeCompare(String(a.date ?? a.logDate))
@@ -2037,9 +2075,14 @@ export default function MemberDetailScreen() {
                 ? "나쁨"
                 : "";
 
-      // rowspan 병합 테이블 빌드
+      // rowspan 병합 테이블 빌드 (피드백은 날짜 아래 별도 행)
       let tableRows = "";
       for (const dg of dateGroups) {
+        const feedbacks = dg.typeGroups
+          .filter((tg) => tg.feedback)
+          .map((tg) => `[${tg.type}] ${(tg.feedback ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}`)
+          .join("　/　");
+        const dateRowspan = dg.totalRows + (feedbacks ? 1 : 0);
         let dateFirst = true;
         for (const tg of dg.typeGroups) {
           let typeFirst = true;
@@ -2048,12 +2091,13 @@ export default function MemberDetailScreen() {
             for (const s of ex.sets) {
               let row = "<tr>";
               if (dateFirst) {
-                row += `<td rowspan="${dg.totalRows}" class="date-cell">${dg.date.replace(/-/g, ".")}</td>`;
+                row += `<td rowspan="${dateRowspan}" class="date-cell">${dg.date.replace(/-/g, ".")}</td>`;
                 dateFirst = false;
               }
               if (typeFirst) {
                 const isPt = tg.type === "PT";
-                row += `<td rowspan="${tg.totalRows}" class="type-cell ${isPt ? "type-pt" : "type-personal"}">${tg.type}</td>`;
+                const isOt = tg.type === "OT";
+                row += `<td rowspan="${tg.totalRows}" class="type-cell ${isPt ? "type-pt" : isOt ? "type-ot" : "type-personal"}">${tg.type}</td>`;
                 row += `<td rowspan="${tg.totalRows}" class="bodypart-cell">${tg.painPoints ?? ""}</td>`;
               }
               if (exFirst) {
@@ -2063,15 +2107,11 @@ export default function MemberDetailScreen() {
               row += `<td class="weight-cell">${s.weight}</td>`;
               row += `<td class="reps-cell">${s.reps}회</td>`;
               if (exFirst) {
-                row += `<td rowspan="${ex.sets.length}" class="memo-cell">${ex.memo ?? ""}</td>`;
+                const memoText = (ex.memo ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+                row += `<td rowspan="${ex.sets.length}" class="memo-cell">${memoText}</td>`;
                 exFirst = false;
               }
               if (typeFirst) {
-                const fb = (tg.feedback ?? "")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;")
-                  .replace(/\n/g, "<br>");
-                row += `<td rowspan="${tg.totalRows}" class="feedback-cell">${fb}</td>`;
                 row += `<td rowspan="${tg.totalRows}" class="condition-cell">${condLabel(tg.conditionScore)}</td>`;
                 typeFirst = false;
               }
@@ -2079,6 +2119,9 @@ export default function MemberDetailScreen() {
               tableRows += row;
             }
           }
+        }
+        if (feedbacks) {
+          tableRows += `<tr><td colspan="8" class="feedback-row">💬 ${feedbacks}</td></tr>`;
         }
       }
 
@@ -2094,20 +2137,22 @@ export default function MemberDetailScreen() {
   h1 { font-size: 17px; font-weight: 800; margin-bottom: 3px; }
   .sub { font-size: 11px; color: #6b7280; margin-bottom: 16px; }
   table { width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; }
-  th { background: #f3f4f6; font-size: 10px; color: #6b7280; font-weight: 700; padding: 5px 6px; text-align: center; border: 1px solid #d1d5db; white-space: nowrap; }
-  td { padding: 4px 6px; border: 1px solid #e5e7eb; vertical-align: middle; font-size: 11px; }
-  .date-cell { background: #f8faf8; font-weight: 700; text-align: center; white-space: nowrap; color: #1f2937; }
+  th { background: #f0f2f0; font-size: 10px; color: #555; font-weight: 700; padding: 6px; text-align: center; border: 1px solid #ccc; white-space: nowrap; }
+  td { padding: 5px 6px; border: 1px solid #e5e7eb; vertical-align: middle; font-size: 11px; }
+  tr { page-break-inside: avoid; }
+  .date-cell { background: #f8faf8; font-weight: 700; text-align: center; white-space: nowrap; color: #1f2937; font-size: 11px; }
   .type-cell { text-align: center; font-weight: 700; font-size: 11px; }
-  .type-pt { background: #f0fff4; color: #1f2937; }
-  .type-personal { background: #fafafa; color: #1f2937; }
-  .bodypart-cell { color: #1f2937; font-size: 10px; }
+  .type-pt { background: #f0fff4; color: #00897B; }
+  .type-ot { background: #FFF7ED; color: #F97316; }
+  .type-personal { background: #fafafa; color: #6b7280; }
+  .bodypart-cell { color: #6b7280; font-size: 10px; }
   .exercise-cell { font-weight: 700; color: #1f2937; }
-  .set-cell { text-align: center; color: #1f2937; width: 28px; }
+  .set-cell { text-align: center; color: #9ca3af; width: 28px; }
   .weight-cell { text-align: center; color: #00897B; font-weight: 800; }
-  .reps-cell { text-align: center; color: #00897B; font-weight: 800; }
-  .memo-cell { color: #1f2937; font-size: 10px; }
-  .feedback-cell { color: #1f2937; font-size: 10px; }
+  .reps-cell { text-align: center; color: #4b72f0; font-weight: 800; }
+  .memo-cell { color: #6b7280; font-size: 10px; }
   .condition-cell { text-align: center; color: #1f2937; font-weight: 600; font-size: 11px; }
+  .feedback-row { background: #fffbf0; color: #8a6500; font-size: 11px; padding: 7px 10px; }
 </style>
 </head><body>
   <h1>${memberName}님 전체 운동 기록</h1>
@@ -2117,10 +2162,10 @@ export default function MemberDetailScreen() {
       <tr>
         <th>날짜</th><th>구분</th><th>부위</th><th>운동명</th>
         <th>세트</th><th>무게</th><th>횟수</th>
-        <th>메모</th><th>피드백</th><th>컨디션</th>
+        <th>메모</th><th>컨디션</th>
       </tr>
     </thead>
-    <tbody>${tableRows || "<tr><td colspan='10' style='text-align:center;color:#9ca3af;padding:12px;'>기록 없음</td></tr>"}</tbody>
+    <tbody>${tableRows || "<tr><td colspan='9' style='text-align:center;color:#9ca3af;padding:12px;'>기록 없음</td></tr>"}</tbody>
   </table>
 </body></html>`;
 
@@ -2279,7 +2324,8 @@ export default function MemberDetailScreen() {
 
     const selectedDateKey = toDateKey(selectedDate);
 
-    const historySource = allFitLogs.length > 0 ? allFitLogs : fitLogs;
+    const allSource = allFitLogs.length > 0 ? allFitLogs : fitLogs;
+    const historySource = allSource.filter((l: any) => l.workoutType === "PT" || l.workoutType === "OT");
 
     const candidates = historySource
       .map((log: any) => ({
@@ -2309,7 +2355,11 @@ export default function MemberDetailScreen() {
         return Number(b.workoutId) - Number(a.workoutId);
       });
 
-    return candidates[0] ?? null;
+    // 실제 세트 값이 있는 기록 우선, 없으면 첫 번째
+    const withSets = candidates.find((c: any) =>
+      (c.exercise.sets ?? []).some((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0)
+    );
+    return withSets ?? null;
   };
 
   const fetchBodyLogs = async () => {
@@ -2498,6 +2548,7 @@ export default function MemberDetailScreen() {
       setWeekOffset(calcWeekOffset(d));
     }
   }, [notifDate]);
+
 
   // 탭 전환 시 데이터 로드 (운동=0, 식단=1, 바디=2)
   useEffect(() => {
@@ -2853,14 +2904,18 @@ export default function MemberDetailScreen() {
             name: ex.name,
             memo: ex.memo?.trim() || undefined,
             mediaUrls: uploadedUrls.filter(Boolean),
-            sets: ex.sets
-              .filter((s) => s.weight || s.reps)
-              .map((s, i) => ({
-                setId: s.setId ?? undefined,
-                setNumber: i + 1,
-                weight: parseFloat(s.weight) || 0,
-                reps: parseInt(s.reps) || 0,
-              })),
+            sets: (() => {
+              const filled = ex.sets.filter((s) => s.weight || s.reps);
+              if (filled.length > 0) {
+                return filled.map((s, i) => ({
+                  setId: s.setId ?? undefined,
+                  setNumber: i + 1,
+                  weight: parseFloat(s.weight) || 0,
+                  reps: parseInt(s.reps) || 0,
+                }));
+              }
+              return [{ setNumber: 1, weight: 0, reps: 0 }];
+            })(),
           };
         }),
       );
@@ -3912,6 +3967,7 @@ export default function MemberDetailScreen() {
     onEdit?: () => void,
   ) => {
     const exercises = log.exercises ?? [];
+    const isAllCardio = exercises.length > 0 && exercises.every((ex: any) => String(ex.memo ?? "").startsWith("##CARDIO##"));
     const logDate = String(log.date ?? log.logDate ?? log.log_date ?? "").slice(
       0,
       10,
@@ -4093,7 +4149,11 @@ export default function MemberDetailScreen() {
         ) : null}
 
         {exercises.map((exercise: any, exIdx: number) => {
-          const sets = exercise.sets ?? [];
+          const allSets = exercise.sets ?? [];
+          const sets = allSets.filter((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0);
+          const rawMemo: string = exercise.memo ?? "";
+          const isCardioEx = rawMemo.startsWith("##CARDIO##");
+          const displayMemo = isCardioEx ? rawMemo.replace("##CARDIO##", "").trim() : rawMemo;
           const mediaList = getExerciseMediaList(exercise);
           const mediaKey = getExerciseMediaKey(log, exercise, exIdx);
           const isMediaOpen = !!expandedExerciseMediaKeys[mediaKey];
@@ -4157,7 +4217,29 @@ export default function MemberDetailScreen() {
                 ) : null}
               </View>
 
-              {sets.length > 0 ? (
+              {isCardioEx ? (
+                <View style={{
+                  backgroundColor: "#FF6B3510",
+                  borderRadius: 8,
+                  padding: 10,
+                  marginTop: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  borderWidth: 1,
+                  borderColor: "#FF6B3530",
+                }}>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: "#FF6B35" }}>
+                    🏃 유산소
+                  </Text>
+                  {sets[0]?.reps ? (
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: Colors.text }}>
+                      {sets[0].reps}분
+                      {Number(sets[0]?.weight) > 0 ? ` · ${sets[0].weight}km` : ""}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : sets.length > 0 ? (
                 <View
                   style={{
                     overflow: "hidden",
@@ -4190,19 +4272,12 @@ export default function MemberDetailScreen() {
                           borderRightColor: Colors.border,
                         }}
                       >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            fontWeight: "800",
-                            color: Colors.textMuted,
-                          }}
-                        >
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: Colors.textMuted }}>
                           {col.label}
                         </Text>
                       </View>
                     ))}
                   </View>
-
                   {sets.map((set: any, setIdx: number) => (
                     <View
                       key={`${setIdx}-${set.weight}-${set.reps}`}
@@ -4212,67 +4287,21 @@ export default function MemberDetailScreen() {
                         borderTopColor: "#edf0ed",
                       }}
                     >
-                      <View
-                        style={{
-                          flex: 0.7,
-                          alignItems: "center",
-                          paddingVertical: 6,
-                          borderRightWidth: 1,
-                          borderRightColor: Colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: "800",
-                            color: Colors.textSub,
-                          }}
-                        >
-                          {setIdx + 1}
-                        </Text>
+                      <View style={{ flex: 0.7, alignItems: "center", paddingVertical: 6, borderRightWidth: 1, borderRightColor: Colors.border }}>
+                        <Text style={{ fontSize: 12, fontWeight: "800", color: Colors.textSub }}>{setIdx + 1}</Text>
                       </View>
-                      <View
-                        style={{
-                          flex: 1,
-                          alignItems: "center",
-                          paddingVertical: 6,
-                          borderRightWidth: 1,
-                          borderRightColor: Colors.border,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: "900",
-                            color,
-                          }}
-                        >
-                          {Number(set.weight) > 0 ? set.weight : "맨몸"}
-                        </Text>
+                      <View style={{ flex: 1, alignItems: "center", paddingVertical: 6, borderRightWidth: 1, borderRightColor: Colors.border }}>
+                        <Text style={{ fontSize: 12, fontWeight: "900", color }}>{Number(set.weight) > 0 ? set.weight : "맨몸"}</Text>
                       </View>
-                      <View
-                        style={{
-                          flex: 1,
-                          alignItems: "center",
-                          paddingVertical: 6,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: "900",
-                            color,
-                          }}
-                        >
-                          {set.reps}
-                        </Text>
+                      <View style={{ flex: 1, alignItems: "center", paddingVertical: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "900", color }}>{set.reps}</Text>
                       </View>
                     </View>
                   ))}
                 </View>
               ) : null}
 
-              {exercise.memo ? (
+              {displayMemo ? (
                 <View
                   style={{
                     marginTop: 7,
@@ -4281,14 +4310,8 @@ export default function MemberDetailScreen() {
                     borderTopColor: Colors.border,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: Colors.textSub,
-                      lineHeight: 17,
-                    }}
-                  >
-                    메모: {exercise.memo}
+                  <Text style={{ fontSize: 12, color: Colors.textSub, lineHeight: 17 }}>
+                    메모: {displayMemo}
                   </Text>
                 </View>
               ) : null}
@@ -4339,7 +4362,7 @@ export default function MemberDetailScreen() {
           );
         })}
 
-        {log.feedback ? (
+        {log.feedback && !isAllCardio ? (
           <View
             style={{
               marginTop: 12,
@@ -5239,12 +5262,6 @@ export default function MemberDetailScreen() {
                             isOt ? "OT 수업 완료" : "PT 수업 완료",
                             () => startEditFitLog(log),
                           )}
-                          {!isManual && (
-                            <CommentSection
-                              targetType="WORKOUT_LOG"
-                              targetId={wid}
-                            />
-                          )}
                         </View>
                       );
                     })}
@@ -5290,12 +5307,6 @@ export default function MemberDetailScreen() {
                             "OT 수업 완료",
                             () => startEditFitLog(log),
                           )}
-                          {!isManual && (
-                            <CommentSection
-                              targetType="WORKOUT_LOG"
-                              targetId={wid}
-                            />
-                          )}
                         </View>
                       );
                     })}
@@ -5334,6 +5345,8 @@ export default function MemberDetailScreen() {
 
                     {dayPersonalLogs.map((log: any) => {
                       const wid = log.workoutId ?? log.id;
+                      const logExercises = log.exercises ?? [];
+                      const isAllCardioLog = logExercises.length > 0 && logExercises.every((ex: any) => String(ex.memo ?? "").startsWith("##CARDIO##"));
                       return (
                         <View key={wid}>
                           {renderFitLogCard(
@@ -5343,7 +5356,7 @@ export default function MemberDetailScreen() {
                             undefined,
                           )}
                           {/* 트레이너 피드백 입력 */}
-                          <View
+                          {!isAllCardioLog && <View
                             style={{
                               backgroundColor: Colors.bgSub,
                               borderRadius: 12,
@@ -5431,18 +5444,26 @@ export default function MemberDetailScreen() {
                                 )}
                               </TouchableOpacity>
                             </View>
-                          </View>
-                          {!isManual && (
-                            <CommentSection
-                              targetType="WORKOUT_LOG"
-                              targetId={wid}
-                            />
-                          )}
+                          </View>}
                         </View>
                       );
                     })}
                   </View>
                 )}
+
+                {/* 댓글 — PT/OT/개인 운동 중 하나의 workoutId로 하단에 단일 표시 */}
+                {!isManual && (() => {
+                  const commentId =
+                    dayPtLogs.find((l: any) => l.workoutId ?? l.id)?.workoutId ??
+                    dayPtLogs.find((l: any) => l.id)?.id ??
+                    dayOtLogs.find((l: any) => l.workoutId ?? l.id)?.workoutId ??
+                    dayOtLogs.find((l: any) => l.id)?.id ??
+                    dayPersonalLogs.find((l: any) => l.workoutId ?? l.id)?.workoutId ??
+                    dayPersonalLogs.find((l: any) => l.id)?.id;
+                  return commentId ? (
+                    <CommentSection targetType="WORKOUT_LOG" targetId={commentId} />
+                  ) : null;
+                })()}
 
                 {/* 오운완 인증샷 버튼 — PT 기록 있을 때만 */}
                 {dayPtLogs.length > 0 && (
@@ -6604,7 +6625,7 @@ export default function MemberDetailScreen() {
                           gap: 6,
                         }}
                       >
-                        {latest.exercise.sets?.map(
+                        {(latest.exercise.sets ?? []).filter((s: any) => Number(s.reps) > 0 || Number(s.weight) > 0).map(
                           (prevSet: any, prevIdx: number) => (
                             <TouchableOpacity
                               key={prevIdx}
@@ -9059,6 +9080,7 @@ export default function MemberDetailScreen() {
         ).filter(Boolean).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i)}
         sessionType="PT"
       />
+
     </View>
   );
 }

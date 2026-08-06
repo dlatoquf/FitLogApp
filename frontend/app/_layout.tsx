@@ -57,64 +57,81 @@ function navigateByType(type: string, date?: string, targetId?: string) {
   try {
     AsyncStorage.getItem("role").then((role) => {
       const isTrainer = role === "TRAINER";
-      if (type === "SCHEDULE_CONFIRM" || type === "SCHEDULE_CANCEL" || type === "PT_ADD" || type === "PT_EXPIRY") {
+
+      // 수업 관련
+      if (type === "SCHEDULE_CONFIRM" || type === "SCHEDULE_CANCEL" || type === "SCHEDULE_CHANGE" || type === "SCHEDULE_REMINDER" || type === "PT_ADD" || type === "PT_EXPIRY") {
         router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/home");
+
+      } else if (type === "SCHEDULE_OPEN") {
+        if (isTrainer) {
+          router.push("/(tabs)/trainer/schedule" as any);
+        } else {
+          router.push({ pathname: "/(tabs)/member/home", params: { openSchedule: "true" } } as any);
+        }
+
+      } else if (type === "SCHEDULE_REQUEST") {
+        router.push(isTrainer
+          ? ({ pathname: "/(tabs)/trainer/schedule", params: { tab: "NEXT" } } as any)
+          : "/(tabs)/member/home"
+        );
+
+      // 식단 관련
       } else if (type === "DIET_FEEDBACK") {
         if (isTrainer) {
-          if (targetId) {
-            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
-          } else {
-            router.push("/(tabs)/trainer/members" as any);
-          }
+          targetId
+            ? router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any)
+            : router.push("/(tabs)/trainer/members" as any);
         } else {
-          router.push(date
-            ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any)
-            : "/(tabs)/member/diet"
-          );
+          router.push(date ? ({ pathname: "/(tabs)/member/diet", params: { date } } as any) : "/(tabs)/member/diet");
         }
+
       } else if (type === "DIET_PHOTO") {
-        if (targetId) {
-          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any);
-        } else {
-          router.push("/(tabs)/trainer/members" as any);
-        }
+        targetId
+          ? router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "1", ...(date ? { date } : {}) } } as any)
+          : router.push("/(tabs)/trainer/members" as any);
+
+      // 운동 관련
       } else if (type === "WORKOUT_LOG") {
         if (isTrainer) {
-          if (targetId) {
-            router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "0", ...(date ? { date } : {}) } } as any);
-          } else {
-            router.push("/(tabs)/trainer/members" as any);
-          }
+          targetId
+            ? router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId, initialTab: "0", ...(date ? { date } : {}) } } as any)
+            : router.push("/(tabs)/trainer/members" as any);
         } else {
-          router.push(date
-            ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any)
-            : "/(tabs)/member/workout"
-          );
+          router.push(date ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any) : "/(tabs)/member/workout");
         }
+
       } else if (type === "FEEDBACK") {
-        router.push(date
-          ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any)
-          : "/(tabs)/member/workout"
-        );
-      } else if (type === "GENERAL") {
-        router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/notices" as any);
-      } else if (type === "BIRTHDAY_TODAY" || type === "BIRTHDAY_WEEK") {
-        router.push("/(tabs)/trainer/home");
-      } else if (type === "SCHEDULE_REMINDER") {
-        router.push("/(tabs)/member/home");
-      } else if (type === "SCHEDULE_OPEN" || type === "SCHEDULE_REQUEST") {
-        router.push(isTrainer ? "/(tabs)/trainer/schedule" : "/(tabs)/member/home");
+        router.push(date ? ({ pathname: "/(tabs)/member/workout", params: { date } } as any) : "/(tabs)/member/workout");
+
+      // 신체 기록
+      } else if (type === "BODY_LOG") {
+        router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/growth" as any);
+
+      // 회원/멤버 관련
       } else if (type === "NEW_MEMBER" || type === "MEMBER_DELETED" || type === "MEMBER_DISCONNECT" || type === "MISSION_DONE") {
-        if (targetId) {
-          router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId } } as any);
-        } else {
-          router.push("/(tabs)/trainer/members" as any);
-        }
+        targetId
+          ? router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId } } as any)
+          : router.push("/(tabs)/trainer/members" as any);
+
+      // 생일
+      } else if (type === "BIRTHDAY_TODAY" || type === "BIRTHDAY_WEEK") {
+        targetId
+          ? router.push({ pathname: "/(tabs)/trainer/member-detail", params: { id: targetId } } as any)
+          : router.push("/(tabs)/trainer/home");
+
+      // 미완료 수업
       } else if (type === "INCOMPLETE_SESSION") {
         router.push(date
           ? ({ pathname: "/(tabs)/trainer/schedule", params: { date, mode: "week" } } as any)
           : "/(tabs)/trainer/schedule"
         );
+
+      // 공지/일반
+      } else if (type === "GENERAL") {
+        router.push(isTrainer ? "/(tabs)/trainer/more" as any : "/(tabs)/member/notices" as any);
+
+      } else {
+        router.push(isTrainer ? "/(tabs)/trainer/home" : "/(tabs)/member/home");
       }
     });
   } catch {}

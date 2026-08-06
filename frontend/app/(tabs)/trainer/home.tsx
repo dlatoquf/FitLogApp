@@ -129,6 +129,7 @@ export default function TrainerHomeScreen() {
   const [pendingPurchase, setPendingPurchase] = useState<(() => void) | null>(null);
 
   // 목표 설정 모달
+  const [eventPopupVisible, setEventPopupVisible] = useState(false);
   const [goalModal, setGoalModal] = useState(false);
   const [goalModalMode, setGoalModalMode] = useState<"sessions" | "revenue" | "both">("both");
   const [goalSessionsInput, setGoalSessionsInput] = useState("");
@@ -944,6 +945,16 @@ export default function TrainerHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchHome();
+    }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const dismissed = await AsyncStorage.getItem("event_popup_dismissed");
+        if (dismissed !== today) setEventPopupVisible(true);
+      })();
     }, []),
   );
 
@@ -3817,6 +3828,41 @@ export default function TrainerHomeScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* 이벤트 팝업 */}
+      <Modal
+        visible={eventPopupVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEventPopupVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", paddingHorizontal: 24 }}>
+          <View style={{ width: Dimensions.get("window").width * 0.82, borderRadius: 16, overflow: "hidden", backgroundColor: "#fff" }}>
+            <Image
+              source={require("../../../assets/images/event_starbucks.png")}
+              style={{ width: "100%", height: Dimensions.get("window").height * 0.62 }}
+              resizeMode="contain"
+            />
+            <View style={{ flexDirection: "row", borderTopWidth: 1, borderTopColor: "#E5E7EB" }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  await AsyncStorage.setItem("event_popup_dismissed", today);
+                  setEventPopupVisible(false);
+                }}
+                style={{ flex: 1, paddingVertical: 14, alignItems: "center", borderRightWidth: 1, borderRightColor: "#E5E7EB" }}
+              >
+                <Text style={{ fontSize: 14, color: Colors.textMuted, fontWeight: "600" }}>오늘 그만 보기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setEventPopupVisible(false)}
+                style={{ flex: 1, paddingVertical: 14, alignItems: "center" }}
+              >
+                <Text style={{ fontSize: 14, color: Colors.text, fontWeight: "700" }}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </>
   );

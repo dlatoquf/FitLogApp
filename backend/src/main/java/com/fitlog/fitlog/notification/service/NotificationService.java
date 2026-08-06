@@ -122,7 +122,7 @@ public class NotificationService {
             if (response.statusCode() == 200) {
                 System.out.println("FCM 푸시 전송 성공");
             } else if (response.statusCode() == 404 || response.body().contains("UNREGISTERED")) {
-                userRepository.findByFcmToken(fcmToken).ifPresent(u -> {
+                userRepository.findFirstByFcmToken(fcmToken).ifPresent(u -> {
                     u.setFcmToken(null);
                     userRepository.save(u);
                     System.out.println("만료된 FCM 토큰 삭제: userId=" + u.getId());
