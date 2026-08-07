@@ -966,19 +966,28 @@ export default function TrainerHomeScreen() {
       (async () => {
         try {
           const CURRENT_VERSION = Application.nativeApplicationVersion ?? "0.0.0";
-          console.log("[업데이트 체크] 시작 - 현재 버전:", CURRENT_VERSION);
-          const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
-          const json = await res.json();
-          const latest = json.results?.[0]?.version;
-          console.log("[업데이트 체크] App Store 최신 버전:", latest);
           const parseVer = (v: string) => v.split(".").map(Number);
           const isNewer = (a: string, b: string) => {
             const [a1,a2,a3] = parseVer(a);
             const [b1,b2,b3] = parseVer(b);
             return a1 > b1 || (a1===b1 && a2 > b2) || (a1===b1 && a2===b2 && a3 > b3);
           };
+          // 백엔드 버전 우선 체크 (iTunes 캐시 문제 우회)
+          let latest: string | undefined;
+          try {
+            const vRes = await fetch(`${API_URL}/api/app/version`);
+            if (vRes.ok) {
+              const vJson = await vRes.json();
+              latest = vJson.minVersion;
+            }
+          } catch {}
+          // 백엔드 실패 시 iTunes 폴백
+          if (!latest) {
+            const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
+            const json = await res.json();
+            latest = json.results?.[0]?.version;
+          }
           if (latest && isNewer(latest, CURRENT_VERSION)) {
-            console.log("[업데이트 체크] 업데이트 Alert 표시");
             Alert.alert(
               "업데이트 안내",
               `새 버전(${latest})이 출시됐어요!\n업데이트 후 이용해주세요.`,

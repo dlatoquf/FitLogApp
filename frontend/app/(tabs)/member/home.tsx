@@ -316,15 +316,25 @@ export default function MemberHomeScreen() {
       (async () => {
         try {
           const CURRENT_VERSION = Application.nativeApplicationVersion ?? "0.0.0";
-          const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
-          const json = await res.json();
-          const latest = json.results?.[0]?.version;
           const parseVer = (v: string) => v.split(".").map(Number);
           const isNewer = (a: string, b: string) => {
             const [a1, a2, a3] = parseVer(a);
             const [b1, b2, b3] = parseVer(b);
             return a1 > b1 || (a1 === b1 && a2 > b2) || (a1 === b1 && a2 === b2 && a3 > b3);
           };
+          let latest: string | undefined;
+          try {
+            const vRes = await fetch(`${API_URL}/api/app/version`);
+            if (vRes.ok) {
+              const vJson = await vRes.json();
+              latest = vJson.minVersion;
+            }
+          } catch {}
+          if (!latest) {
+            const res = await fetch("https://itunes.apple.com/lookup?id=6769366090&country=kr");
+            const json = await res.json();
+            latest = json.results?.[0]?.version;
+          }
           if (latest && isNewer(latest, CURRENT_VERSION)) {
             Alert.alert(
               "업데이트 안내",

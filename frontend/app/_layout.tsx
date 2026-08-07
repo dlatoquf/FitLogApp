@@ -192,11 +192,14 @@ export default function RootLayout() {
   const [initialNotif, setInitialNotif] = useState<{ type: string; date?: string; targetId?: string } | null>(null);
   const navigationState = useRootNavigationState();
 
-  // 콜드 스타트: 라우터가 준비되면 저장해둔 알림으로 이동
+  // 콜드 스타트: 라우터가 준비되면 저장해둔 알림으로 이동 (딜레이로 초기화 완료 후 실행)
   useEffect(() => {
     if (!navigationState?.key || !initialNotif) return;
-    navigateByType(initialNotif.type, initialNotif.date, initialNotif.targetId);
+    const notif = initialNotif;
     setInitialNotif(null);
+    setTimeout(() => {
+      navigateByType(notif.type, notif.date, notif.targetId);
+    }, 500);
   }, [navigationState?.key, initialNotif]);
 
   // JWT 만료 30일 이내면 자동 갱신
