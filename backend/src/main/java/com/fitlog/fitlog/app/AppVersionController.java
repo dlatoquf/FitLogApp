@@ -10,7 +10,7 @@ import java.util.Map;
 @RequestMapping("/api/app")
 public class AppVersionController {
 
-    private static final String MIN_VERSION = "3.1.0";
+    private static final String MIN_VERSION = "3.1.1";
 
     @GetMapping("/version")
     public Map<String, String> getVersion() {
